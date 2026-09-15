@@ -50,6 +50,33 @@ function IndicatorCard({ label, value, accent, ariaLabel }) {
   )
 }
 
+function EmptyChartCard({ kicker, title, description, emptyMessage, emptyDescription, legend }) {
+  return (
+    <section className="chart-card" aria-labelledby={`${title}-chart-title`}>
+      <div className="chart-heading">
+        <div>
+          <span className="section-kicker">{kicker}</span>
+          <h2 id={`${title}-chart-title`}>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <BarChart3 aria-hidden="true" size={24} />
+      </div>
+
+      <div className="chart-empty" role="status">
+        <div className="empty-chart-icon"><BarChart3 aria-hidden="true" size={30} /></div>
+        <strong>{emptyMessage}</strong>
+        <p>{emptyDescription}</p>
+      </div>
+
+      <div className="legend" aria-label={`Legenda: ${title}`}>
+        {legend.map((item) => (
+          <span key={item.label}><i className={item.color} /> {item.label}</span>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
 
@@ -123,26 +150,30 @@ function App() {
           {indicators.map((indicator) => <IndicatorCard key={indicator.label} {...indicator} />)}
         </section>
 
-        <section className="chart-card" aria-labelledby="chart-title">
-          <div className="chart-heading">
-            <div>
-              <span className="section-kicker">Distribuição</span>
-              <h2 id="chart-title">Resultado dos recursos</h2>
-              <p>Provido × Desprovido — Responsabilidade Civil, TJDFT</p>
-            </div>
-            <BarChart3 aria-hidden="true" size={24} />
-          </div>
+        <section className="chart-grid" aria-label="Gráficos do recorte selecionado">
+          <EmptyChartCard
+            kicker="Distribuição"
+            title="Resultado dos recursos"
+            description="Provido × Desprovido — Responsabilidade Civil, TJDFT"
+            emptyMessage="Dados ainda não disponíveis"
+            emptyDescription="O gráfico será preenchido quando a integração com o DataJud estiver ativa."
+            legend={[
+              { label: 'Provido', color: 'legend-provido' },
+              { label: 'Desprovido', color: 'legend-desprovido' },
+            ]}
+          />
 
-          <div className="chart-empty" role="status">
-            <div className="empty-chart-icon"><BarChart3 aria-hidden="true" size={30} /></div>
-            <strong>Dados ainda não disponíveis</strong>
-            <p>O gráfico será preenchido quando a integração com o DataJud estiver ativa.</p>
-          </div>
-
-          <div className="legend" aria-label="Legenda do gráfico">
-            <span><i className="legend-provido" /> Provido</span>
-            <span><i className="legend-desprovido" /> Desprovido</span>
-          </div>
+          <EmptyChartCard
+            kicker="Instâncias"
+            title="G1 vs. G2 por trimestre"
+            description="Volume de processos por instância — Responsabilidade Civil, TJDFT"
+            emptyMessage="Dados ainda não disponíveis"
+            emptyDescription="O histórico por instância será exibido quando a integração com o DataJud estiver ativa."
+            legend={[
+              { label: 'G1 — 1ª instância', color: 'legend-g1' },
+              { label: 'G2 — 2ª instância', color: 'legend-g2' },
+            ]}
+          />
         </section>
 
         <footer className="dashboard-footer">
