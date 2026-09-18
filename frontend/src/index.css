@@ -130,3 +130,31 @@ button:focus-visible, a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+.filter-field select, .filter-field input { width: 100%; min-width: 0; height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: #fbfaf6; color: var(--deep-navy); font: inherit; }
+.filter-field select:disabled { opacity: 1; }
+input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+.filter-actions { display: flex; flex-direction: column; gap: 8px; }
+.secondary-button { padding: 8px 14px; border: 1px solid var(--border); background: white; color: var(--navy); cursor: pointer; border-radius: 3px; }
+button:disabled { cursor: not-allowed; opacity: .6; }
+.filter-help, .validation-error { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--muted); }
+.validation-error { color: #9b2626; }
+.data-status { margin-top: 24px; padding: 16px 20px; background: #eef3f1; border-left: 3px solid var(--teal); line-height: 1.5; }
+.data-status[role="alert"] { background: #fff0ed; border-left-color: #9b2626; }
+.indicator-card small { margin-top: 10px; color: var(--muted); line-height: 1.5; }
+.chart-note { font-size: 13px; color: var(--muted); margin: 16px 0; line-height: 1.5; }
+.instance-bars { max-height: 350px; overflow-y: auto; padding: 8px 4px 8px 0; }
+.instance-row { display: grid; grid-template-columns: 120px 1fr 40px; align-items: center; gap: 10px; margin: 10px 0; font-size: 13px; }
+.instance-row strong { text-align: right; }
+.bar-track { height: 18px; background: #f2f1eb; }
+.bar-fill { height: 100%; background: var(--teal); }
+.degree-G2 { background: var(--gold); }
+.degree-JE { background: var(--green); }
+.degree-TR, .degree-SUP { background: var(--navy); }
+.chart-table { overflow-x: auto; font-size: 14px; }
+.chart-table summary { cursor: pointer; padding: 10px 0; }
+.chart-table table { width: 100%; border-collapse: collapse; }
+.chart-table caption { text-align: left; margin-bottom: 10px; }
+.chart-table th, .chart-table td { padding: 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.chart-table th:last-child, .chart-table td:last-child { text-align: right; }
+@media (max-width: 400px) { .instance-row { grid-template-columns: 100px 1fr 28px; gap: 6px; font-size: 12px; } }
