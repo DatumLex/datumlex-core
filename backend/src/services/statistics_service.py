@@ -3,6 +3,7 @@ from datetime import date
 from django.db.models import Count, Max, Min
 
 from src.db.models import ExtractionRun, FactProcess
+from src.services.outcomes import summarize
 
 
 class InvalidQuery(ValueError):
@@ -66,8 +67,8 @@ def metadata(query, scope):
             "finished_at": latest.finished_at,
         },
         "coverage": "Local loaded records only; consult run scopes, limits and rejections. Full coverage is not asserted.",
-        "merit_status": "unavailable",
-        "merit_reason": "No validated appeal-grain/outcome mapping. G2 presence and procedural movement names do not establish an appeal result.",
+        "merit_status": "document_proxy",
+        "merit_reason": "Latest dated mapped TPU outcome per document in G2/TR; timestamp ties use highest local movement ID. Partial/non-admitted outcomes remain outside binary denominator. Filing-date filter, not judgment-date filter.",
     }
 
 
@@ -76,11 +77,7 @@ def metrics(query):
         "process_records": query.count(),
         "distinct_process_numbers": query.values("number_process").distinct().count(),
         "analyzed_appeals": None,
-        "granted": None,
-        "denied": None,
-        "grant_rate": None,
-        "denial_rate": None,
-        "binary_denominator": None,
+        **summarize(query),
     }
 
 

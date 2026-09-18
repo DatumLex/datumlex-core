@@ -1,5 +1,12 @@
 # Local validation - 2026-09-17
 
+## Update 2026-09-18 — document outcome rates
+
+- 21 Django tests passed, including binary denominator, repeated movements, mixed outcomes, partial grants, unknown outcomes, degree exclusions and filter invariance.
+- Ruff, frontend ESLint and production build passed; Playwright integration passed against the local API.
+- Local HTTP reconciliation: 200 documents, binary base 22; granted 0, denied 22; rates 0% and 100%. Excluded: 6 partial, 6 ambiguous, 1 not admitted, 1 unmapped G2/TR, 164 other degrees. This is a partial sample and document-level proxy, not the TJDFT appeal success rate.
+- Evidence and limitations: [methodology](merit-methodology.md). Earlier validation below describes the pre-classification implementation.
+
 Working-tree implementation based on `datumlex-core` commit `9dee323`. No commit or push was created.
 
 ## Executed checks

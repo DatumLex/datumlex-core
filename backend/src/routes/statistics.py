@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from src.db.models import DimSubject, FactProcess
+from src.services.outcomes import classify, summarize
 from src.services.statistics_service import (
     InvalidQuery,
     filtered_processes,
@@ -75,7 +76,24 @@ def statistics(request):
 @endpoint
 def distribution(request):
     query, selected = filtered_processes(request.GET)
-    return {"status": "unavailable", "series": [], "denominator": None, "metadata": metadata(query, selected)}
+    result = summarize(query)
+    denominator = result["binary_denominator"]
+    series = (
+        [
+            {"outcome": key, "count": result[key], "rate": result[key] / denominator}
+            for key in ("granted", "denied")
+            if selected["outcome"] in {"all", key}
+        ]
+        if denominator
+        else []
+    )
+    return {
+        "status": "partial" if denominator else "unavailable",
+        "series": series,
+        "denominator": denominator,
+        "excluded": result["excluded"],
+        "metadata": metadata(query, selected),
+    }
 
 
 @endpoint
@@ -102,7 +120,7 @@ def processes(request):
     count = query.count()
     rows = (
         query.select_related("time", "process_class", "organization")
-        .prefetch_related("subjects")
+        .prefetch_related("subjects", "movements")
         .order_by("id")[(page - 1) * size : page * size]
     )
     return {
@@ -120,7 +138,7 @@ def processes(request):
                 "class": {"code": row.process_class_id, "name": row.process_class.name},
                 "organization": {"code": row.organization.code, "name": row.organization.name},
                 "subjects": [{"code": subject.code, "name": subject.name} for subject in row.subjects.all()],
-                "outcome": "unknown",
+                **classify(row),
             }
             for row in rows
         ],
