@@ -1,6 +1,6 @@
 # DatumLex backend
 
-Atualização 18/09/2026: a API calcula taxas exploratórias por documento com movimentos TPU explícitos. Consulte [metodologia, exclusões e limitações](docs/merit-methodology.md). Esta atualização substitui as referências abaixo a taxas sempre indisponíveis; a contagem de recursos individuais continua indisponível.
+API calcula taxas exploratórias por documento com movimentos TPU explícitos. Consulte [metodologia, exclusões e limitações](docs/merit-methodology.md). Esta atualização substitui as referências abaixo a taxas sempre indisponíveis; a contagem de recursos individuais continua indisponível.
 
 Local Django backend for **DataJud -> normalization -> dimensional warehouse -> JSON API**.
 Python 3.12+, Django 5.2 LTS. SQLite works without a database server; PostgreSQL is configured
