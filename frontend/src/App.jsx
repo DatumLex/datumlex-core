@@ -25,22 +25,71 @@ function ChartState({ title, children }) {
   return <div className="chart-empty"><div className="empty-chart-icon"><BarChart3 aria-hidden="true" size={30} /></div><strong>{title}</strong><p>{children}</p></div>
 }
 
+const degreeColors = { G1: '#1f4e5f', G2: '#c9a227', JE: '#3f7452', TR: '#718496', SUP: '#866a96' }
+
 function InstanceChart({ series }) {
-  const maximum = Math.max(1, ...series.map((row) => row.count))
+  const groups = new Map()
+  for (const row of series) {
+    const key = row.time__year * 4 + row.time__quarter - 1
+    if (!groups.has(key)) groups.set(key, {})
+    groups.get(key)[row.degree] = (groups.get(key)[row.degree] || 0) + row.count
+  }
+  const keys = [...groups.keys()].sort((a, b) => a - b)
+  const periods = Array.from({ length: keys.at(-1) - keys[0] + 1 }, (_, i) => {
+    const key = keys[0] + i
+    return { key, label: `T${key % 4 + 1}/${String(Math.floor(key / 4)).slice(-2)}`, values: groups.get(key) || {} }
+  })
+  const present = Object.keys(degrees).filter((degree) => series.some((row) => row.degree === degree))
+  const maximum = Math.max(1, ...periods.map((period) => Object.values(period.values).reduce((a, b) => a + b, 0)))
+  const step = Math.max(1, Math.ceil(maximum / 5))
+  const ceiling = step * 5
+  const width = Math.max(480, periods.length * 36 + 52)
+  const plotWidth = width - 56
+  const slot = plotWidth / periods.length
   return <>
-    <p className="chart-note">Contagem por trimestre de ajuizamento. Cada barra parte de zero.</p>
-    <div className="instance-bars" aria-label="Registros por trimestre e instância">
-      {series.map((row) => <div className="instance-row" key={`${row.time__year}-${row.time__quarter}-${row.degree}`}>
-        <span>{row.time__quarter}º tri/{row.time__year} · {row.degree}</span>
-        <div className="bar-track" aria-hidden="true"><div className={`bar-fill degree-${row.degree}`} style={{ width: `${100 * row.count / maximum}%` }} /></div><strong>{formatNumber(row.count)}</strong>
-      </div>)}
+    <div className="period-chart-scroll">
+      <svg className="period-chart" viewBox={`0 0 ${width} 330`} style={{ minWidth: width }} role="img" aria-label="Barras empilhadas: documentos por trimestre de ajuizamento e instância">
+        {Array.from({ length: 6 }, (_, i) => <g key={i}>
+          <line x1="42" x2={width - 14} y1={272 - i * 48} y2={272 - i * 48} stroke="#e8e5dc" />
+          <text x="34" y={276 - i * 48} textAnchor="end">{formatNumber(i * step)}</text>
+        </g>)}
+        {periods.map((period, index) => {
+          let accumulated = 0
+          return <g key={period.key}>{present.map((degree) => {
+            const count = period.values[degree] || 0
+            const height = count / ceiling * 240
+            accumulated += height
+            return <rect key={degree} x={42 + index * slot + slot * .23} y={272 - accumulated} width={slot * .54} height={height} fill={degreeColors[degree]} tabIndex={count ? 0 : undefined} aria-label={`${period.label}, ${degrees[degree]}: ${formatNumber(count)} documentos`}>
+              <title>{period.label} · {degrees[degree]}: {formatNumber(count)} documentos</title>
+            </rect>
+          })}<text x={42 + (index + .5) * slot} y="294" textAnchor="middle">{period.label}</text></g>
+        })}
+      </svg>
     </div>
-    <p className="chart-note">{[...new Set(series.map((row) => row.degree))].map((degree) => `${degree}: ${degrees[degree] || degree}`).join(' · ')}</p>
-    <details className="chart-table"><summary>Ver dados em tabela</summary><table>
+    <div className="chart-legend">{present.map((degree) => <span key={degree}><i style={{ background: degreeColors[degree] }} />{degree} — {degrees[degree]}</span>)}</div>
+    <p className="chart-note">Compare o volume e a composição por instância ao longo do período. A data é de ajuizamento; as barras não representam a evolução de um mesmo processo.</p>
+    <details className="chart-table"><summary>Ver dados por trimestre</summary><table>
       <caption>Documentos por trimestre de ajuizamento e instância</caption>
-      <thead><tr><th scope="col">Trimestre</th><th scope="col">Instância</th><th scope="col">Registros</th></tr></thead>
-      <tbody>{series.map((row) => <tr key={`${row.time__year}-${row.time__quarter}-${row.degree}`}><td>{row.time__quarter}º tri/{row.time__year}</td><td>{row.degree}</td><td>{formatNumber(row.count)}</td></tr>)}</tbody>
+      <thead><tr><th scope="col">Trimestre</th>{present.map((degree) => <th scope="col" key={degree}>{degree}</th>)}</tr></thead>
+      <tbody>{periods.map((period) => <tr key={period.key}><td>{period.label}</td>{present.map((degree) => <td key={degree}>{formatNumber(period.values[degree] || 0)}</td>)}</tr>)}</tbody>
     </table></details>
+  </>
+}
+
+function OutcomeChart({ series }) {
+  const total = series.reduce((sum, row) => sum + row.count, 0)
+  return <>
+    <svg className="outcome-donut" viewBox="0 0 360 340" role="img" aria-label={`Proporção de resultados em ${formatNumber(total)} documentos`}>
+      {series.map((row, index) => {
+        const portion = total ? row.count / total * 100 : 0
+        const start = total ? series.slice(0, index).reduce((sum, item) => sum + item.count, 0) / total * 100 : 0
+        const label = row.outcome === 'granted' ? 'Providos' : 'Desprovidos'
+        return <circle key={row.outcome} cx="180" cy="170" r="124" pathLength="100" fill="none" stroke={row.outcome === 'granted' ? '#1f4e5f' : '#c9a227'} strokeWidth="62" strokeDasharray={`${portion} ${100 - portion}`} strokeDashoffset={-start} transform="rotate(-90 180 170)" tabIndex="0" aria-label={`${label}: ${formatNumber(row.count)} (${formatRate(row.rate)})`}><title>{label}: {formatNumber(row.count)} ({formatRate(row.rate)})</title></circle>
+      })}
+      <text x="180" y="168" textAnchor="middle" className="donut-total">{formatNumber(total)}</text>
+      <text x="180" y="193" textAnchor="middle" className="donut-caption">documentos com resultado</text>
+    </svg>
+    <div className="chart-legend outcome-legend">{series.map((row) => <span key={row.outcome}><i style={{ background: row.outcome === 'granted' ? '#1f4e5f' : '#c9a227' }} /><span>{row.outcome === 'granted' ? 'Providos' : 'Desprovidos'}<strong>{formatRate(row.rate)} · {formatNumber(row.count)}</strong></span></span>)}</div>
   </>
 }
 
@@ -140,17 +189,14 @@ export default function App() {
         <IndicatorCard label="Taxa de desprovimento" value={formatRate(metrics?.denial_rate)} accent="gold" note={rateNote} />
       </section>
       <section className="chart-grid" aria-label="Gráficos do recorte selecionado" aria-busy={loading}>
-        <ChartCard title="Resultados identificados" description="Provido × Desprovido — por documento do DataJud">
-          {data?.distribution.series.length ? <>
-            <div className="outcome-bars">{data.distribution.series.map((row) => <div key={row.outcome}>
-              <p>{row.outcome === 'granted' ? 'Providos' : 'Desprovidos'}: <strong>{formatNumber(row.count)} ({formatRate(row.rate)})</strong></p>
-              <div className="bar-track" aria-hidden="true"><div className={`bar-fill degree-${row.outcome === 'granted' ? 'G1' : 'JE'}`} style={{ width: `${row.rate * 100}%` }} /></div>
-            </div>)}</div>
+        <ChartCard title="Registros por trimestre" description="Volume por instância e data de ajuizamento — TJDFT">{data?.instances.series.length ? <InstanceChart series={data.instances.series} /> : <ChartState title={loadTitle}>{loading ? 'Buscando a distribuição por instância.' : error ? 'A distribuição será exibida quando a conexão for restabelecida.' : 'Experimente outro período ou limpe os filtros.'}</ChartState>}</ChartCard>
+        <ChartCard title="Proporção geral" description="Providos × Desprovidos no recorte selecionado">
+          {data?.distribution.series.some((row) => row.count > 0) ? <>
+            <OutcomeChart series={data.distribution.series} />
             <p className="chart-note">{rateNote}</p>
           </> : <ChartState title={loading || error ? loadTitle : 'Sem base para calcular as taxas'}>{unavailableNote}</ChartState>}
-          {metrics?.excluded && <p className="chart-note">Fora da base: {formatNumber(metrics.excluded.partial)} parciais; {formatNumber(metrics.excluded.ambiguous)} ambíguos; {formatNumber(metrics.excluded.not_admitted + metrics.excluded.partial_knowledge)} não conhecidos ou conhecidos em parte; {formatNumber(metrics.excluded.unknown)} sem resultado mapeado em G2/TR; {formatNumber(metrics.excluded.outside_appellate_degree)} de outras instâncias.</p>}
+          {metrics?.excluded && <details className="chart-table"><summary>Consultar exclusões da base</summary><p className="chart-note">Fora da base: {formatNumber(metrics.excluded.partial)} parciais; {formatNumber(metrics.excluded.ambiguous)} ambíguos; {formatNumber(metrics.excluded.not_admitted + metrics.excluded.partial_knowledge)} não conhecidos ou conhecidos em parte; {formatNumber(metrics.excluded.unknown)} sem resultado mapeado em G2/TR; {formatNumber(metrics.excluded.outside_appellate_degree)} de outras instâncias.</p></details>}
         </ChartCard>
-        <ChartCard title="Registros por instância e trimestre" description="Volume por data de ajuizamento — TJDFT">{data?.instances.series.length ? <InstanceChart series={data.instances.series} /> : <ChartState title={loadTitle}>{loading ? 'Buscando a distribuição por instância.' : error ? 'A distribuição será exibida quando a conexão for restabelecida.' : 'Experimente outro período ou limpe os filtros.'}</ChartState>}</ChartCard>
       </section>
       <footer className="dashboard-footer"><p>Fonte: {metadata?.source || 'DataJud · Conselho Nacional de Justiça'}</p><p>Última atualização dos registros: {refreshed ? new Date(refreshed).toLocaleString('pt-BR') : '—'}</p></footer>
     </main>

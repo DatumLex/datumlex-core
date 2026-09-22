@@ -1,6 +1,6 @@
 # DatumLex backend
 
-Atualização 18/09/2026: a API calcula taxas exploratórias por documento com movimentos TPU explícitos. Consulte [metodologia, exclusões e limitações](docs/merit-methodology.md). Esta atualização substitui as referências abaixo a taxas sempre indisponíveis; a contagem de recursos individuais continua indisponível.
+Update 2026-09-18: the API calculates exploratory per-document rates using explicit TPU procedural events. See the [methodology, exclusions, and limitations](docs/merit-methodology.md). This update supersedes the references below to rates always being unavailable; the count of individual appeals remains unavailable.
 
 Local Django backend for **DataJud -> normalization -> dimensional warehouse -> JSON API**.
 Python 3.12+, Django 5.2 LTS. SQLite works without a database server; PostgreSQL is configured
@@ -52,7 +52,7 @@ Rejection reasons/source IDs are stored separately without retaining the rejecte
 
 ### Scope and dates
 
-- `10431`: Responsabilidade Civil; `10433`: Indenização por Dano Moral; `10439`: Indenização por Dano Material.
+- `10431`: Civil Liability; `10433`: Compensation for Non-Pecuniary Damage; `10439`: Compensation for Pecuniary Damage.
 - These are **explicit codes**, not a complete or automatically expanded descendant taxonomy.
   The default without `--subjects` is only `10431`. Approve the full taxonomy before claiming
   complete Civil Liability coverage. References: [CNJ hierarchy](https://www.cnj.jus.br/sgt/visualizar_sugestoes.php?codigo=366)
@@ -113,7 +113,7 @@ Counts are real loaded **DataJud documents**, not analyzed appeals. The same CNJ
 G1/G2 documents; multiple subjects never multiply counts. `analyzed_appeals`, `grant_rate`,
 `denial_rate`, granted/denied counts and the binary denominator deliberately remain `null`.
 There is no validated movement-to-outcome mapping in the supplied model. In particular, `G2`,
-"procedência" and a procedural event must not be equated with a granted appeal.
+a claim being upheld and a procedural event must not be equated with a granted appeal.
 This backend implements extraction and the documented process model, not a completed merit release.
 
 `status=partial` describes loaded volume, `empty` describes no local matches, and `unavailable`
