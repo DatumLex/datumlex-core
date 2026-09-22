@@ -1,5 +1,7 @@
 # Local implementation dictionary
 
+Update 2026-09-18: grant_rate and denial_rate are nullable fractions calculated at document grain by `tpu-document-v1`; binary_denominator counts eligible documents, and excluded contains exclusion counts. Process responses include mapped outcome, evidence codes/dates and rule_version. No schema migration or appeal-grain fact was introduced. See [current methodology](merit-methodology.md), which supersedes earlier unavailable-rate notes below.
+
 Reference: `documentation/architecture/Dimensional-Model.md` (main d3492f3).
 This is an implementation proposal and local executable schema, not independent modeling approval.
 The schema source of truth is `src/db/models.py` and `src/db/migrations/0001_initial.py`.

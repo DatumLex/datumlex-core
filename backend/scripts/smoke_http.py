@@ -19,7 +19,9 @@ def main():
     count = result["metrics"]["process_records"]
     assert sum(item["count"] for item in get("/api/instances/")["series"]) == count
     assert get("/api/processes/?page_size=1")["count"] == count
-    assert get("/api/distribution/")["denominator"] is None
+    distribution = get("/api/distribution/")
+    assert distribution["denominator"] == result["metrics"]["binary_denominator"]
+    assert sum(row["count"] for row in distribution["series"]) == distribution["denominator"]
     assert get("/api/statistics/?outcome=granted")["metrics"] == result["metrics"]
     try:
         get("/api/statistics/?court=TJSP")
@@ -27,7 +29,7 @@ def main():
         assert error.code == 400
     else:
         raise AssertionError("Invalid court was accepted")
-    print(json.dumps({"result": "passed", "loaded_process_records": count, "merit": "unavailable"}))
+    print(json.dumps({"result": "passed", "loaded_process_records": count, "metrics": result["metrics"]}))
 
 
 if __name__ == "__main__":
