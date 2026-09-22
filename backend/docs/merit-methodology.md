@@ -1,21 +1,21 @@
-# Regra atual: tpu-document-latest-v2
+# Current rule: tpu-document-latest-v2
 
-O resultado selecionado é o movimento mapeado com maior occurred_at por documento. Em empate, vence o maior ID local de process_movement (desempate técnico solicitado, não precedência jurídica). Movimentos sem data não disputam a seleção; sem resultado datado o documento é desconhecido. Movimentos posteriores não relacionados a resultado não alteram a classificação. O histórico misto não exclui mais documentos. Se o resultado selecionado for parcial ou não conhecido, continua fora da base binária. selected_evidence expõe código, data e ID usados. Os IDs são locais e podem mudar numa recarga dos movimentos.
+The selected outcome is the mapped procedural event with the latest occurred_at for each document. In a tie, the highest local process_movement ID wins (the requested technical tiebreaker, not legal precedence). Undated events are not eligible for selection; without a dated outcome, the document is classified as unknown. Later events unrelated to an outcome do not change the classification. A mixed history no longer excludes documents. If the selected outcome is partially allowed or not admitted for review, it remains outside the binary denominator. selected_evidence exposes the code, date, and ID used. IDs are local and may change when events are reloaded.
 
-A base, filtros e limitações por documento continuam iguais. A regra anterior abaixo é mantida apenas como histórico e foi substituída.
+The per-document denominator, filters, and limitations remain unchanged. The previous rule below is retained only for historical reference and has been superseded.
 
-# Taxas por documento — tpu-document-v1
+# Per-document rates — tpu-document-v1
 
-Indicador exploratório, calculado sobre documentos DataJud em G2/TR, não uma contagem de recursos individuais. A unidade do modelo dimensional continua sendo source_id. A consulta usa data de ajuizamento, não de julgamento. A extração local é parcial e não permite estimar a taxa geral do TJDFT.
+This is an exploratory indicator calculated from DataJud documents in G2/TR, not a count of individual appeals. The unit of the dimensional model remains source_id. The query uses the filing date, not the judgment date. The local extract is partial and cannot be used to estimate the overall TJDFT rate.
 
-Movimentos TPU 237/972: provimento; 239: desprovimento; 238: parcial; 235: não conhecimento; 240–242: conhecimento parcial. Somente documentos com uma única categoria mapeada em todo o histórico entram na respectiva categoria. Movimentos repetidos contam uma vez por documento. Categorias diferentes no mesmo documento são ambíguas, mesmo em datas diferentes: não se presume qual recurso ou parte representam. Não se infere mérito de procedência, improcedência, presença em G2 ou nome livre do movimento. Códigos fora do mapa não são classificados; a cobertura é limitada e a classificação não equivale à revisão jurídica do inteiro teor.
+TPU procedural events 237/972: appeal allowed; 239: appeal denied; 238: appeal partially allowed; 235: appeal not admitted for review; 240–242: appeal admitted for review in part. Only documents with a single mapped category across their entire history are included in that category. Repeated events count once per document. Different categories within the same document are ambiguous, even on different dates: no assumption is made about which appeal or party they represent. An appeal's merits outcome is not inferred from a claim being upheld or dismissed, inclusion in G2, or the event's free-text name. Codes outside the mapping are not classified; coverage is limited, and classification is not equivalent to a legal review of the full text.
 
-Base binária = documentos providos + documentos desprovidos. Taxas são frações entre 0 e 1. Base vazia retorna taxas null. Parciais, ambíguos, não conhecidos/conhecimento parcial, desconhecidos e outras instâncias são explicitados como exclusões. O filtro outcome só seleciona séries da distribuição, sem alterar a base. analyzed_appeals permanece null, pois não identificamos recursos individuais. /api/processes/ expõe categoria, códigos/datas de evidência e versão da regra.
+Binary denominator = documents with appeals allowed + documents with appeals denied. Rates are fractions between 0 and 1. An empty denominator returns null rates. Documents with appeals partially allowed, ambiguous outcomes, appeals not admitted for review or admitted for review in part, unknown outcomes, and documents from other court levels are explicitly listed as exclusions. The outcome filter only selects distribution series, without changing the denominator. analyzed_appeals remains null because we do not identify individual appeals. /api/processes/ exposes the category, evidence codes/dates, and rule version.
 
-Referências oficiais consultadas em 18/09/2026:
+Official references consulted on September 18, 2026:
 
-- [SGT/CNJ — complementos e códigos dos movimentos](https://www.cnj.jus.br/sgt/gerenciar_complementos.php).
-- [Manual TPU/CNJ, item 6.3.7](https://www.cnj.jus.br/sgt/versoes_tabelas/manual/Manual_de_utilizacao_das_Tabelas_Processuais_Unificadas.pdf): uma decisão pode conter movimentos distintos por parte; não somar movimentos como se fossem decisões independentes.
-- [Glossário CNJ — códigos de julgamento](https://www.cnj.jus.br/wp-content/uploads/2016/12/647ce9b3aeafe3f54d3832731c925406.pdf), incluindo o código 972.
+- [SGT/CNJ — procedural event supplements and codes](https://www.cnj.jus.br/sgt/gerenciar_complementos.php).
+- [TPU/CNJ Manual, section 6.3.7](https://www.cnj.jus.br/sgt/versoes_tabelas/manual/Manual_de_utilizacao_das_Tabelas_Processuais_Unificadas.pdf): a decision may contain different events for each party; do not add events together as if they were independent decisions.
+- [CNJ Glossary — judgment codes](https://www.cnj.jus.br/wp-content/uploads/2016/12/647ce9b3aeafe3f54d3832731c925406.pdf), including code 972.
 
-Esta implementação substitui as notas anteriores de mérito indisponível: agora há um indicador por documento com exclusões explícitas, mas ainda não há fato dimensional no grão de recurso individual.
+This implementation replaces the previous notes stating that merits information was unavailable: there is now a per-document indicator with explicit exclusions, but there is still no dimensional fact at the individual-appeal grain.
