@@ -1,6 +1,6 @@
 # DatumLex frontend
 
-Atualização 18/09/2026: os cards e o gráfico mostram taxas por documento calculadas pela API, com base binária e exclusões visíveis. Consulte [metodologia atual](../backend/docs/merit-methodology.md). Isso substitui as notas anteriores de mérito indisponível; base vazia continua exibindo “—”.
+Update 18/09/2026: the cards and charts display API-calculated rates per document, based on the binary dataset and visible exclusions. Refer to the [current methodology](../backend/docs/merit-methodology.md). This replaces previous "merit unavailable" notes; an empty dataset continues to display “—”.
 
 React dashboard built with Vite and Tailwind CSS.
 
