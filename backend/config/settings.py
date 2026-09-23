@@ -39,7 +39,9 @@ if database_url:
         }
     }
 else:
-    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": DATA_DIR / "datumlex.sqlite3"}}
+    DATABASES = {
+        "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": DATA_DIR / "datumlex_v2.sqlite3"}
+    }
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 ).split(",")

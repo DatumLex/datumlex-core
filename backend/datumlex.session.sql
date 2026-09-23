@@ -1,4 +1,7 @@
 -- Created by Redgate Data Modeler (https://datamodeler.redgate-platform.com)
+-- Design reference. The application installs its executable adaptation through
+-- Django migrations (0002_resource_schema). Do not run this file on the app DB.
+-- See docs/resource-schema.md for physical keys, audit tables and source mapping.
 -- Last modification date: 2026-09-23 00:08:08.323
 
 -- tables

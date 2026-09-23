@@ -1,4 +1,8 @@
-# Local implementation dictionary
+# Historical v1 implementation dictionary
+
+Superseded on 2026-09-22 by [the v2 resource schema](resource-schema.md), which
+documents the current tables, columns, source mapping and fresh-data transition.
+The descriptions below are retained only as history of the removed v1 schema.
 
 Update 2026-09-18: grant_rate and denial_rate are nullable fractions calculated at document grain by `tpu-document-v1`; binary_denominator counts eligible documents, and excluded contains exclusion counts. Process responses include mapped outcome, evidence codes/dates and rule_version. No schema migration or appeal-grain fact was introduced. See [current methodology](merit-methodology.md), which supersedes earlier unavailable-rate notes below.
 

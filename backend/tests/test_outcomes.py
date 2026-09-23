@@ -1,16 +1,54 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
-from src.db.models import ExtractionRun
+from src.db.models import ExtractionRun, FactProcess
 from src.etl.loader import load_record
 from src.etl.transformer import normalize
-from src.services.outcomes import classify
+from src.services.outcomes import classify, summarize
 from tests.test_pipeline import SCOPE, hit
 
 
 class OutcomeTests(TestCase):
+    def test_summary_deduplicates_subject_joins_and_refreshes_after_import(self):
+        run = ExtractionRun.objects.create(scope=SCOPE)
+        source = hit()
+        source["_source"]["movimentos"] = [
+            {"codigo": 237, "nome": "Synthetic", "dataHora": "2024-01-01T00:00:00Z"}
+        ]
+        load_record(normalize(source, SCOPE), run)
+        query = FactProcess.objects.filter(subjects__code__in=[10433, 10439])
+        with self.assertNumQueries(1):
+            summary = summarize(query)
+        self.assertEqual(summary["granted"], 1)
+        self.assertEqual(summary["binary_denominator"], 1)
+        source["_source"]["movimentos"] = []
+        load_record(normalize(source, SCOPE), run)
+        updated = summarize(query)
+        self.assertEqual(updated["granted"], 0)
+        self.assertIsNone(updated["grant_rate"])
+        self.assertEqual(updated["excluded"]["unknown"], 1)
+
+    def test_dashboard_queries_do_not_read_payloads_or_movements(self):
+        run = ExtractionRun.objects.create(scope=SCOPE)
+        load_record(normalize(hit(), SCOPE), run)
+        for endpoint in ("scope", "statistics", "distribution", "instances"):
+            with self.subTest(endpoint=endpoint), CaptureQueriesContext(connection) as queries:
+                response = self.client.get(f"/api/{endpoint}/?subject=10433")
+                self.assertEqual(response.status_code, 200)
+            sql = " ".join(query["sql"].lower() for query in queries)
+            self.assertNotIn("raw_payload", sql)
+            self.assertNotIn("process_movement", sql)
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get("/api/processes/?page_size=1")
+        self.assertEqual(response.status_code, 200)
+        sql = " ".join(query["sql"].lower() for query in queries)
+        self.assertNotIn("raw_payload", sql)
+        self.assertNotIn("complements", sql)
+
     def test_latest_outcome_ignores_list_order_and_later_unrelated_movements(self):
         def movement(code, day):
             return SimpleNamespace(pk=day, code=code, occurred_at=datetime(2024, 1, day, tzinfo=timezone.utc))

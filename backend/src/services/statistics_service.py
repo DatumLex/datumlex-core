@@ -1,8 +1,8 @@
 from datetime import date
 
-from django.db.models import Count, Max, Min
+from django.db.models import Count, Exists, F, Max, Min, OuterRef
 
-from src.db.models import ExtractionRun, FactProcess
+from src.db.models import ExtractionRun, FactProcess, FactProcessSubject
 from src.services.outcomes import summarize
 
 
@@ -32,9 +32,11 @@ def filtered_processes(params):
         raise InvalidQuery("Invalid date range (2023..today) or subject code") from None
     query = FactProcess.objects.filter(court="TJDFT", time__date__range=[start, end])
     if subject:
-        query = query.filter(subjects__code=subject)
-    # Distinct document grain protects all aggregates from the multi-subject bridge.
-    return query.distinct(), {
+        query = query.filter(
+            Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code=subject))
+        )
+    # EXISTS keeps one row per document without DISTINCT over large JSON payloads.
+    return query, {
         "court": "TJDFT",
         "subject": subject,
         "start": start.isoformat(),
@@ -73,9 +75,12 @@ def metadata(query, scope):
 
 
 def metrics(query):
+    totals = query.aggregate(
+        process_records=Count("pk", distinct=True),
+        distinct_process_numbers=Count("process_dimension_id", distinct=True),
+    )
     return {
-        "process_records": query.count(),
-        "distinct_process_numbers": query.values("number_process").distinct().count(),
+        **totals,
         "analyzed_appeals": None,
         **summarize(query),
     }
@@ -83,7 +88,8 @@ def metrics(query):
 
 def instance_series(query):
     return list(
-        query.values("time__year", "time__quarter", "degree")
+        query.annotate(degree=F("degree_dimension__code"))
+        .values("time__year", "time__quarter", "degree")
         .annotate(count=Count("pk", distinct=True))
         .order_by("time__year", "time__quarter", "degree")
     )

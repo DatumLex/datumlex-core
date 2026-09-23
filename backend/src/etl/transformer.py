@@ -120,7 +120,9 @@ def normalize(hit, scope):
         "class_name": str(process_class.get("nome") or "")[:255],
         "org_code": org_code,
         "org_name": str(org.get("nome") or "")[:255],
-        "municipality_code": str(org.get("codigoMunicipioIBGE") or "")[:16],
+        "municipality_code": (
+            positive_code(org["codigoMunicipioIBGE"]) if org.get("codigoMunicipioIBGE") else None
+        ),
         "subjects": subjects,
         "movements": movements,
         "raw": raw,

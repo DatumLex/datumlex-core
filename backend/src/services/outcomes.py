@@ -2,6 +2,8 @@
 
 from collections import Counter
 
+from django.db.models import Count
+
 VERSION = "tpu-document-latest-v2"
 # Deliberately limited to explicitly mapped TPU outcomes. See docs/merit-methodology.md.
 CODES = {
@@ -38,7 +40,15 @@ def classify(process):
 
 
 def summarize(query):
-    counts = Counter(classify(row)["outcome"] for row in query.prefetch_related("movements"))
+    # The loader stores this classification atomically with the movement snapshot.
+    # Aggregate it in SQL instead of loading every payload and movement into Python.
+    # Distinct IDs also protect callers that join the multi-subject bridge.
+    counts = Counter()
+    for row in query.order_by().values("result__name").annotate(count=Count("pk", distinct=True)):
+        name = row["result__name"]
+        if name == "outside_degree":
+            name = "outside_appellate_degree"
+        counts[name] += row["count"]
     denominator = counts["granted"] + counts["denied"]
     return {
         "granted": counts["granted"],
