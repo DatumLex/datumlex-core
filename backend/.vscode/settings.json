@@ -6,10 +6,9 @@
             "server": "localhost",
             "port": 5433,
             "driver": "PostgreSQL",
-            "name": "postgres",
+            "name": "datumlex",
             "database": "datumlex",
-            "username": "datumlex",
-            "password": "postgres"
+            "username": "datumlex"
         }
     ]
 }
