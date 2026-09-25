@@ -1,11 +1,12 @@
 from functools import wraps
 
 from django.db import DatabaseError, connection
+from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-from src.db.models import DimSubject, FactProcess
-from src.services.outcomes import classify, summarize
+from src.db.models import DimSubject, FactProcess, ProcessMovement
+from src.services.outcomes import CODES, classify, summarize
 from src.services.statistics_service import (
     InvalidQuery,
     filtered_processes,
@@ -119,8 +120,17 @@ def processes(request):
         raise InvalidQuery("page must be positive; page_size must be 1..100") from None
     count = query.count()
     rows = (
-        query.select_related("time", "process_class", "organization")
-        .prefetch_related("subjects", "movements")
+        query.select_related("time", "process_class", "organization", "degree_dimension")
+        .defer("raw_payload", "payload_hash")
+        .prefetch_related(
+            "subjects",
+            Prefetch(
+                "movements",
+                queryset=ProcessMovement.objects.filter(code__in=CODES).only(
+                    "id", "process_id", "code", "occurred_at"
+                ),
+            ),
+        )
         .order_by("id")[(page - 1) * size : page * size]
     )
     return {
@@ -135,7 +145,7 @@ def processes(request):
                 "court": row.court,
                 "degree": row.degree,
                 "filing_date": row.time.date,
-                "class": {"code": row.process_class_id, "name": row.process_class.name},
+                "class": {"code": row.process_class.code, "name": row.process_class.name},
                 "organization": {"code": row.organization.code, "name": row.organization.name},
                 "subjects": [{"code": subject.code, "name": subject.name} for subject in row.subjects.all()],
                 **classify(row),

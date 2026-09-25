@@ -1,5 +1,11 @@
 # DatumLex backend
 
+Update 2026-09-22: the backend now uses the resource dimensional schema based on
+`datumlex.session.sql`, with new process, degree and result dimensions. See
+[schema mapping and fresh database setup](docs/resource-schema.md). Migration
+`0002_resource_schema` rebuilds the warehouse and discards v1 rows: use the new
+`datumlex_v2` database/volume. Do not execute the reference SQL manually.
+
 Update 2026-09-18: the API calculates exploratory per-document rates using explicit TPU procedural events. See the [methodology, exclusions, and limitations](docs/merit-methodology.md). This update supersedes the references below to rates always being unavailable; the count of individual appeals remains unavailable.
 
 Local Django backend for **DataJud -> normalization -> dimensional warehouse -> JSON API**.
@@ -19,7 +25,7 @@ Copy-Item .env.example .env
 
 If the virtual environment already exists, start with `migrate` and `runserver`.
 Open <http://127.0.0.1:8000/api/health/> or <http://127.0.0.1:8000/api/statistics/>.
-The local database is `data/datumlex.sqlite3`; `.env`, raw data, database files and `.venv` are ignored by Git.
+The fallback local database is `data/datumlex_v2.sqlite3`; `.env`, raw data, database files and `.venv` are ignored by Git.
 The development server is local only, not a production deployment.
 
 ## Extract real DataJud data
@@ -135,12 +141,12 @@ With Docker Desktop running, choose a local password and start a separate local 
 $env:POSTGRES_PASSWORD = '<choose-local-password>'
 docker compose up -d db
 # Set DATABASE_URL in .env; URL-encode special characters in the password.
-# postgresql://datumlex:<password>@127.0.0.1:5433/datumlex
+# postgresql://datumlex:<password>@127.0.0.1:5433/datumlex_v2
 .venv/Scripts/python.exe manage.py migrate
 .venv/Scripts/python.exe manage.py test tests
 ```
 
-This uses port 5433 and a named local volume. Changing DATABASE_URL does not copy SQLite data;
+This uses loopback port 5433 and the new `datumlex_pg_v2` named volume. Changing DATABASE_URL does not copy SQLite data;
 rerun extraction/import against the selected database. Credentials and data remain local.
 Production deployment, authentication/rate limiting for public exposure, scheduled extraction,
 full taxonomy, outcome methodology, and frontend integration are separate work.
