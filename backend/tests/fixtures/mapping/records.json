@@ -1,0 +1,6 @@
+[
+  {"code": 900001, "name": "Synthetic allowed", "complement": {"kind": "synthetic", "value": "allowed"}},
+  {"code": 900001},
+  {"code": 999999, "name": "Unmapped", "complement": null},
+  {"code": 900001, "name": "Synthetic denied", "complement": {"kind": "synthetic", "value": "allowed"}}
+]

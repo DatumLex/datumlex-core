@@ -1,0 +1,18 @@
+{
+  "rule_version": "synthetic-example-v1",
+  "description": "Synthetic software validation only. Not an approved TPU mapping.",
+  "rules": [
+    {
+      "id": "synthetic-allowed",
+      "target": "synthetic_allowed",
+      "match": {"code": 900001, "name": "Synthetic allowed", "complement": {"kind": "synthetic", "value": "allowed"}},
+      "evidence": [{"file": "tests/fixtures/mapping/rules.json", "line": 6, "source": "Synthetic fixture: allowed fields identify the same target"}]
+    },
+    {
+      "id": "synthetic-denied",
+      "target": "synthetic_denied",
+      "match": {"code": 900002, "name": "Synthetic denied", "complement": {"kind": "synthetic", "value": "denied"}},
+      "evidence": [{"file": "tests/fixtures/mapping/rules.json", "line": 12, "source": "Synthetic fixture: denied fields identify the same target"}]
+    }
+  ]
+}

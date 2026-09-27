@@ -14,6 +14,7 @@ from src.api.datajud_client import DataJudClient, DataJudError
 from src.db.models import ExtractionRun, FactProcess, FactProcessSubject, ProcessMovement, RejectedRecord
 from src.etl.loader import load_record
 from src.etl.transformer import InvalidRecord, normalize, timestamp
+from tests.access_helpers import authorize_data
 
 SCOPE = {
     "start": "2023-01-01",
@@ -219,6 +220,7 @@ class WarehouseTests(TestCase):
 
 class ApiTests(TestCase):
     def setUp(self):
+        authorize_data(self.client)
         run = ExtractionRun.objects.create(scope=SCOPE, status="sample")
         load_record(normalize(hit(), SCOPE), run)
         load_record(normalize(hit("another-instance", "G1"), SCOPE), run)
@@ -261,7 +263,10 @@ class ApiTests(TestCase):
             "unknown=yes",
         ]:
             with self.subTest(query=query):
-                self.assertEqual(self.client.get("/api/statistics/?" + query).status_code, 400)
+                self.assertEqual(
+                    self.client.get("/api/statistics/?" + query).status_code,
+                    403 if query == "court=TJSP" else 400,
+                )
         self.assertEqual(self.client.get("/api/processes/?page_size=101").status_code, 400)
         self.assertEqual(self.client.post("/api/statistics/").status_code, 405)
 

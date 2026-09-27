@@ -1,5 +1,7 @@
 # DatumLex backend
 
+Update 2026-09-27: analytics now require an approved session and authorized court. Login, registration, user management, immutable support provisioning, and audit are implemented. See [access control and deployment](docs/access-control.md), which supersedes earlier unauthenticated API/startup examples below.
+
 Update 2026-09-22: the backend now uses the resource dimensional schema based on
 `datumlex.session.sql`, with new process, degree and result dimensions. See
 [schema mapping and fresh database setup](docs/resource-schema.md). Migration

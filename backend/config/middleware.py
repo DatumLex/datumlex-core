@@ -13,7 +13,8 @@ class LocalCorsMiddleware:
         origin = request.headers.get("Origin")
         if origin in settings.CORS_ALLOWED_ORIGINS:
             response["Access-Control-Allow-Origin"] = origin
-            response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response["Access-Control-Allow-Headers"] = "Content-Type"
+            response["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+            response["Access-Control-Allow-Headers"] = "Content-Type, X-CSRFToken"
+            response["Access-Control-Allow-Credentials"] = "true"
         patch_vary_headers(response, ["Origin"])
         return response

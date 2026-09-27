@@ -13,8 +13,31 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
 if not DEBUG and SECRET_KEY == "local-development-only-datumlex":
     raise ValueError("Set DJANGO_SECRET_KEY when DJANGO_DEBUG=false")
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
-INSTALLED_APPS = ["src.db"]
-MIDDLEWARE = ["django.middleware.security.SecurityMiddleware", "config.middleware.LocalCorsMiddleware"]
+INSTALLED_APPS = [
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "django.contrib.sessions",
+    "src.db",
+    "src.accounts",
+]
+AUTH_USER_MODEL = "accounts.User"
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "config.middleware.LocalCorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "src.accounts.middleware.AccessMiddleware",
+]
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 28800
+CSRF_FAILURE_VIEW = "src.accounts.views.csrf_failure"
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}}
+]
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -43,6 +66,8 @@ else:
         "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": DATA_DIR / "datumlex_v2.sqlite3"}
     }
 CORS_ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
 ).split(",")
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS)).split(",")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
