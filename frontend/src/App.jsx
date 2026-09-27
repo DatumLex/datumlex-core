@@ -93,7 +93,7 @@ function OutcomeChart({ series }) {
   </>
 }
 
-export default function App() {
+export default function App({ court, courts, onCourtChange }) {
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
   const [draft, setDraft] = useState({ start: '', end: '' })
   const [applied, setApplied] = useState(null)
@@ -110,11 +110,13 @@ export default function App() {
     const timeout = setTimeout(() => controller.abort(), 20000)
     async function load() {
       try {
-        const scope = await getData('scope', {}, controller.signal)
+        if (!courts.includes(court)) throw new Error('Você não possui acesso a este tribunal.')
+        if (court !== 'TJDFT') throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
+        const scope = await getData('scope', { court }, controller.signal)
         const available = scope.metadata.available_period
         const filters = applied || (available.start && available.end ? { start: available.start, end: available.end } : {})
         const [statistics, instances, distribution] = await Promise.all(
-          ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, filters, controller.signal)),
+          ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court }, controller.signal)),
         )
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
@@ -134,7 +136,7 @@ export default function App() {
     }
     load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [applied, retry])
+  }, [applied, retry, court, courts])
 
   function apply(event) {
     event.preventDefault()
@@ -161,7 +163,7 @@ export default function App() {
     <header className="site-header"><a className="brand" href="#main-content" aria-label="DatumLex, ir ao conteúdo"><span className="brand-mark"><img src="/assets/datumlex-logo.jpeg" alt="" /></span><span>DatumLex</span></a><span className="header-context">Análise de Recursos</span></header>
     <main id="main-content" className="dashboard">
       <section className="hero" aria-labelledby="page-title"><span className="eyebrow">Painel de mérito recursal</span>
-        <div className="hero-title-row"><h1 id="page-title">Taxa de Provimento — TJDFT</h1>
+        <div className="hero-title-row"><h1 id="page-title">Taxa de Provimento — {court}</h1>
           <div className="methodology-trigger"><button className="info-button" type="button" aria-label="Ver metodologia de cálculo" aria-expanded={isMethodologyOpen} aria-controls="methodology-popover" onClick={() => setIsMethodologyOpen(!isMethodologyOpen)}><Info aria-hidden="true" size={21} /></button>
             {isMethodologyOpen && <aside id="methodology-popover" className="methodology-popover" onKeyDown={(event) => { if (event.key === 'Escape') setIsMethodologyOpen(false) }}><div className="popover-heading"><strong>Como interpretar os dados</strong><button type="button" aria-label="Fechar metodologia" onClick={() => setIsMethodologyOpen(false)}><X aria-hidden="true" size={18} /></button></div>
               <p>Os valores contam documentos do DataJud por data de ajuizamento. Um processo pode aparecer em mais de uma instância. Ter vários assuntos não multiplica a contagem.</p><p>Provimento = providos ÷ (providos + desprovidos). Desprovimento usa a mesma base. Último resultado por data do movimento TPU em G2/TR: 237/972 para provimento e 239 para desprovimento. Resultados anteriores não excluem o documento. Em empate de data e horário, usamos o maior ID do movimento no banco (desempate técnico). Resultados mais recentes parciais, não conhecidos e sem evidência datada ficam fora da base binária. Cada documento conta uma vez. Não representa recursos individuais nem a taxa geral do tribunal.</p>
@@ -171,17 +173,17 @@ export default function App() {
       </section>
       <form className="filter-panel" aria-label="Filtros do dashboard" onSubmit={apply}>
         <div className="filter-grid">
-          <label className="filter-field"><span>Tribunal</span><select disabled value="TJDFT"><option>TJDFT</option></select></label>
+          <label className="filter-field"><span>Tribunal</span><select value={court} onChange={(event) => onCourtChange(event.target.value)}>{courts.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
           <label className="filter-field"><span>Assunto</span><select disabled value="civil"><option value="civil">Responsabilidade Civil</option></select></label>
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
         <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button></div>
-        <p className="filter-help">Período por data de ajuizamento, não de julgamento. Tribunal e assunto fixos neste recorte.</p>
+        <p className="filter-help">Período por data de ajuizamento, não de julgamento. A seleção do tribunal atualiza o painel. Assunto fixo neste recorte.</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
       <div className="data-status" role={error ? 'alert' : 'status'}>
-        {loading ? 'Consultando os dados do TJDFT…' : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
+        {loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
       </div>
       <section className="indicator-grid" aria-label="Indicadores do recorte selecionado" aria-busy={loading}>
         <IndicatorCard label="Registros de processos no recorte" value={formatNumber(metrics?.process_records)} accent="navy" note={metrics ? `${formatNumber(metrics.distinct_process_numbers)} números de processo distintos; não é uma contagem de recursos julgados.` : unavailableNote} />
@@ -189,7 +191,7 @@ export default function App() {
         <IndicatorCard label="Taxa de desprovimento" value={formatRate(metrics?.denial_rate)} accent="gold" note={rateNote} />
       </section>
       <section className="chart-grid" aria-label="Gráficos do recorte selecionado" aria-busy={loading}>
-        <ChartCard title="Registros por trimestre" description="Volume por instância e data de ajuizamento — TJDFT">{data?.instances.series.length ? <InstanceChart series={data.instances.series} /> : <ChartState title={loadTitle}>{loading ? 'Buscando a distribuição por instância.' : error ? 'A distribuição será exibida quando a conexão for restabelecida.' : 'Experimente outro período ou limpe os filtros.'}</ChartState>}</ChartCard>
+        <ChartCard title="Registros por trimestre" description={`Volume por instância e data de ajuizamento — ${court}`}>{data?.instances.series.length ? <InstanceChart series={data.instances.series} /> : <ChartState title={loadTitle}>{loading ? 'Buscando a distribuição por instância.' : error ? 'A distribuição será exibida quando a conexão for restabelecida.' : 'Experimente outro período ou limpe os filtros.'}</ChartState>}</ChartCard>
         <ChartCard title="Proporção geral" description="Providos × Desprovidos no recorte selecionado">
           {data?.distribution.series.some((row) => row.count > 0) ? <>
             <OutcomeChart series={data.distribution.series} />

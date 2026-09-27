@@ -9,10 +9,14 @@ from src.db.models import ExtractionRun, FactProcess
 from src.etl.loader import load_record
 from src.etl.transformer import normalize
 from src.services.outcomes import classify, summarize
+from tests.access_helpers import authorize_data
 from tests.test_pipeline import SCOPE, hit
 
 
 class OutcomeTests(TestCase):
+    def setUp(self):
+        authorize_data(self.client)
+
     def test_summary_deduplicates_subject_joins_and_refreshes_after_import(self):
         run = ExtractionRun.objects.create(scope=SCOPE)
         source = hit()

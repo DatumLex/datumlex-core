@@ -4,11 +4,13 @@ from django.test import TestCase
 from src.db.models import DimProcess, DimSubject, ExtractionRun, FactProcess, FactProcessSubject
 from src.etl.loader import load_record
 from src.etl.transformer import normalize
+from tests.access_helpers import authorize_data
 from tests.test_pipeline import SCOPE, hit
 
 
 class ResourceSchemaTests(TestCase):
     def setUp(self):
+        authorize_data(self.client)
         self.run = ExtractionRun.objects.create(scope=SCOPE)
 
     def test_shared_process_and_separate_document_degrees(self):

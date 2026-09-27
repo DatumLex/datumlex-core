@@ -1,5 +1,7 @@
 # DatumLex frontend
 
+Update 2026-09-27: the frontend now uses real Django login. See [access management](../backend/docs/access-control.md) and the UI/API test `tests/access-live.mjs`. Demo profiles were removed. The historical dashboard test below predates this authentication boundary.
+
 Update 2026-09-18: the cards and chart display per-document rates calculated by the API, with a visible binary denominator and exclusions. See the [current methodology](../backend/docs/merit-methodology.md). This supersedes the earlier notes stating that merits information was unavailable; an empty denominator still displays “—”.
 
 React dashboard built with Vite and Tailwind CSS.
