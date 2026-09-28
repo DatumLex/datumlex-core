@@ -169,7 +169,10 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .period-chart-scroll { overflow-x: auto; margin-top: 18px; }
 .period-chart { display: block; width: 100%; min-height: 340px; }
 .period-chart text { fill: #59636d; font-size: 11px; }
-.period-chart rect:focus, .outcome-donut circle:focus { outline: none; stroke: var(--navy); stroke-width: 2px; }
+.chart-segment { cursor: help; transition: opacity .14s ease, filter .14s ease, stroke-width .14s ease; }
+.period-chart .chart-segment:hover, .period-chart .chart-segment:focus-visible { opacity: .78; filter: brightness(.92); outline: none; stroke: white; stroke-width: 1.5px; }
+.outcome-donut .chart-segment:hover, .outcome-donut .chart-segment:focus-visible { filter: brightness(.88); outline: none; stroke-width: 68px; }
+.chart-tooltip { position: fixed; z-index: 1000; max-width: min(280px, calc(100vw - 24px)); padding: 8px 11px; color: white; background: var(--deep-navy); border: 1px solid rgba(255,255,255,.2); border-radius: 4px; box-shadow: 0 8px 24px rgba(13,36,54,.24); font-size: 13px; line-height: 1.35; pointer-events: none; transform: translate(-50%, -100%); }
 .chart-legend { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 20px; font-size: 12px; color: #535e68; }
 .chart-legend > span { display: flex; align-items: center; gap: 7px; }
 .chart-legend i { display: block; flex: 0 0 11px; width: 11px; height: 11px; }

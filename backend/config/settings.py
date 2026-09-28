@@ -13,6 +13,8 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
 if not DEBUG and SECRET_KEY == "local-development-only-datumlex":
     raise ValueError("Set DJANGO_SECRET_KEY when DJANGO_DEBUG=false")
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
+if render_hostname := os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(render_hostname)
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -32,8 +34,11 @@ MIDDLEWARE = [
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", SESSION_COOKIE_SAMESITE)
 SESSION_COOKIE_AGE = 28800
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_FAILURE_VIEW = "src.accounts.views.csrf_failure"
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}}
