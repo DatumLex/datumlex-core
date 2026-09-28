@@ -19,7 +19,8 @@ The Blueprint generates `DJANGO_SECRET_KEY` and injects the database connection 
 
 The backend start command applies migrations, provisions the support account, and runs an
 idempotent bootstrap before starting Gunicorn. The bootstrap loads the complete TJDFT scope
-used by the dashboard (subject `10431`, from 2023-01-01 through 2026-09-27) only when no
+used by the dashboard (subjects `10431`, `10433`, and `10439`, from 2023-01-01 through
+2026-09-27) only when no
 completed deployment extraction exists; an interrupted run is resumed from its saved cursor.
 This keeps the free service self-contained without reloading the dataset after each sleep or
 redeploy. The local development database is intentionally ignored by Git and is never included

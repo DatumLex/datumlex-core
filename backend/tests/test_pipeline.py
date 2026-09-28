@@ -223,7 +223,7 @@ class WarehouseTests(TestCase):
             status="completed",
             scope={
                 "court": "TJDFT",
-                "subject_codes": [10431],
+                "subject_codes": [10431, 10433, 10439],
                 "start": "2023-01-01",
                 "end": "2026-09-27",
                 "origin": "datajud",
@@ -238,7 +238,7 @@ class WarehouseTests(TestCase):
             status="failed",
             scope={
                 "court": "TJDFT",
-                "subject_codes": [10431],
+                "subject_codes": [10431, 10433, 10439],
                 "start": "2023-01-01",
                 "end": "2026-09-27",
                 "origin": "datajud",
