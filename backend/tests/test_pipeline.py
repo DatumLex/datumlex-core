@@ -217,6 +217,38 @@ class WarehouseTests(TestCase):
             call_command("extract_datajud", input=path, subjects="10433", stdout=io.StringIO())
         self.assertEqual(ExtractionRun.objects.latest("id").status, "sample")
 
+    @patch("src.db.management.commands.bootstrap_datajud.call_command")
+    def test_bootstrap_datajud_skips_completed_scope(self, extract):
+        ExtractionRun.objects.create(
+            status="completed",
+            scope={
+                "court": "TJDFT",
+                "subject_codes": [10431],
+                "start": "2023-01-01",
+                "end": "2026-09-27",
+                "origin": "datajud",
+            },
+        )
+        call_command("bootstrap_datajud", stdout=io.StringIO())
+        extract.assert_not_called()
+
+    @patch("src.db.management.commands.bootstrap_datajud.call_command")
+    def test_bootstrap_datajud_resumes_matching_failed_run(self, extract):
+        run = ExtractionRun.objects.create(
+            status="failed",
+            scope={
+                "court": "TJDFT",
+                "subject_codes": [10431],
+                "start": "2023-01-01",
+                "end": "2026-09-27",
+                "origin": "datajud",
+            },
+        )
+        call_command("bootstrap_datajud", stdout=io.StringIO())
+        self.assertEqual(extract.call_args.args, ("extract_datajud",))
+        self.assertEqual(extract.call_args.kwargs["resume"], run.pk)
+        self.assertEqual(extract.call_args.kwargs["max_pages"], 0)
+
 
 class ApiTests(TestCase):
     def setUp(self):
