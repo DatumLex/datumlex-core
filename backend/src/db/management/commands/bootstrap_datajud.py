@@ -27,6 +27,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("DataJud deployment scope is already loaded."))
             return
 
+        running = next(
+            (run for run in runs if run.status == "running" and matches_target(run)),
+            None,
+        )
+        if running:
+            ExtractionRun.objects.filter(pk=running.pk, status="running").update(
+                status="failed",
+                error="Previous deployment stopped before the extraction completed.",
+            )
+            running.refresh_from_db()
+
         resumable = next(
             (
                 run
