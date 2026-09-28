@@ -15,8 +15,8 @@ services:
     region: virginia
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: python manage.py migrate && python manage.py bootstrap_support
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    startCommand: python manage.py migrate && python manage.py bootstrap_support && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    initialDeployHook: python manage.py extract_datajud --start 2023-01-01 --end 2026-09-27 --subjects 10431 --page-size 1000 --max-pages 0
     healthCheckPath: /api/health/
     envVars:
       - key: DATABASE_URL
