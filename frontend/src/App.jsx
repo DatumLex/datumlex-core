@@ -27,7 +27,25 @@ function ChartState({ title, children }) {
 
 const degreeColors = { G1: '#1f4e5f', G2: '#c9a227', JE: '#3f7452', TR: '#718496', SUP: '#866a96' }
 
+function useChartTooltip() {
+  const [tooltip, setTooltip] = useState(null)
+  const showAtPointer = (event, key, text) => setTooltip({ key, text, x: event.clientX, y: event.clientY - 14 })
+  const showAtElement = (event, key, text) => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    setTooltip({ key, text, x: bounds.left + bounds.width / 2, y: bounds.top - 10 })
+  }
+  const hide = () => setTooltip(null)
+  return { tooltip, showAtPointer, showAtElement, hide }
+}
+
+function ChartTooltip({ id, tooltip }) {
+  if (!tooltip) return null
+  return <div id={id} className="chart-tooltip" role="tooltip" style={{ left: tooltip.x, top: tooltip.y }}>{tooltip.text}</div>
+}
+
 function InstanceChart({ series }) {
+  const { tooltip, showAtPointer, showAtElement, hide } = useChartTooltip()
+  const tooltipId = 'instance-chart-tooltip'
   const groups = new Map()
   for (const row of series) {
     const key = row.time__year * 4 + row.time__quarter - 1
@@ -59,13 +77,16 @@ function InstanceChart({ series }) {
             const count = period.values[degree] || 0
             const height = count / ceiling * 240
             accumulated += height
-            return <rect key={degree} x={42 + index * slot + slot * .23} y={272 - accumulated} width={slot * .54} height={height} fill={degreeColors[degree]} tabIndex={count ? 0 : undefined} aria-label={`${period.label}, ${degrees[degree]}: ${formatNumber(count)} documentos`}>
-              <title>{period.label} · {degrees[degree]}: {formatNumber(count)} documentos</title>
-            </rect>
+            const segmentKey = `${period.key}-${degree}`
+            const label = `${period.label} · ${degrees[degree]}: ${formatNumber(count)} documentos`
+            return <rect className="chart-segment" key={degree} x={42 + index * slot + slot * .23} y={272 - accumulated} width={slot * .54} height={height} fill={degreeColors[degree]} tabIndex={count ? 0 : undefined} aria-label={label} aria-describedby={tooltip?.key === segmentKey ? tooltipId : undefined}
+              onPointerEnter={(event) => showAtPointer(event, segmentKey, label)} onPointerMove={(event) => showAtPointer(event, segmentKey, label)} onPointerLeave={hide}
+              onFocus={(event) => showAtElement(event, segmentKey, label)} onBlur={hide} onKeyDown={(event) => { if (event.key === 'Escape') hide() }} />
           })}<text x={42 + (index + .5) * slot} y="294" textAnchor="middle">{period.label}</text></g>
         })}
       </svg>
     </div>
+    <ChartTooltip id={tooltipId} tooltip={tooltip} />
     <div className="chart-legend">{present.map((degree) => <span key={degree}><i style={{ background: degreeColors[degree] }} />{degree} — {degrees[degree]}</span>)}</div>
     <p className="chart-note">Compare o volume e a composição por instância ao longo do período. A data é de ajuizamento; as barras não representam a evolução de um mesmo processo.</p>
     <details className="chart-table"><summary>Ver dados por trimestre</summary><table>
@@ -77,6 +98,8 @@ function InstanceChart({ series }) {
 }
 
 function OutcomeChart({ series }) {
+  const { tooltip, showAtPointer, showAtElement, hide } = useChartTooltip()
+  const tooltipId = 'outcome-chart-tooltip'
   const total = series.reduce((sum, row) => sum + row.count, 0)
   return <>
     <svg className="outcome-donut" viewBox="0 0 360 340" role="img" aria-label={`Proporção de resultados em ${formatNumber(total)} documentos`}>
@@ -84,11 +107,15 @@ function OutcomeChart({ series }) {
         const portion = total ? row.count / total * 100 : 0
         const start = total ? series.slice(0, index).reduce((sum, item) => sum + item.count, 0) / total * 100 : 0
         const label = row.outcome === 'granted' ? 'Providos' : 'Desprovidos'
-        return <circle key={row.outcome} cx="180" cy="170" r="124" pathLength="100" fill="none" stroke={row.outcome === 'granted' ? '#1f4e5f' : '#c9a227'} strokeWidth="62" strokeDasharray={`${portion} ${100 - portion}`} strokeDashoffset={-start} transform="rotate(-90 180 170)" tabIndex="0" aria-label={`${label}: ${formatNumber(row.count)} (${formatRate(row.rate)})`}><title>{label}: {formatNumber(row.count)} ({formatRate(row.rate)})</title></circle>
+        const text = `${label}: ${formatNumber(row.count)} (${formatRate(row.rate)})`
+        return <circle className="chart-segment" key={row.outcome} cx="180" cy="170" r="124" pathLength="100" fill="none" stroke={row.outcome === 'granted' ? '#1f4e5f' : '#c9a227'} strokeWidth="62" strokeDasharray={`${portion} ${100 - portion}`} strokeDashoffset={-start} transform="rotate(-90 180 170)" tabIndex="0" aria-label={text} aria-describedby={tooltip?.key === row.outcome ? tooltipId : undefined}
+          onPointerEnter={(event) => showAtPointer(event, row.outcome, text)} onPointerMove={(event) => showAtPointer(event, row.outcome, text)} onPointerLeave={hide}
+          onFocus={(event) => showAtElement(event, row.outcome, text)} onBlur={hide} onKeyDown={(event) => { if (event.key === 'Escape') hide() }} />
       })}
       <text x="180" y="168" textAnchor="middle" className="donut-total">{formatNumber(total)}</text>
       <text x="180" y="193" textAnchor="middle" className="donut-caption">documentos com resultado</text>
     </svg>
+    <ChartTooltip id={tooltipId} tooltip={tooltip} />
     <div className="chart-legend outcome-legend">{series.map((row) => <span key={row.outcome}><i style={{ background: row.outcome === 'granted' ? '#1f4e5f' : '#c9a227' }} /><span>{row.outcome === 'granted' ? 'Providos' : 'Desprovidos'}<strong>{formatRate(row.rate)} · {formatNumber(row.count)}</strong></span></span>)}</div>
   </>
 }
