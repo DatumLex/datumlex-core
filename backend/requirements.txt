@@ -5,3 +5,4 @@ tzdata==2026.4
 psycopg[binary]==3.3.5
 typing-extensions==4.16.0
 python-dotenv==1.2.3
+gunicorn==26.2.0
