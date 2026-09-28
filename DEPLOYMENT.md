@@ -17,9 +17,15 @@ The Blueprint generates `DJANGO_SECRET_KEY` and injects the database connection 
 
 ## Initial data
 
-Migrations create an empty database. After the first deploy, either restore a compatible
-PostgreSQL dump or run the bounded DataJud extractor from the backend service. The local
-development database is intentionally ignored by Git and is never included in a deploy.
+The backend start command applies migrations and provisions the support account before
+starting Gunicorn. On the first successful service deployment, an initial deploy hook loads
+the complete TJDFT scope used by the dashboard (subject `10431`, from 2023-01-01 through
+2026-09-27). The extractor is idempotent at the warehouse grain, and the hook runs only once
+for the service instance. The local development database is intentionally ignored by Git and
+is never included in a deploy.
+
+The migrations run in the start command because Render pre-deploy commands are unavailable
+to free web services.
 
 ## Limitations of the free configuration
 
