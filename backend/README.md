@@ -8,7 +8,7 @@ Update 2026-09-22: the backend now uses the resource dimensional schema based on
 `0002_resource_schema` rebuilds the warehouse and discards v1 rows: use the new
 `datumlex_v2` database/volume. Do not execute the reference SQL manually.
 
-Update 2026-09-18: the API calculates exploratory per-document rates using explicit TPU procedural events. See the [methodology, exclusions, and limitations](docs/merit-methodology.md). This update supersedes the references below to rates always being unavailable; the count of individual appeals remains unavailable.
+Update 2026-10-18: the API calculates exploratory per-document rates for TJDFT (G2/TR) and STJ (SUP), using explicit CNJ TPU result movements. Migration `0004_stj_merit_outcomes` reclassifies the already-loaded STJ snapshot. See the [methodology, exclusions, and limitations](docs/merit-methodology.md). Individual appeals are not counted.
 
 Local Django backend for **DataJud -> normalization -> dimensional warehouse -> JSON API**.
 Python 3.12+, Django 5.2 LTS. SQLite works without a database server; PostgreSQL is configured
@@ -41,11 +41,48 @@ The key is never included in extraction metadata or API responses.
 ```
 
 This command intentionally loads a **bounded sample** (up to 200 returned documents).
-Use the run ID printed by the command to continue:
+Repeating an extraction with the exact same court, subjects, dates and page size now resumes
+the latest matching paused/failed run from its saved cursor. The run ID is still printed, and
+you can explicitly continue it with:
 
 ```powershell
 .venv/Scripts/python.exe manage.py extract_datajud --resume 1 --max-pages 5
 ```
+
+### Atualização incremental TJDFT + STJ
+
+Para a carga histórica inicial, execute uma vez para cada tribunal (use um espaço antes de
+`--page-size`; os comandos existentes continuam limitados pela quantidade de páginas):
+
+```powershell
+.venv/Scripts/python.exe manage.py extract_datajud --court TJDFT --subjects 10431,10433,10439 --start 2023-01-01 --page-size 100 --max-pages 2
+.venv/Scripts/python.exe manage.py extract_datajud --court STJ --subjects 10431,10433,10439 --start 2023-01-01 --page-size 100 --max-pages 2
+```
+
+Depois da carga inicial, use um único comando para buscar documentos atualizados nos dois tribunais:
+
+```powershell
+.venv/Scripts/python.exe manage.py refresh_datajud --subjects 10431,10433,10439 --page-size 100 --max-pages 5
+```
+
+O comando consulta `dataHoraUltimaAtualizacao`, usa uma sobreposição de três dias para absorver
+atrasos de indexação e salva cursor/escopo em cada execução. Se atingir `--max-pages`, a próxima
+execução continua essa busca antes de abrir uma nova janela. Sem execução incremental anterior,
+busca os últimos 30 dias (`--initial-lookback-days` altera esse período); isso não substitui a
+carga histórica por data de ajuizamento descrita acima. A lista de assuntos explícitos é aplicada
+aos dois tribunais. Os novos registros ficam disponíveis na API e no dashboard após serem gravados
+no banco. Com o painel aberto, a interface consulta a API novamente a cada cinco minutos e ao
+voltar para a aba.
+
+Para agendar no Windows, crie uma tarefa diária no Agendador de Tarefas com:
+
+- **Programa/script:** caminho completo para `backend\.venv\Scripts\python.exe`
+- **Argumentos:** `manage.py refresh_datajud --subjects 10431,10433,10439 --page-size 100 --max-pages 5`
+- **Iniciar em:** caminho completo para a pasta `backend`
+
+O agendamento deve usar o mesmo `.env` e banco configurados para o dashboard. Cada execução
+registra tribunal, escopo, cursor, contagens e falhas em `extraction_run`; a rotina não torna a
+cobertura completa nem substitui a revisão jurídica das avaliações de precedentes.
 
 `--max-pages 0` traverses until the source returns an empty page. The default is five pages
 of 100 records, to avoid accidentally downloading a whole court. `--end` defaults to today.
@@ -54,7 +91,7 @@ this local database at a time. A still-running/completed run cannot be resumed. 
 was force-killed, first verify it has stopped before changing that run from `running` to `failed`
 in a Django shell; the last committed page/cursor is the recovery boundary.
 
-Only public TJDFT records (`nivelSigilo=0`) are loaded. Other courts, malformed process
+Only public records (`nivelSigilo=0`) from the selected supported court are loaded. Other courts, malformed process
 identifiers, out-of-range dates and absent required dimensions are rejected and counted.
 Rejection reasons/source IDs are stored separately without retaining the rejected payload.
 
@@ -95,12 +132,13 @@ All routes are read-only `GET`, return JSON and use a trailing slash.
 |---|---|
 | `/api/health/` | Database connectivity and migration/table availability |
 | `/api/scope/` | Loaded subject codes, period, source and latest-run context |
-| `/api/statistics/` | Document count, distinct CNJ process numbers, unavailable merit fields |
-| `/api/distribution/` | Explicit unavailable state until merit classification is validated |
+| `/api/statistics/` | Document count, distinct CNJ process numbers, document-level grant/denial proxy and exclusions |
+| `/api/distribution/` | Grant/denial proportions over the eligible binary document denominator |
 | `/api/instances/` | Records by filing year/quarter and degree; no appeal/reversal inference |
 | `/api/processes/` | Paginated normalized metadata; raw payload/movements are not returned |
+| `/api/alignment/` | Validated TJDFT-to-STJ/BDJur links, adherence/divergence rates, quarterly trends and citations |
 
-Filters: `court=TJDFT`, `subject=<exact code>`, `start=YYYY-MM-DD`, `end=YYYY-MM-DD`,
+Filters: `court=TJDFT|STJ`, `subject=<exact code>`, `start=YYYY-MM-DD`, `end=YYYY-MM-DD`,
 `outcome=all|granted|denied`. With no subject, results cover all locally loaded subjects.
 `page` (default 1) and `page_size` (default 25, max 100) apply to `/api/processes/`.
 Dates are inclusive and limited to 2023 through today. Unknown parameters, repeated parameters,
@@ -114,18 +152,17 @@ Invoke-RestMethod 'http://127.0.0.1:8000/api/processes/?page=1&page_size=10'
 ```
 
 The outcome parameter is accepted for contract continuity but **does not filter process volume**.
-Instance/process endpoints disclose `outcome_filter_applied=false`. Distribution remains unavailable.
+Instance/process endpoints disclose `outcome_filter_applied=false`.
 Statistics retain the same population for all outcome selections.
 
 Counts are real loaded **DataJud documents**, not analyzed appeals. The same CNJ process may have
-G1/G2 documents; multiple subjects never multiply counts. `analyzed_appeals`, `grant_rate`,
-`denial_rate`, granted/denied counts and the binary denominator deliberately remain `null`.
-There is no validated movement-to-outcome mapping in the supplied model. In particular, `G2`,
-a claim being upheld and a procedural event must not be equated with a granted appeal.
-This backend implements extraction and the documented process model, not a completed merit release.
+G1/G2/SUP documents; multiple subjects never multiply counts. `analyzed_appeals` remains `null`.
+Grant and denial rates are limited to mapped TPU movements and the binary denominator. They are
+document-level proxies, not appeal-grain counts or tribunal-wide rates. See the methodology for
+supported codes and exclusions.
 
 `status=partial` describes loaded volume, `empty` describes no local matches, and `unavailable`
-describes unsupported merit data. Latest-run metadata is global; its scope is returned explicitly
+describes a zero binary denominator. Latest-run metadata is global; its scope is returned explicitly
 and is not a claim of completeness for the user's filters. Records from different runs can coexist.
 
 ## Model and dictionary
@@ -179,3 +216,24 @@ For the read-only HTTP smoke test after starting the server:
 - [DataJud endpoints](https://datajud-wiki.cnj.jus.br/api-publica/endpoints/)
 - [Official pagination example](https://datajud-wiki.cnj.jus.br/api-publica/exemplos/exemplo3/)
 - [Django database support](https://docs.djangoproject.com/en/5.2/ref/databases/)
+# DataJud court ingestion
+
+The `extract_datajud` management command supports `TJDFT` and `STJ`. Example:
+
+```sh
+python manage.py extract_datajud --court STJ --start 2023-01-01 --end 2026-10-18 --subjects 10431 --max-pages 5
+```
+
+Each extraction run retains its court, explicit subject codes, date window,
+source totals, pagination status and rejected-record count. DataJud IDs are
+namespaced by court. The dashboard reports loaded-record coverage as partial;
+it does not assert complete jurisprudence coverage.
+
+The STJ feed is process metadata, not a curated precedent corpus. Comparing
+local TJDFT reasoning with binding or persuasive STJ precedents requires an
+approved, sourced precedent collection and a reviewable mapping from decisions
+to legal theses. BDJur doctrine likewise must be separately ingested with its
+approval and citation metadata. The application does not label cases as aligned
+or misaligned from process metadata alone. See [the approved-corpus import and
+review workflow](docs/precedent-alignment.md) for cited, human-validated
+TJDFT-to-STJ/BDJur assessments.

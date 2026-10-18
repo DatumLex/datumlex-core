@@ -4,9 +4,9 @@ from collections import Counter
 
 from django.db.models import Count
 
-VERSION = "tpu-document-latest-v2"
+VERSION = "tpu-document-latest-v3"
 # Deliberately limited to explicitly mapped TPU outcomes. See docs/merit-methodology.md.
-CODES = {
+COMMON_CODES = {
     237: "granted",
     972: "granted",
     239: "denied",
@@ -16,19 +16,38 @@ CODES = {
     241: "partial_knowledge",
     242: "partial_knowledge",
 }
+# STJ-specific TPU events encode the result of the Recurso Especial in the
+# movement itself. Admission-only codes (12437, 12441 and 12442) are excluded.
+STJ_CODES = {
+    12434: "granted",
+    12435: "denied",
+    12436: "not_admitted",
+    12438: "partial",
+    12439: "partial_knowledge",
+    12440: "partial_knowledge",
+    12443: "partial_knowledge",
+}
+CODES = {**COMMON_CODES, **STJ_CODES}
+
+
+def _code_map(court):
+    return {**COMMON_CODES, **(STJ_CODES if court == "STJ" else {})}
 
 
 def classify(process):
+    court = getattr(process, "court", "TJDFT")
+    code_map = _code_map(court)
     evidence = [
         {"movement_id": movement.pk, "code": movement.code, "date": movement.occurred_at}
         for movement in process.movements.all()
-        if movement.code in CODES
+        if movement.code in code_map
     ]
     dated = [item for item in evidence if item["date"] is not None]
     selected = max(dated, key=lambda item: (item["date"], item["movement_id"]), default=None)
     latest = [selected] if selected else []
-    states = {CODES[item["code"]] for item in latest}
-    if process.degree not in {"G2", "TR"}:
+    states = {code_map[item["code"]] for item in latest}
+    allowed_degrees = {"SUP"} if court == "STJ" else {"G2", "TR"}
+    if process.degree not in allowed_degrees:
         outcome = "outside_appellate_degree"
     elif not states:
         outcome = "unknown"
@@ -68,5 +87,5 @@ def summarize(query):
             )
         },
         "rule_version": VERSION,
-        "rate_unit": "DataJud documents classified by latest dated mapped outcome in G2/TR",
+        "rate_unit": "DataJud documents classified by latest dated mapped outcome in the court's appellate degree",
     }

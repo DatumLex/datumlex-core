@@ -38,7 +38,7 @@ def load_record(record, run):
         code=record["class_code"], defaults={"name": record["class_name"][:100]}
     )
     org, _ = DimOrg.objects.update_or_create(
-        court="TJDFT",
+        court=record.get("court", "TJDFT"),
         code=record["org_code"],
         defaults={
             "name": record["org_name"][:100],
@@ -54,7 +54,7 @@ def load_record(record, run):
             "process_dimension": process_dimension,
             "degree_dimension": degree,
             "result": unknown,
-            "court": "TJDFT",
+            "court": record.get("court", "TJDFT"),
             "time": time,
             "process_class": process_class,
             "organization": org,

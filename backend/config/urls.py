@@ -19,4 +19,5 @@ urlpatterns = [
     path("api/distribution/", statistics.distribution),
     path("api/instances/", statistics.instances),
     path("api/processes/", statistics.processes),
+    path("api/alignment/", statistics.alignment),
 ]
