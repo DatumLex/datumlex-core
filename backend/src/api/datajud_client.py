@@ -34,6 +34,12 @@ class DataJudClient:
         self.timeout, self.attempts, self.pause = timeout, attempts, pause
 
     def search(self, scope, cursor=None):
+        court = scope.get("court", "TJDFT")
+        if court not in {"TJDFT", "STJ"}:
+            raise DataJudError("Unsupported court")
+        endpoint = (
+            ENDPOINT if court == "TJDFT" else "https://api-publica.datajud.cnj.jus.br/api_publica_stj/_search"
+        )
         body = {
             "size": scope["page_size"],
             "track_total_hits": True,
@@ -76,7 +82,7 @@ class DataJudClient:
         if cursor is not None:
             body["search_after"] = cursor
         request = Request(
-            ENDPOINT,
+            endpoint,
             data=json.dumps(body).encode(),
             method="POST",
             headers={

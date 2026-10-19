@@ -2,7 +2,6 @@ from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.db.models.deletion import ProtectedError
 from django.test import Client, TestCase
-
 from src.accounts.models import AuditEvent, Court, User
 from src.accounts.provisioning import provision_support
 
@@ -168,9 +167,10 @@ class AccessTests(TestCase):
             403,
         )
         self.assertEqual(self.client.get("/api/statistics/").status_code, 200)
-        Court.objects.create(code="STJ", name="STJ")
+        Court.objects.create(code="TJSP", name="TJSP")
         data = self.client.get("/api/auth/me/").json()["user"]
         self.assertIn("STJ", data["courts"])
+        self.assertIn("TJSP", data["courts"])
         self.assertFalse(data["must_change_password"])
         self.assertTrue(AuditEvent.objects.filter(actor=self.support, action="support.request").exists())
         self.assertEqual(provision_support("different").password, self.support.password)

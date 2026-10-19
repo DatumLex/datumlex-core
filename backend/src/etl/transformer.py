@@ -57,10 +57,12 @@ def normalize(hit, scope):
     source = hit.get("_source")
     if not isinstance(source, dict):
         raise InvalidRecord("Missing source payload")
-    if source.get("tribunal") != "TJDFT" or source.get("nivelSigilo") != 0:
-        raise InvalidRecord("Outside public TJDFT scope")
+    court = scope.get("court", "TJDFT")
+    if court not in {"TJDFT", "STJ"} or source.get("tribunal") != court or source.get("nivelSigilo") != 0:
+        raise InvalidRecord(f"Outside public {court} scope")
     identity = hit.get("_id") or source.get("id")
     number = source.get("numeroProcesso")
+    identity = f"STJ:{identity}" if court == "STJ" and identity else identity
     if not identity or len(str(identity)) > 255:
         raise InvalidRecord("Missing or oversized source identifier")
     if not isinstance(number, str) or not re.fullmatch(r"\d{20}", number):
@@ -112,6 +114,7 @@ def normalize(hit, scope):
         if key in source
     }
     return {
+        "court": court,
         "source_id": str(identity),
         "number_process": number,
         "degree": degree,

@@ -1,5 +1,11 @@
 # Resource dimensional schema (v2)
 
+STJ extension: see [ETL architecture and source lineage](../../etl/STJ-ARCHITECTURE.md).
+The same dimensional tables now accept explicit TJDFT/STJ selection; STJ source
+IDs are namespaced with `STJ:`. Official STJ texts use additive operational
+provenance tables and local staging, without adding analytical facts or assigning
+G2/TR outcome rates to SUP documents.
+
 The backend adopts the dimensions and resource fact from `datumlex.session.sql`.
 The executable schema is defined by Django models and migrations; the SQL file
 remains the original design reference, not an installation script.

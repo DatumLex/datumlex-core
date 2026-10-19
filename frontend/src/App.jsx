@@ -138,7 +138,7 @@ export default function App({ court, courts, onCourtChange }) {
     async function load() {
       try {
         if (!courts.includes(court)) throw new Error('Você não possui acesso a este tribunal.')
-        if (court !== 'TJDFT') throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
+        if (!['TJDFT', 'STJ'].includes(court)) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
         const scope = await getData('scope', { court }, controller.signal)
         const available = scope.metadata.available_period
         const filters = applied || (available.start && available.end ? { start: available.start, end: available.end } : {})

@@ -1,0 +1,2 @@
+# Reuse the backend's pinned dependencies to keep Django and database drivers aligned.
+-r ../backend/requirements.txt

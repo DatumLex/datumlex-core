@@ -14,9 +14,10 @@ from src.etl.transformer import InvalidRecord, normalize
 
 
 class Command(BaseCommand):
-    help = "Extract public TJDFT metadata into the local dimensional warehouse."
+    help = "Extract public TJDFT or STJ metadata into the dimensional warehouse."
 
     def add_arguments(self, parser):
+        parser.add_argument("--court", choices=["TJDFT", "STJ"], default="TJDFT")
         parser.add_argument("--start", default="2023-01-01")
         parser.add_argument("--end", default=date.today().isoformat())
         parser.add_argument(
@@ -77,7 +78,7 @@ class Command(BaseCommand):
                 ) from None
             run = ExtractionRun.objects.create(
                 scope={
-                    "court": "TJDFT",
+                    "court": options["court"],
                     "subject_codes": subjects,
                     "start": start.isoformat(),
                     "end": end.isoformat(),
