@@ -159,6 +159,81 @@ class RejectedRecord(models.Model):
         db_table = "rejected_record"
 
 
+class STJDocument(models.Model):
+    """Operational full-text provenance; never counted as an analytical resource."""
+
+    source_id = models.CharField(max_length=64, unique=True)
+    publication_date = models.DateField()
+    metadata = models.JSONField()
+    metadata_url = models.URLField(max_length=1000)
+    archive_url = models.URLField(max_length=1000)
+    local_path = models.CharField(max_length=500)
+    sha256 = models.CharField(max_length=64)
+    collected_at = models.DateTimeField(auto_now=True)
+    decision_date = models.DateField(null=True)
+    panel = models.CharField(max_length=255, null=True)
+    precedent_type = models.CharField(max_length=100, null=True)
+    precedent_status = models.CharField(max_length=100, null=True)
+    text_status = models.CharField(max_length=24, default="available")
+    last_run = models.ForeignKey("STJIngestionRun", null=True, on_delete=models.PROTECT)
+
+    class Meta:
+        db_table = "stj_document"
+
+
+class STJDocumentBatch(models.Model):
+    scope_hash = models.CharField(max_length=64)
+    scope = models.JSONField()
+    publication_date = models.DateField()
+    completed_at = models.DateTimeField(auto_now=True)
+    last_run = models.ForeignKey("STJIngestionRun", null=True, on_delete=models.PROTECT)
+
+    class Meta:
+        db_table = "stj_document_batch"
+        constraints = [
+            models.UniqueConstraint(fields=["scope_hash", "publication_date"], name="unique_stj_batch")
+        ]
+
+
+class STJIngestionRun(models.Model):
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True)
+    status = models.CharField(max_length=24, default="running")
+    scope = models.JSONField()
+    collector_version = models.CharField(max_length=64)
+    catalog_url = models.URLField(max_length=1000)
+    catalog_hash = models.CharField(max_length=64, blank=True)
+    source_license = models.JSONField(default=dict)
+    retrieved = models.PositiveIntegerField(default=0)
+    created = models.PositiveIntegerField(default=0)
+    updated = models.PositiveIntegerField(default=0)
+    duplicates = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    unavailable = models.PositiveIntegerField(default=0)
+    batches = models.PositiveIntegerField(default=0)
+    errors = models.JSONField(default=list)
+
+    class Meta:
+        db_table = "stj_ingestion_run"
+
+
+class STJDocumentVersion(models.Model):
+    document = models.ForeignKey(STJDocument, on_delete=models.PROTECT, related_name="versions")
+    run = models.ForeignKey(STJIngestionRun, on_delete=models.PROTECT)
+    fingerprint = models.CharField(max_length=64)
+    metadata = models.JSONField()
+    metadata_url = models.URLField(max_length=1000)
+    archive_url = models.URLField(max_length=1000, blank=True)
+    local_path = models.CharField(max_length=500, blank=True)
+    sha256 = models.CharField(max_length=64, blank=True)
+    text_status = models.CharField(max_length=24)
+    collected_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "stj_document_version"
+        constraints = [models.UniqueConstraint(fields=["document", "fingerprint"], name="unique_stj_version")]
+
+
 class LegalReference(models.Model):
     """Sourced precedent/doctrine entry admitted to the reviewed analysis corpus."""
 
@@ -173,6 +248,7 @@ class LegalReference(models.Model):
     identifier = models.CharField(max_length=200)
     title = models.CharField(max_length=500)
     thesis = models.TextField()
+    related_decisions = models.JSONField(default=list)
     authority = models.CharField(max_length=100, blank=True)
     subject_code = models.PositiveIntegerField(null=True)
     source_name = models.CharField(max_length=200)

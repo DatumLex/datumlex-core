@@ -18,7 +18,7 @@ def filtered_processes(params):
         raise InvalidQuery("Repeated query parameters are not supported")
     court = params.get("court", "TJDFT")
     if court not in {"TJDFT", "STJ"}:
-        raise InvalidQuery("Unsupported court")
+        raise InvalidQuery("Only TJDFT and STJ are available")
     if params.get("outcome", "all") not in {"all", "granted", "denied"}:
         raise InvalidQuery("outcome must be all, granted or denied")
     try:

@@ -76,3 +76,10 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 ).split(",")
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS)).split(",")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
+BNP_API_BASE_URL = os.environ.get("BNP_API_BASE_URL", "https://bnp-sempj.cloud.pje.jus.br").rstrip("/")
+BNP_TOKEN_URL = os.environ.get(
+    "BNP_TOKEN_URL",
+    "https://sso.cloud.pje.jus.br/auth/realms/pje/protocol/openid-connect/token",
+)
+BNP_API_CLIENT_ID = os.environ.get("BNP_API_CLIENT_ID", "")
+BNP_API_CLIENT_SECRET = os.environ.get("BNP_API_CLIENT_SECRET", "")

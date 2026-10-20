@@ -45,10 +45,7 @@ class Command(BaseCommand):
                     raise ValueError
             except (OSError, ValueError, KeyError, TypeError):
                 raise CommandError("--input must contain a DataJud response with hits.hits") from None
-        try:
-            client = DataJudClient(settings.DATAJUD_API_KEY, court=options["court"]) if imported is None else None
-        except DataJudError as exc:
-            raise CommandError(str(exc)) from None
+        client = None
         resumed_matching_scope = False
         if options["resume"]:
             try:
@@ -119,6 +116,13 @@ class Command(BaseCommand):
                             break
             if run is None:
                 run = ExtractionRun.objects.create(scope=scope)
+        if imported is None:
+            try:
+                # A resumed STJ run must keep using its saved tribunal endpoint even
+                # when --court is omitted from the resume command.
+                client = DataJudClient(settings.DATAJUD_API_KEY, court=run.scope.get("court", "TJDFT"))
+            except DataJudError as exc:
+                raise CommandError(str(exc)) from None
         self.stdout.write(f"Run {run.pk}: {json.dumps(run.scope)}")
         if resumed_matching_scope:
             self.stdout.write("Resuming the paused/failed run for this exact scope from its saved cursor.")

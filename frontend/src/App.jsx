@@ -154,6 +154,7 @@ export default function App({ court, courts, onCourtChange }) {
       try {
         setAlignment(null)
         if (!courts.includes(court)) throw new Error('Você não possui acesso a este tribunal.')
+        if (!['TJDFT', 'STJ'].includes(court)) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
         const scopeResults = await Promise.all(courts.map(async (courtCode) => [
           courtCode,
           await getData('scope', { court: courtCode }, controller.signal),
@@ -273,18 +274,26 @@ export default function App({ court, courts, onCourtChange }) {
           </div>
           {alignment.trend.length > 0 && <details className="chart-table alignment-trend" open><summary>Tendência trimestral das avaliações</summary><table><caption>Vínculos validados por trimestre da decisão local</caption><thead><tr><th scope="col">Trimestre</th><th scope="col">Aderentes</th><th scope="col">Possíveis divergências</th><th scope="col">Distinguishing</th><th scope="col">Inconclusivos</th></tr></thead><tbody>{alignment.trend.map((row) => <tr key={row.period}><td>{row.period.slice(0, 7)}</td><td>{formatNumber(row.aligned)}</td><td>{formatNumber(row.divergent)}</td><td>{formatNumber(row.distinguished)}</td><td>{formatNumber(row.uncertain)}</td></tr>)}</tbody></table></details>}
           <div className="precedent-grid">
-            <article className="thesis-card"><span className="section-kicker">Frequência</span><h3>Principais teses no recorte</h3><p>Contagem de vínculos revisados agrupados pelo precedente do STJ.</p>
-              {alignment.theses?.length ? <ol className="thesis-list">{alignment.theses.map((thesis) => <li key={thesis.reference_id}>
-                <div className="thesis-title"><strong>{thesis.reference__title}</strong><span>{formatNumber(thesis.validated_links)} vínculos</span></div>
-                <div className="thesis-track"><span style={{ width: `${Math.max(5, thesis.validated_links / Math.max(...alignment.theses.map((item) => item.validated_links)) * 100)}%` }} /></div>
-                <p>{thesis.reference__thesis}</p><small>{formatNumber(thesis.local_decisions)} decisões locais · <a href={thesis.reference__source_url} target="_blank" rel="noreferrer">{thesis.reference__identifier} · fonte</a>{thesis.reference__source_locator ? ` · ${thesis.reference__source_locator}` : ''}</small>
-              </li>)}</ol> : <ChartState title="Sem teses validadas neste recorte">As frequências aparecem após a importação do corpus aprovado e a revisão dos vínculos com decisões TJDFT. Nenhum dado ilustrativo está sendo contado.</ChartState>}
+            <article className="thesis-card"><span className="section-kicker">Frequência · TJDFT</span><h3>Principais teses no recorte</h3><p>Teses importadas de fontes do STJ. A contagem mostra decisões locais distintas com vínculo aprovado no período; os julgados citados pela fonte ficam separados.</p>
+              {alignment.source_theses?.length ? <ol className="thesis-list">{alignment.source_theses.map((thesis) => <li key={thesis.id}>
+                <div className="thesis-title"><strong>{thesis.title}</strong><span>{formatNumber(thesis.local_decisions)} {thesis.local_decisions === 1 ? 'caso' : 'casos'}</span></div>
+                <div className="thesis-track"><span style={{ width: `${thesis.local_decisions && Math.max(...alignment.source_theses.map((item) => item.local_decisions)) ? Math.max(5, thesis.local_decisions / Math.max(...alignment.source_theses.map((item) => item.local_decisions)) * 100) : 0}%` }} /></div>
+                <p>{thesis.thesis}</p><small>{formatNumber(thesis.validated_links)} vínculos revisados · <a href={thesis.source_url} target="_blank" rel="noreferrer">{thesis.source_name} · {thesis.identifier}</a>{thesis.source_locator ? ` · ${thesis.source_locator}` : ''}{!thesis.approved && ' · fonte pendente de aprovação do corpus'}</small>
+              </li>)}</ol> : <ChartState title="Corpus STJ ainda não carregado">Execute o comando load_stj_responsabilidade_civil após aplicar as migrações.</ChartState>}
             </article>
-            <article className="related-card"><span className="section-kicker">Evidências</span><h3>Decisões relacionadas</h3><p>Inspecione a classificação, o trecho local e o precedente utilizado.</p>
-              {alignment.assessments.length ? <div className="related-list">{alignment.assessments.slice(0, 10).map((row) => <article className="related-item" key={`${row.local_source_id}-${row.reference.identifier}`}>
-                <div><span className={`alignment-badge alignment-badge--${row.relation}`}>{relationLabels[row.relation]}</span><h4>{row.reference.title}</h4><p>{row.evidence_excerpt || row.rationale}</p><small>TJDFT {row.local_process_number} · {formatDate(row.decision_date)} · revisor {row.reviewer}</small></div>
-                <a href={row.reference.source_url} target="_blank" rel="noreferrer">Ver fonte ↗</a>
-              </article>)}</div> : <ChartState title="Nenhuma decisão relacionada validada">A lista será preenchida com decisões e trechos rastreáveis depois da revisão jurídica.</ChartState>}
+            <article className="related-card"><span className="section-kicker">Síntese das evidências</span><h3>Decisões relacionadas</h3><p>Resumo dos julgados relacionados na fonte de cada tese e das decisões TJDFT com vínculo validado.</p>
+              {alignment.source_theses?.length ? <div className="related-list">{alignment.source_theses.map((thesis) => {
+                const cited = thesis.related_decisions || []
+                const localRows = alignment.assessments.filter((row) => row.reference.identifier === thesis.identifier)
+                const citedSummary = cited.slice(0, 3).map((decision) => decision.identifier).join(' · ')
+                return <article className="related-item" key={`related-${thesis.id}`}>
+                  <div><span className="alignment-badge alignment-badge--uncertain">{formatNumber(cited.length)} julgados STJ citados</span><h4>{thesis.title}</h4>
+                    <p>{citedSummary || 'A fonte não lista julgados associados.'}{cited.length > 3 ? ` · +${cited.length - 3} outros` : ''}</p>
+                    <small>{formatNumber(thesis.local_decisions)} decisões TJDFT com vínculo validado no recorte{localRows.length ? ` · ${localRows.slice(0, 3).map((row) => `${row.local_process_number} (${relationLabels[row.relation]})`).join(' · ')}` : ''}</small>
+                  </div><a href={thesis.source_url} target="_blank" rel="noreferrer">Ver fontes ↗</a>
+                </article>
+              })}</div> : <ChartState title="Nenhuma decisão relacionada">As relações aparecerão quando houver teses e julgados rastreáveis no corpus.</ChartState>}
+              <small>Os julgados refletem as relações informadas pela fonte consultada; não comprovam, isoladamente, aderência das decisões locais.</small>
             </article>
           </div>
           {alignment.assessments.length > 0 && <details className="chart-table alignment-evidence"><summary>Ver tabela completa das evidências (até 100)</summary><table><caption>Vínculos e evidências jurídicas validados</caption><thead><tr><th scope="col">Decisão local</th><th scope="col">Classificação revisada</th><th scope="col">Precedente do STJ</th><th scope="col">Fundamentação e evidência</th></tr></thead><tbody>{alignment.assessments.map((row) => <tr key={`${row.local_source_id}-${row.reference.identifier}`}><td><strong>{row.local_process_number}</strong><br />{formatDate(row.decision_date)}</td><td><span className={`alignment-badge alignment-badge--${row.relation}`}>{relationLabels[row.relation]}</span><br /><small>Revisor: {row.reviewer}</small></td><td><a href={row.reference.source_url} target="_blank" rel="noreferrer">{row.reference.identifier} · {row.reference.title}</a><p>{row.reference.thesis}</p><small>{row.reference.source_name} · {row.reference.source_locator} · aprovação {row.reference.approval_reference}</small></td><td><p>{row.rationale}</p>{row.evidence_excerpt && <blockquote>{row.evidence_excerpt}</blockquote>}<small>{row.evidence_locator && `Localizador: ${row.evidence_locator} · `}Validação: {row.approval_reference}</small></td></tr>)}</tbody></table></details>}

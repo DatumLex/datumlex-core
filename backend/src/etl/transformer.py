@@ -58,11 +58,13 @@ def normalize(hit, scope):
     if not isinstance(source, dict):
         raise InvalidRecord("Missing source payload")
     court = scope.get("court", "TJDFT")
-    if source.get("tribunal") != court or source.get("nivelSigilo") != 0:
+    if court not in {"TJDFT", "STJ"} or source.get("tribunal") != court or source.get("nivelSigilo") != 0:
         raise InvalidRecord(f"Outside public {court} scope")
     identity = hit.get("_id") or source.get("id")
     number = source.get("numeroProcesso")
-    if not identity or len(str(identity)) > 248:
+    # Keep existing TJDFT IDs stable; STJ gets a court prefix to avoid collisions.
+    identity = f"STJ:{identity}" if court == "STJ" and identity else identity
+    if not identity or len(str(identity)) > 255:
         raise InvalidRecord("Missing or oversized source identifier")
     if not isinstance(number, str) or not re.fullmatch(r"\d{20}", number):
         raise InvalidRecord("Process number must be a 20-digit string")
@@ -113,9 +115,8 @@ def normalize(hit, scope):
         if key in source
     }
     return {
-        # A source document ID is only unique inside its DataJud court index.
-        "source_id": f"{court}:{identity}",
         "court": court,
+        "source_id": str(identity),
         "number_process": number,
         "degree": degree,
         "filing": filing.date(),

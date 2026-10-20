@@ -1,4 +1,4 @@
-"""Bounded retries and strict search_after pagination for the official TJDFT API."""
+"""Bounded retries and strict search_after pagination for DataJud court APIs."""
 
 import json
 import time

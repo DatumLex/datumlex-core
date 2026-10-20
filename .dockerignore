@@ -1,0 +1,15 @@
+**/.env
+**/.env.*
+**/.venv
+**/__pycache__
+**/node_modules
+**/dist
+**/.git
+**/data
+**/backups
+**/clientes
+**/server.json
+**/ACESSO-INICIAL.txt
+**/*.sqlite3
+**/*.dump
+**/tests

@@ -1,0 +1,251 @@
+{
+  "generated_at": "2026-10-19T23:38:06.099537+00:00",
+  "source": "Official STJ open-data publication catalog",
+  "unit": "STJ seqDocumento; source-selected records, separate from DataJud process facts",
+  "runs": [
+    {
+      "id": 1,
+      "status": "paused",
+      "scope": {
+        "end": "2026-10-15",
+        "start": "2023-01-01",
+        "subjects": [
+          "10431",
+          "10433",
+          "10439"
+        ]
+      },
+      "collector_version": "stj-publications-v2",
+      "catalog_hash": "0278460d1f09e2342c278e5ed94c874d77c33371a10735349fa3bc346fc258f4",
+      "license": {
+        "license_id": "cc-by",
+        "license_url": "http://www.opendefinition.org/licenses/cc-by",
+        "license_title": "Creative Commons Atribuição"
+      },
+      "retrieved": 41,
+      "created": 0,
+      "updated": 41,
+      "duplicates": 0,
+      "failed": 0,
+      "unavailable": 0,
+      "batches": 1,
+      "reconciled": true,
+      "errors": []
+    },
+    {
+      "id": 2,
+      "status": "paused",
+      "scope": {
+        "end": "2026-10-15",
+        "start": "2023-01-01",
+        "subjects": [
+          "10431",
+          "10433",
+          "10439"
+        ]
+      },
+      "collector_version": "stj-publications-v2",
+      "catalog_hash": "0278460d1f09e2342c278e5ed94c874d77c33371a10735349fa3bc346fc258f4",
+      "license": {
+        "license_id": "cc-by",
+        "license_url": "http://www.opendefinition.org/licenses/cc-by",
+        "license_title": "Creative Commons Atribuição"
+      },
+      "retrieved": 41,
+      "created": 0,
+      "updated": 0,
+      "duplicates": 41,
+      "failed": 0,
+      "unavailable": 0,
+      "batches": 1,
+      "reconciled": true,
+      "errors": []
+    },
+    {
+      "id": 3,
+      "status": "completed",
+      "scope": {
+        "mode": "existing-local-snapshot",
+        "court": "STJ",
+        "limitation": "Current verified baseline; no reconstruction of unrecorded past versions"
+      },
+      "collector_version": "stj-publications-v2",
+      "catalog_hash": "",
+      "license": {},
+      "retrieved": 521,
+      "created": 0,
+      "updated": 521,
+      "duplicates": 0,
+      "failed": 0,
+      "unavailable": 0,
+      "batches": 0,
+      "reconciled": true,
+      "errors": []
+    },
+    {
+      "id": 4,
+      "status": "paused",
+      "scope": {
+        "end": "2026-10-15",
+        "start": "2023-01-01",
+        "subjects": [
+          "10431",
+          "10433",
+          "10439"
+        ]
+      },
+      "collector_version": "stj-publications-v2",
+      "catalog_hash": "0278460d1f09e2342c278e5ed94c874d77c33371a10735349fa3bc346fc258f4",
+      "license": {
+        "license_id": "cc-by",
+        "license_url": "http://www.opendefinition.org/licenses/cc-by",
+        "license_title": "Creative Commons Atribuição"
+      },
+      "retrieved": 15,
+      "created": 4,
+      "updated": 0,
+      "duplicates": 11,
+      "failed": 0,
+      "unavailable": 4,
+      "batches": 1,
+      "reconciled": true,
+      "errors": []
+    }
+  ],
+  "current_records": 566,
+  "text_status": [
+    {
+      "text_status": "available",
+      "total": 562
+    },
+    {
+      "text_status": "unavailable",
+      "total": 4
+    }
+  ],
+  "versions": 566,
+  "field_coverage": {
+    "publication_date": {
+      "available": 566,
+      "unavailable": 0
+    },
+    "decision_date": {
+      "available": 0,
+      "unavailable": 566
+    },
+    "panel": {
+      "available": 0,
+      "unavailable": 566
+    },
+    "precedent_type": {
+      "available": 0,
+      "unavailable": 566
+    },
+    "precedent_status": {
+      "available": 0,
+      "unavailable": 566
+    }
+  },
+  "pending_batches": [
+    {
+      "date": "2023-01-23",
+      "missing_document_ids": [
+        "108838603",
+        "169224654",
+        "171970760",
+        "172706332",
+        "173049695",
+        "173467021"
+      ],
+      "failed_records": [],
+      "metadata_url": null,
+      "archive_url": null
+    },
+    {
+      "date": "2023-01-17",
+      "missing_document_ids": [
+        "168427664",
+        "168902746",
+        "174969004",
+        "174973621"
+      ],
+      "failed_records": [],
+      "metadata_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/709470b4-9e11-4f25-981b-779922e1bda4/download/metadados20230117.json",
+      "archive_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/d37f5113-928f-47a7-bd65-3ef88682b947/download/20230117.zip"
+    }
+  ],
+  "sample": [
+    {
+      "source_id": "135133326",
+      "publication_date": "2023-02-02",
+      "decision_date": null,
+      "panel": null,
+      "precedent_type": null,
+      "precedent_status": null,
+      "text_status": "available",
+      "metadata_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/7ef05ecc-ace9-4ae5-935b-a16deb2b218a/download/metadados20230203.json",
+      "archive_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/14a6a894-a8f4-45d3-b2df-7e1595540487/download/20230203.zip",
+      "sha256": "32811c755075effe2edcaec374a0308fe73087ff46ec889cf33fadec78523082"
+    },
+    {
+      "source_id": "135141433",
+      "publication_date": "2023-02-02",
+      "decision_date": null,
+      "panel": null,
+      "precedent_type": null,
+      "precedent_status": null,
+      "text_status": "available",
+      "metadata_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/7ef05ecc-ace9-4ae5-935b-a16deb2b218a/download/metadados20230203.json",
+      "archive_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/14a6a894-a8f4-45d3-b2df-7e1595540487/download/20230203.zip",
+      "sha256": "fb9be835fbca8be1937f0af73bc1a1e6b9406b8106ea2924f1674f5532716e3f"
+    },
+    {
+      "source_id": "158521938",
+      "publication_date": "2023-02-02",
+      "decision_date": null,
+      "panel": null,
+      "precedent_type": null,
+      "precedent_status": null,
+      "text_status": "available",
+      "metadata_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/7ef05ecc-ace9-4ae5-935b-a16deb2b218a/download/metadados20230203.json",
+      "archive_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/14a6a894-a8f4-45d3-b2df-7e1595540487/download/20230203.zip",
+      "sha256": "9f547560a1cd0a89aa79c44ad1e10535984eec5f0388e3c409be512cdd0b75d9"
+    },
+    {
+      "source_id": "161921119",
+      "publication_date": "2023-02-02",
+      "decision_date": null,
+      "panel": null,
+      "precedent_type": null,
+      "precedent_status": null,
+      "text_status": "available",
+      "metadata_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/7ef05ecc-ace9-4ae5-935b-a16deb2b218a/download/metadados20230203.json",
+      "archive_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/14a6a894-a8f4-45d3-b2df-7e1595540487/download/20230203.zip",
+      "sha256": "baf98d55e7a68bc001b82d4fe5fe365acd371c979dfe6b935ad41dbb3bdb5876"
+    },
+    {
+      "source_id": "161935472",
+      "publication_date": "2023-02-02",
+      "decision_date": null,
+      "panel": null,
+      "precedent_type": null,
+      "precedent_status": null,
+      "text_status": "available",
+      "metadata_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/7ef05ecc-ace9-4ae5-935b-a16deb2b218a/download/metadados20230203.json",
+      "archive_url": "https://dadosabertos.web.stj.jus.br/dataset/a2cd85cc-1391-4ebc-aeed-a45dd75a7987/resource/14a6a894-a8f4-45d3-b2df-7e1595540487/download/20230203.zip",
+      "sha256": "2a0785d5fa8fc7032a36329aa0750007e3fab20833b2e73e61afa5c37d825f11"
+    }
+  ],
+  "file_integrity": {
+    "checked": 562,
+    "missing": [],
+    "hash_mismatch": [],
+    "unsafe_path": []
+  },
+  "limitations": [
+    "Publication date is not filing date",
+    "No automatic precedent authority inference",
+    "Null means source field unavailable",
+    "Catalog traversal is not proof of full STJ coverage"
+  ]
+}

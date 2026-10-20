@@ -30,7 +30,7 @@ the local decision and cited source.
 
 ## Importing an approved corpus
 
-The repository contains the import path, not an approved BDJur/STJ corpus.
+The repository contains the import path and an initial, unapproved STJ source set; it does not contain an approved BDJur/STJ analytical corpus.
 Obtain the reviewed source file through the project's approved BDJur process;
 do not treat DataJud's case metadata as a substitute for an STJ thesis or a
 doctrinal work. Each reference needs its institution (`STJ` for precedent,
@@ -99,3 +99,22 @@ limitations alongside the indicators. The official STJ data portal describes
 the distinction between process metadata, curated jurisprudence, and qualified
 precedent datasets. Public-source starting points include the [STJ Open Data
 Portal](https://dadosabertos.web.stj.jus.br/) and [BDJur](https://bdjur.stj.jus.br/).
+
+## Initial STJ source set
+
+After applying migrations, load two traceable entries from the STJ's
+*Jurisprudência em Teses*, edition 125, with:
+
+```powershell
+.venv/Scripts/python.exe manage.py load_stj_responsabilidade_civil
+```
+
+The idempotent command stores the edition's summaries on moral-damage
+valuation (bifasic method) and collective moral damage, with STJ decisions
+cited under each thesis. These records are visible as sourced material but
+remain `approved=False`, so they do not affect adherence/divergence indicators
+until the project's corpus approval process approves them. The edition's
+research covers cases published through 26 April 2019 and states it is not an
+official case-law repository. Its citations show what the edition cites; they
+do not establish that a cited case is binding or that any TJDFT decision
+follows it.
