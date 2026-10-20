@@ -1,0 +1,17 @@
+{
+    auto_https disable_redirects
+    default_sni {$SERVER_HOST}
+}
+https://{$SERVER_HOST} {
+    tls internal
+    handle /api/* {
+        reverse_proxy backend:8000 {
+            header_up X-Forwarded-Proto https
+        }
+    }
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}
