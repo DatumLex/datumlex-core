@@ -157,3 +157,69 @@ class RejectedRecord(models.Model):
 
     class Meta:
         db_table = "rejected_record"
+
+
+class LegalReference(models.Model):
+    """Sourced precedent/doctrine entry admitted to the reviewed analysis corpus."""
+
+    PRECEDENT = "precedent"
+    DOCTRINE = "doctrine"
+    SOURCE_TYPES = [(PRECEDENT, "Precedente"), (DOCTRINE, "Doutrina")]
+    SOURCE_INSTITUTIONS = [("STJ", "STJ"), ("BDJur", "BDJur")]
+
+    id = models.BigAutoField(primary_key=True)
+    reference_type = models.CharField(max_length=16, choices=SOURCE_TYPES)
+    source_institution = models.CharField(max_length=12, choices=SOURCE_INSTITUTIONS)
+    identifier = models.CharField(max_length=200)
+    title = models.CharField(max_length=500)
+    thesis = models.TextField()
+    authority = models.CharField(max_length=100, blank=True)
+    subject_code = models.PositiveIntegerField(null=True)
+    source_name = models.CharField(max_length=200)
+    source_url = models.URLField(max_length=1000)
+    source_locator = models.CharField(max_length=300, blank=True)
+    published_at = models.DateField(null=True)
+    approval_reference = models.CharField(max_length=200)
+    approved = models.BooleanField(default=False)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "legal_reference"
+        constraints = [models.UniqueConstraint(fields=["source_name", "identifier"], name="unique_legal_reference")]
+        indexes = [models.Index(fields=["reference_type", "approved", "subject_code"], name="legal_ref_type_approved_idx")]
+
+
+class DecisionAssessment(models.Model):
+    ALIGNED = "aligned"
+    DIVERGENT = "divergent"
+    DISTINGUISHED = "distinguished"
+    UNCERTAIN = "uncertain"
+    RELATIONS = [
+        (ALIGNED, "Aderente"),
+        (DIVERGENT, "Possível divergência"),
+        (DISTINGUISHED, "Distinguishing justificado"),
+        (UNCERTAIN, "Inconclusivo"),
+    ]
+    PENDING = "pending"
+    REVIEWED = "reviewed"
+    REVIEW_APPROVED = "approved"
+    REVIEW_STATES = [(PENDING, "Pendente"), (REVIEWED, "Revisado"), (REVIEW_APPROVED, "Validado")]
+
+    id = models.BigAutoField(primary_key=True)
+    local_decision = models.ForeignKey(FactProcess, on_delete=models.PROTECT, related_name="precedent_assessments")
+    reference = models.ForeignKey(LegalReference, on_delete=models.PROTECT, related_name="assessments")
+    relation = models.CharField(max_length=16, choices=RELATIONS)
+    review_state = models.CharField(max_length=16, choices=REVIEW_STATES, default=PENDING)
+    decision_date = models.DateField()
+    rationale = models.TextField()
+    evidence_excerpt = models.TextField(blank=True)
+    evidence_locator = models.CharField(max_length=300, blank=True)
+    reviewer = models.CharField(max_length=200, blank=True)
+    reviewed_at = models.DateTimeField(null=True)
+    approval_reference = models.CharField(max_length=200, blank=True)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "decision_assessment"
+        constraints = [models.UniqueConstraint(fields=["local_decision", "reference"], name="unique_decision_reference_assessment")]
+        indexes = [models.Index(fields=["decision_date", "review_state", "relation"], name="decision_dt_review_rel_idx")]

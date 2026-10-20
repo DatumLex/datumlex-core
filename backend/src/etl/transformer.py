@@ -57,16 +57,17 @@ def normalize(hit, scope):
     source = hit.get("_source")
     if not isinstance(source, dict):
         raise InvalidRecord("Missing source payload")
-    if source.get("tribunal") != "TJDFT" or source.get("nivelSigilo") != 0:
-        raise InvalidRecord("Outside public TJDFT scope")
+    court = scope.get("court", "TJDFT")
+    if source.get("tribunal") != court or source.get("nivelSigilo") != 0:
+        raise InvalidRecord(f"Outside public {court} scope")
     identity = hit.get("_id") or source.get("id")
     number = source.get("numeroProcesso")
-    if not identity or len(str(identity)) > 255:
+    if not identity or len(str(identity)) > 248:
         raise InvalidRecord("Missing or oversized source identifier")
     if not isinstance(number, str) or not re.fullmatch(r"\d{20}", number):
         raise InvalidRecord("Process number must be a 20-digit string")
     filing = timestamp(source.get("dataAjuizamento"), required=True)
-    if not scope["start"] <= filing.date().isoformat() < scope["end_exclusive"]:
+    if not scope.get("update_mode") and not scope["start"] <= filing.date().isoformat() < scope["end_exclusive"]:
         raise InvalidRecord("Filing date outside extraction scope")
     subjects = {}
     for item in flatten(source.get("assuntos")):
@@ -112,7 +113,9 @@ def normalize(hit, scope):
         if key in source
     }
     return {
-        "source_id": str(identity),
+        # A source document ID is only unique inside its DataJud court index.
+        "source_id": f"{court}:{identity}",
+        "court": court,
         "number_process": number,
         "degree": degree,
         "filing": filing.date(),

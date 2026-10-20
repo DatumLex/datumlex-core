@@ -16,8 +16,9 @@ def filtered_processes(params):
         raise InvalidQuery("Unsupported query parameter")
     if any(len(params.getlist(key)) > 1 for key in params):
         raise InvalidQuery("Repeated query parameters are not supported")
-    if params.get("court", "TJDFT") != "TJDFT":
-        raise InvalidQuery("Only TJDFT is available")
+    court = params.get("court", "TJDFT")
+    if court not in {"TJDFT", "STJ"}:
+        raise InvalidQuery("Unsupported court")
     if params.get("outcome", "all") not in {"all", "granted", "denied"}:
         raise InvalidQuery("outcome must be all, granted or denied")
     try:
@@ -30,14 +31,14 @@ def filtered_processes(params):
             raise ValueError
     except ValueError:
         raise InvalidQuery("Invalid date range (2023..today) or subject code") from None
-    query = FactProcess.objects.filter(court="TJDFT", time__date__range=[start, end])
+    query = FactProcess.objects.filter(court=court, time__date__range=[start, end])
     if subject:
         query = query.filter(
             Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code=subject))
         )
     # EXISTS keeps one row per document without DISTINCT over large JSON payloads.
     return query, {
-        "court": "TJDFT",
+        "court": court,
         "subject": subject,
         "start": start.isoformat(),
         "end": end.isoformat(),
@@ -48,10 +49,12 @@ def filtered_processes(params):
 
 
 def metadata(query, scope):
-    latest = ExtractionRun.objects.order_by("-id").first()
+    latest = ExtractionRun.objects.filter(scope__court=scope["court"]).order_by("-id").first()
     dates = query.aggregate(first=Min("time__date"), last=Max("time__date"), refreshed=Max("collected_at"))
     return {
         "source": "DataJud / CNJ",
+        "source_url": "https://api-publica.datajud.cnj.jus.br/",
+        "loaded_records": query.count(),
         "scope": scope,
         "available_period": {"start": dates["first"], "end": dates["last"]},
         "last_record_refresh": dates["refreshed"],
@@ -69,8 +72,9 @@ def metadata(query, scope):
             "finished_at": latest.finished_at,
         },
         "coverage": "Local loaded records only; consult run scopes, limits and rejections. Full coverage is not asserted.",
+        "uncertainty": "DataJud metadata is not a curated precedent or doctrine corpus. No legal alignment is inferred from shared process numbers or movement labels.",
         "merit_status": "document_proxy",
-        "merit_reason": "Latest dated mapped TPU outcome per document in G2/TR; timestamp ties use highest local movement ID. Partial/non-admitted outcomes remain outside binary denominator. Filing-date filter, not judgment-date filter.",
+        "merit_reason": "Latest dated mapped TPU outcome per DataJud document (G2/TR for TJDFT; SUP for STJ); timestamp ties use highest local movement ID. Partial, partial-knowledge and non-admitted outcomes remain outside the binary denominator. Filing-date filter, not judgment-date filter; not a count of individual appeals.",
     }
 
 

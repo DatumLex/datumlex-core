@@ -55,7 +55,7 @@ document-level meaning.
   to `fact_resource`. Existing API field names remain stable, including source
   class/subject codes rather than their new surrogate IDs.
 
-Stored results follow `tpu-document-latest-v2`: granted, denied, partial,
+Stored results follow `tpu-document-latest-v3`: granted, denied, partial,
 not_admitted, partial_knowledge, unknown, ambiguous or outside_degree. The last
 label maps to the API's existing `outside_appellate_degree` label to fit the
 reference's 20-character limit. Classification is refreshed from movements in

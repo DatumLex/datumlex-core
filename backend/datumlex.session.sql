@@ -262,3 +262,8 @@ ADD CONSTRAINT Fact_Process_Subject_DIM_Subject
     INITIALLY IMMEDIATE;
 
 -- End of file.
+
+SELECT username, email, is_staff, is_superuser, date_joined 
+FROM auth_user 
+WHERE is_staff = 1 OR username LIKE '%supor
+te%' OR username LIKE '%suport%';

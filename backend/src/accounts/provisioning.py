@@ -10,6 +10,7 @@ def provision_support(password=None):
     Court.objects.get_or_create(
         code="TJDFT", defaults={"name": "Tribunal de Justiça do Distrito Federal e dos Territórios"}
     )
+    Court.objects.get_or_create(code="STJ", defaults={"name": "Superior Tribunal de Justiça"})
     user = User.objects.filter(username="suport").first()
     if user:
         return user
