@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 
 from django.conf import settings
@@ -14,18 +14,19 @@ from src.etl.transformer import InvalidRecord, normalize
 
 
 class Command(BaseCommand):
-    help = "Extract public TJDFT or STJ metadata into the dimensional warehouse."
+    help = "Extract public TJDFT or STJ metadata into the local dimensional warehouse."
 
     def add_arguments(self, parser):
-        parser.add_argument("--court", choices=["TJDFT", "STJ"], default="TJDFT")
         parser.add_argument("--start", default="2023-01-01")
         parser.add_argument("--end", default=date.today().isoformat())
+        parser.add_argument("--court", choices=["TJDFT", "STJ"], default="TJDFT")
         parser.add_argument(
             "--subjects", default="10431", help="Exact CNJ codes; descendants are not inferred"
         )
         parser.add_argument("--page-size", type=int, default=100)
         parser.add_argument("--max-pages", type=int, default=5, help="Per invocation; 0 traverses all pages")
         parser.add_argument("--resume", type=int, help="Resume a paused/failed run using its saved scope")
+        parser.add_argument("--updated-since", help="Incremental refresh by DataJud update timestamp (ISO date/time)")
         parser.add_argument(
             "--input", type=Path, help="Import a local DataJud JSON response as a partial sample"
         )
@@ -33,8 +34,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["max_pages"] < 0:
             raise CommandError("--max-pages cannot be negative")
-        if options["resume"] and options["input"]:
-            raise CommandError("File imports cannot resume a remote run")
+        if options["resume"] and (options["input"] or options["updated_since"]):
+            raise CommandError("--resume cannot be combined with --input or --updated-since")
         imported = None
         if options["input"]:
             try:
@@ -44,10 +45,8 @@ class Command(BaseCommand):
                     raise ValueError
             except (OSError, ValueError, KeyError, TypeError):
                 raise CommandError("--input must contain a DataJud response with hits.hits") from None
-        try:
-            client = DataJudClient(settings.DATAJUD_API_KEY) if imported is None else None
-        except DataJudError as exc:
-            raise CommandError(str(exc)) from None
+        client = None
+        resumed_matching_scope = False
         if options["resume"]:
             try:
                 with transaction.atomic():
@@ -66,30 +65,67 @@ class Command(BaseCommand):
                 raise CommandError("Extraction run does not exist") from None
         else:
             try:
-                start, end = date.fromisoformat(options["start"]), date.fromisoformat(options["end"])
                 subjects = sorted({int(code.strip()) for code in options["subjects"].split(",")})
-                if start < date(2023, 1, 1) or start > end or end > date.today():
-                    raise ValueError
                 if not subjects or min(subjects) < 1 or not 1 <= options["page_size"] <= 1000:
                     raise ValueError
+                update_mode = bool(options["updated_since"])
+                if update_mode:
+                    updated_since = datetime.fromisoformat(options["updated_since"].replace("Z", "+00:00"))
+                    if timezone.is_naive(updated_since):
+                        updated_since = updated_since.replace(tzinfo=dt_timezone.utc)
+                    start, end = None, None
+                else:
+                    start, end = date.fromisoformat(options["start"]), date.fromisoformat(options["end"])
+                    if start < date(2023, 1, 1) or start > end or end > date.today():
+                        raise ValueError
             except ValueError:
                 raise CommandError(
                     "Use valid dates from 2023 to today, positive subject codes and page-size 1..1000"
                 ) from None
-            run = ExtractionRun.objects.create(
-                scope={
-                    "court": options["court"],
-                    "subject_codes": subjects,
+            scope = {
+                "court": options["court"],
+                "subject_codes": subjects,
+                **({"update_mode": True, "updated_since": updated_since.isoformat()} if update_mode else {
                     "start": start.isoformat(),
                     "end": end.isoformat(),
                     "end_exclusive": (end + timedelta(days=1)).isoformat(),
                     "period_field": "dataAjuizamento",
-                    "page_size": options["page_size"],
-                    "origin": "file_sample" if imported is not None else "datajud",
-                    "subject_policy": "explicit_codes_only",
-                }
-            )
+                }),
+                "page_size": options["page_size"],
+                "origin": "file_sample" if imported is not None else "datajud",
+                "subject_policy": "explicit_codes_only",
+            }
+            run = None
+            if imported is None:
+                candidates = ExtractionRun.objects.filter(
+                    status__in=["paused", "failed"],
+                    scope__court=options["court"],
+                    scope__origin="datajud",
+                ).order_by("-pk")
+                for candidate in candidates:
+                    if candidate.scope != scope:
+                        continue
+                    with transaction.atomic():
+                        claimed = ExtractionRun.objects.filter(
+                            pk=candidate.pk, status__in=["paused", "failed"]
+                        ).update(status="running", error="", finished_at=None)
+                        if claimed:
+                            run = candidate
+                            run.refresh_from_db()
+                            resumed_matching_scope = True
+                            break
+            if run is None:
+                run = ExtractionRun.objects.create(scope=scope)
+        if imported is None:
+            try:
+                # A resumed STJ run must keep using its saved tribunal endpoint even
+                # when --court is omitted from the resume command.
+                client = DataJudClient(settings.DATAJUD_API_KEY, court=run.scope.get("court", "TJDFT"))
+            except DataJudError as exc:
+                raise CommandError(str(exc)) from None
         self.stdout.write(f"Run {run.pk}: {json.dumps(run.scope)}")
+        if resumed_matching_scope:
+            self.stdout.write("Resuming the paused/failed run for this exact scope from its saved cursor.")
         try:
             invocation_pages = 0
             while True:

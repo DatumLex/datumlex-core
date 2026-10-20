@@ -1,11 +1,14 @@
-"""Bounded retries and strict search_after pagination for the official TJDFT API."""
+"""Bounded retries and strict search_after pagination for DataJud court APIs."""
 
 import json
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-ENDPOINT = "https://api-publica.datajud.cnj.jus.br/api_publica_tjdft/_search"
+ENDPOINTS = {
+    "TJDFT": "https://api-publica.datajud.cnj.jus.br/api_publica_tjdft/_search",
+    "STJ": "https://api-publica.datajud.cnj.jus.br/api_publica_stj/_search",
+}
 SOURCE_FIELDS = [
     "id",
     "numeroProcesso",
@@ -27,18 +30,28 @@ class DataJudError(Exception):
 
 
 class DataJudClient:
-    def __init__(self, api_key, timeout=45, attempts=4, pause=0.5):
+    def __init__(self, api_key, court="TJDFT", timeout=45, attempts=4, pause=0.5):
+        if court not in ENDPOINTS:
+            raise DataJudError("Unsupported DataJud court.")
         if not api_key.strip():
             raise DataJudError("Configure DATAJUD_API_KEY using the current CNJ public key.")
         self.api_key = api_key.strip().removeprefix("APIKey ")
         self.timeout, self.attempts, self.pause = timeout, attempts, pause
+        self.endpoint = ENDPOINTS[court]
 
     def search(self, scope, cursor=None):
-        court = scope.get("court", "TJDFT")
-        if court not in {"TJDFT", "STJ"}:
-            raise DataJudError("Unsupported court")
-        endpoint = (
-            ENDPOINT if court == "TJDFT" else "https://api-publica.datajud.cnj.jus.br/api_publica_stj/_search"
+        date_filter = (
+            {"range": {"dataHoraUltimaAtualizacao": {"gte": scope["updated_since"]}}}
+            if scope.get("update_mode")
+            else {
+                "bool": {
+                    "minimum_should_match": 1,
+                    "should": [
+                        {"range": {"dataAjuizamento": {"gte": scope["start"] + "T00:00:00Z", "lt": scope["end_exclusive"] + "T00:00:00Z"}}},
+                        {"range": {"dataAjuizamento": {"gte": int(scope["start"].replace("-", "") + "000000"), "lt": int(scope["end_exclusive"].replace("-", "") + "000000")}}},
+                    ],
+                }
+            }
         )
         body = {
             "size": scope["page_size"],
@@ -49,40 +62,19 @@ class DataJudClient:
                     "filter": [
                         {"term": {"nivelSigilo": 0}},
                         {"terms": {"assuntos.codigo": scope["subject_codes"]}},
-                        {
-                            "bool": {
-                                "minimum_should_match": 1,
-                                "should": [
-                                    {
-                                        "range": {
-                                            "dataAjuizamento": {
-                                                "gte": scope["start"] + "T00:00:00Z",
-                                                "lt": scope["end_exclusive"] + "T00:00:00Z",
-                                            }
-                                        }
-                                    },
-                                    # Observed TJDFT 2026 source: yyyyMMddHHmmss indexed as epoch_millis.
-                                    # Match both encodings; normalize and recheck the real date before loading.
-                                    {
-                                        "range": {
-                                            "dataAjuizamento": {
-                                                "gte": int(scope["start"].replace("-", "") + "000000"),
-                                                "lt": int(scope["end_exclusive"].replace("-", "") + "000000"),
-                                            }
-                                        }
-                                    },
-                                ],
-                            }
-                        },
+                        date_filter,
                     ]
                 }
             },
-            "sort": [{"@timestamp": "asc"}, {"id.keyword": "asc"}],
+            "sort": [
+                {"dataHoraUltimaAtualizacao" if scope.get("update_mode") else "@timestamp": "asc"},
+                {"id.keyword": "asc"},
+            ],
         }
         if cursor is not None:
             body["search_after"] = cursor
         request = Request(
-            endpoint,
+            self.endpoint,
             data=json.dumps(body).encode(),
             method="POST",
             headers={

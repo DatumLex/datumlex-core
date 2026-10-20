@@ -53,6 +53,8 @@ def metadata(query, scope):
     dates = query.aggregate(first=Min("time__date"), last=Max("time__date"), refreshed=Max("collected_at"))
     return {
         "source": "DataJud / CNJ",
+        "source_url": "https://api-publica.datajud.cnj.jus.br/",
+        "loaded_records": query.count(),
         "scope": scope,
         "available_period": {"start": dates["first"], "end": dates["last"]},
         "last_record_refresh": dates["refreshed"],
@@ -70,8 +72,9 @@ def metadata(query, scope):
             "finished_at": latest.finished_at,
         },
         "coverage": "Local loaded records only; consult run scopes, limits and rejections. Full coverage is not asserted.",
+        "uncertainty": "DataJud metadata is not a curated precedent or doctrine corpus. No legal alignment is inferred from shared process numbers or movement labels.",
         "merit_status": "document_proxy",
-        "merit_reason": "Latest dated mapped TPU outcome per document in G2/TR; timestamp ties use highest local movement ID. Partial/non-admitted outcomes remain outside binary denominator. Filing-date filter, not judgment-date filter.",
+        "merit_reason": "Latest dated mapped TPU outcome per DataJud document (G2/TR for TJDFT; SUP for STJ); timestamp ties use highest local movement ID. Partial, partial-knowledge and non-admitted outcomes remain outside the binary denominator. Filing-date filter, not judgment-date filter; not a count of individual appeals.",
     }
 
 

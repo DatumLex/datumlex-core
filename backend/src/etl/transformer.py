@@ -62,13 +62,14 @@ def normalize(hit, scope):
         raise InvalidRecord(f"Outside public {court} scope")
     identity = hit.get("_id") or source.get("id")
     number = source.get("numeroProcesso")
+    # Keep existing TJDFT IDs stable; STJ gets a court prefix to avoid collisions.
     identity = f"STJ:{identity}" if court == "STJ" and identity else identity
     if not identity or len(str(identity)) > 255:
         raise InvalidRecord("Missing or oversized source identifier")
     if not isinstance(number, str) or not re.fullmatch(r"\d{20}", number):
         raise InvalidRecord("Process number must be a 20-digit string")
     filing = timestamp(source.get("dataAjuizamento"), required=True)
-    if not scope["start"] <= filing.date().isoformat() < scope["end_exclusive"]:
+    if not scope.get("update_mode") and not scope["start"] <= filing.date().isoformat() < scope["end_exclusive"]:
         raise InvalidRecord("Filing date outside extraction scope")
     subjects = {}
     for item in flatten(source.get("assuntos")):

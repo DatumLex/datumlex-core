@@ -11,7 +11,7 @@ class AccessMiddleware:
     PUBLIC = {"/api/health/", "/api/auth/csrf/", "/api/auth/login/", "/api/auth/register/"}
     PASSWORD_ALLOWED = {"/api/auth/me/", "/api/auth/logout/", "/api/auth/password/"}
     DATA_ROUTES = {
-        f"/api/{name}/" for name in ("scope", "statistics", "distribution", "instances", "processes")
+        f"/api/{name}/" for name in ("scope", "statistics", "distribution", "instances", "processes", "alignment")
     }
 
     def __init__(self, get_response):

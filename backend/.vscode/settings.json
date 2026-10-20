@@ -7,7 +7,7 @@
             "port": 5433,
             "driver": "PostgreSQL",
             "name": "datumlex",
-            "database": "datumlex",
+            "database": "datumlex_v2",
             "username": "datumlex"
         }
     ]
