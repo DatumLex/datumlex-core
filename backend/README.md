@@ -49,40 +49,42 @@ you can explicitly continue it with:
 .venv/Scripts/python.exe manage.py extract_datajud --resume 1 --max-pages 5
 ```
 
-### Atualização incremental TJDFT + STJ
+### Sincronização automática TJDFT + STJ
 
-Para a carga histórica inicial, execute uma vez para cada tribunal (use um espaço antes de
-`--page-size`; os comandos existentes continuam limitados pela quantidade de páginas):
+No Windows, instale a tarefa automática uma única vez executando
+`backend/scripts/install_datajud_schedule.ps1` com PowerShell. A tarefa inicia uma carga histórica
+desde 2023 para TJDFT e STJ, dois lotes de 100 registros por tribunal por execução. Se houver mais
+páginas, ela retoma o cursor salvo nas execuções diárias seguintes; depois de concluir o histórico,
+passa a buscar atualizações pela data de indexação (`dataHoraUltimaAtualizacao`) nos dois tribunais,
+com sobreposição de três dias. Os filtros iniciais são os assuntos 10431, 10433 e 10439.
 
-```powershell
-.venv/Scripts/python.exe manage.py extract_datajud --court TJDFT --subjects 10431,10433,10439 --start 2023-01-01 --page-size 100 --max-pages 2
-.venv/Scripts/python.exe manage.py extract_datajud --court STJ --subjects 10431,10433,10439 --start 2023-01-01 --page-size 100 --max-pages 2
-```
+A tarefa é executada diariamente às 2h enquanto sua sessão do Windows estiver conectada, mesmo
+sem uma janela de terminal aberta, e tenta iniciar na instalação. Usa o `.env` e o banco já configurados para o backend. A saída fica em
+`backend/data/datajud-scheduler.log` (com rotação automática), e cada execução também registra
+tribunal, escopo, cursor e contagens em `extraction_run`. O painel continua consultando a API
+periodicamente. A sincronização não representa cobertura completa e não substitui a revisão
+jurídica das avaliações de precedentes.
 
-Depois da carga inicial, use um único comando para buscar documentos atualizados nos dois tribunais:
+### Integração Pangea/BNP
 
-```powershell
-.venv/Scripts/python.exe manage.py refresh_datajud --subjects 10431,10433,10439 --page-size 100 --max-pages 5
-```
+A tarefa também consulta os Recursos Especiais Repetitivos do STJ no BNP/Pangea. Configure
+`BNP_API_CLIENT_ID` e `BNP_API_CLIENT_SECRET` no `backend/.env`; mantenha os segredos somente
+nesse arquivo local. A API oficial exige credenciais de serviço PDPJ-Br. Caso ainda não tenha
+uma client secret, solicite-a ao CNJ pelo [Portal de Suporte de TI](https://suporteti.cnj.jus.br/).
+Quando as credenciais não estiverem presentes, o agendador apenas registra que a integração foi
+ignorada; não interrompe a carga DataJud. Depois de configurar as credenciais, a importação
+Pangea acontece automaticamente na próxima execução diária. As referências importadas entram no
+corpus como pendentes de aprovação e não contam nos indicadores até revisão jurídica.
 
-O comando consulta `dataHoraUltimaAtualizacao`, usa uma sobreposição de três dias para absorver
-atrasos de indexação e salva cursor/escopo em cada execução. Se atingir `--max-pages`, a próxima
-execução continua essa busca antes de abrir uma nova janela. Sem execução incremental anterior,
-busca os últimos 30 dias (`--initial-lookback-days` altera esse período); isso não substitui a
-carga histórica por data de ajuizamento descrita acima. A lista de assuntos explícitos é aplicada
-aos dois tribunais. Os novos registros ficam disponíveis na API e no dashboard após serem gravados
-no banco. Com o painel aberto, a interface consulta a API novamente a cada cinco minutos e ao
-voltar para a aba.
+Para validar/conectar imediatamente pela aplicação, o comando é
+`manage.py sync_pangea --page-size 100 --max-pages 5`. A integração usa produção por padrão;
+para homologação, configure `BNP_API_BASE_URL` e `BNP_TOKEN_URL` com os endereços oficiais de
+staging documentados pela PDPJ-Br.
 
-Para agendar no Windows, crie uma tarefa diária no Agendador de Tarefas com:
-
-- **Programa/script:** caminho completo para `backend\.venv\Scripts\python.exe`
-- **Argumentos:** `manage.py refresh_datajud --subjects 10431,10433,10439 --page-size 100 --max-pages 5`
-- **Iniciar em:** caminho completo para a pasta `backend`
-
-O agendamento deve usar o mesmo `.env` e banco configurados para o dashboard. Cada execução
-registra tribunal, escopo, cursor, contagens e falhas em `extraction_run`; a rotina não torna a
-cobertura completa nem substitui a revisão jurídica das avaliações de precedentes.
+Para administrar a tarefa depois da instalação, use o aplicativo **Agendador de Tarefas** do
+Windows e procure `DatumLex DataJud TJDFT-STJ`. Se a chave DataJud não estiver configurada no
+`.env` ou o banco/backend não estiver disponível, o erro é registrado no log e a tarefa tenta
+novamente no próximo horário.
 
 `--max-pages 0` traverses until the source returns an empty page. The default is five pages
 of 100 records, to avoid accidentally downloading a whole court. `--end` defaults to today.

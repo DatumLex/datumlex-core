@@ -215,6 +215,25 @@ def alignment(request):
         )
         .order_by("-validated_links", "reference__title")[:20]
     )
+    source_theses = list(
+        LegalReference.objects.filter(
+            reference_type=LegalReference.PRECEDENT,
+            source_institution="STJ",
+        )
+        .order_by("title", "identifier")
+        .values(
+            "id", "identifier", "title", "thesis", "source_name", "source_url",
+            "source_locator", "approved", "approval_reference", "related_decisions",
+        )[:100]
+    )
+    reviewed_thesis_counts = {
+        row["reference_id"]: row
+        for row in theses
+    }
+    for thesis in source_theses:
+        counts_for_thesis = reviewed_thesis_counts.get(thesis["id"], {})
+        thesis["validated_links"] = counts_for_thesis.get("validated_links", 0)
+        thesis["local_decisions"] = counts_for_thesis.get("local_decisions", 0)
     references = list(
         LegalReference.objects.filter(approved=True)
         .order_by("source_institution", "source_name", "identifier")
@@ -263,6 +282,7 @@ def alignment(request):
             for row in rows
         ],
         "theses": theses,
+          "source_theses": source_theses,
         "metadata": {
             "scope": {**selected, "date_field": "decision_date", "court": "TJDFT"},
             "source": "Corpus aprovado e avaliações revisadas; fontes citadas por registro.",

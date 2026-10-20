@@ -248,6 +248,7 @@ class LegalReference(models.Model):
     identifier = models.CharField(max_length=200)
     title = models.CharField(max_length=500)
     thesis = models.TextField()
+    related_decisions = models.JSONField(default=list)
     authority = models.CharField(max_length=100, blank=True)
     subject_code = models.PositiveIntegerField(null=True)
     source_name = models.CharField(max_length=200)
