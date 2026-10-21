@@ -6,7 +6,6 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-
 BACKEND = Path(__file__).resolve().parents[1]
 PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
 LOG_DIR = BACKEND / "data"

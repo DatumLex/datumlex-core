@@ -110,4 +110,4 @@ class OutcomeTests(TestCase):
         row = self.client.get("/api/processes/").json()["results"][0]
         self.assertEqual(row["outcome"], "granted")
         self.assertEqual(len(row["evidence"]), 2)
-        self.assertEqual(row["rule_version"], "tpu-document-latest-v2")
+        self.assertEqual(row["rule_version"], "tpu-document-latest-v3")

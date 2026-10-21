@@ -62,7 +62,6 @@ class Command(BaseCommand):
                         "title": title,
                         "thesis": thesis,
                         "authority": item.get("authority", ""),
-                        "subject_code": item.get("subject_code"),
                         "source_url": source_url,
                         "source_locator": source_locator,
                         "subject_code": int(subject_code) if subject_code is not None else None,

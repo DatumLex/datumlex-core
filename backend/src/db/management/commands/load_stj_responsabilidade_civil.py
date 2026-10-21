@@ -3,7 +3,6 @@ from django.db import transaction
 
 from src.db.models import LegalReference
 
-
 SOURCE_URL = (
     "https://www.stj.jus.br/docs_internet/jurisprudencia/"
     "jurisprudenciaemteses/Jurisprudencia%20em%20Teses%20125%20-"
