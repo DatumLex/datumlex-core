@@ -1,5 +1,8 @@
 # DatumLex backend
 
+BDJur integration: see the [bounded source-feasibility report](docs/bdjur-feasibility.md)
+(#101). Tested direct routes returned 403; no approved doctrine corpus is claimed.
+
 Update 2026-09-27: analytics now require an approved session and authorized court. Login, registration, user management, immutable support provisioning, and audit are implemented. See [access control and deployment](docs/access-control.md), which supersedes earlier unauthenticated API/startup examples below.
 
 Update 2026-09-22: the backend now uses the resource dimensional schema based on

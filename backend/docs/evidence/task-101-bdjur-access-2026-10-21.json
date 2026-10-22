@@ -1,0 +1,41 @@
+{
+  "scope": "Six public BDJur access probes; not a corpus extraction or rights approval",
+  "observations": [
+    {
+      "url": "https://bdjur.stj.jus.br/",
+      "observed_at": "2026-10-22T00:06:05.517176+00:00",
+      "status": 403,
+      "content_type": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://bdjur.stj.jus.br/robots.txt",
+      "observed_at": "2026-10-22T00:06:05.732661+00:00",
+      "status": 403,
+      "content_type": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://bdjur.stj.jus.br/server/api",
+      "observed_at": "2026-10-22T00:06:05.787524+00:00",
+      "status": 403,
+      "content_type": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://bdjur.stj.jus.br/entities/publication/67297921-a874-4880-b8e5-e65e235d4338",
+      "observed_at": "2026-10-22T00:06:05.832504+00:00",
+      "status": 403,
+      "content_type": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://bdjur.stj.jus.br/entities/publication/4bd0920d-0f94-4736-b099-78ddcac45022/full",
+      "observed_at": "2026-10-22T00:06:05.891360+00:00",
+      "status": 403,
+      "content_type": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://bdjur.stj.jus.br/items/9431076b-d413-4887-b648-4c346b35fda4",
+      "observed_at": "2026-10-22T00:06:05.960071+00:00",
+      "status": 403,
+      "content_type": "text/html; charset=UTF-8"
+    }
+  ]
+}
