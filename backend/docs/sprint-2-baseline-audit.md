@@ -146,12 +146,14 @@ status. No row below is labelled proven Done without its complete DoD evidence.
 - Django system check: passed. Migration drift: no changes detected.
 - Ruff with the explicit backend configuration: passed after import cleanup,
   removal of a shadowed dictionary entry and an unused migration-local variable.
-- CI now runs the existing complete backend suite on Windows with isolated settings,
-  plus frontend dependency installation/lint/build in its actual directory.
+- Workflow changes were removed from PR #178 at the project representative's
+  request to avoid conflicts. The existing main workflow is preserved. Local
+  backend/frontend validation and its evidence remain part of this delivery.
 - Frontend ESLint and production build passed. The dependency audit initially
   reported three high-severity packages; compatible lockfile updates corrected
-  them and the repeated npm audit reported zero vulnerabilities. CI checks
-  `npm audit --audit-level=high`. The hosted run is linked in the PR handoff.
+  them and the repeated npm audit reported zero vulnerabilities. The previously
+  passing hosted run used the earlier workflow revision; it is historical evidence
+  and does not describe the current PR workflow after its removal from scope.
 - Tests use controlled fixtures; no development/production data was migrated,
   recollected, modified or claimed as a fresh real-source validation.
 - Independent review, hosting decision and integrated release acceptance remain
@@ -221,7 +223,7 @@ Dates, priorities and estimates were not changed by this work.
 
 | Task | Branch / commit | PR | Validation and completion boundary |
 |---|---|---|---|
-| #177, supporting #169 | fix/177-sprint2-baseline-validation / 8389dad | [#178](https://github.com/DatumLex/datumlex-core/pull/178) | 63 isolated Django tests, no migration drift, Ruff, frontend lint/build/audit passed; [hosted backend/frontend CI passed](https://github.com/DatumLex/datumlex-core/actions/runs/39696964908). Independent review pending. |
+| #177, supporting #169 | fix/177-sprint2-baseline-validation / 8389dad | [#178](https://github.com/DatumLex/datumlex-core/pull/178) | 63 isolated Django tests, no migration drift, Ruff, frontend lint/build/audit passed. Workflow changes later removed at the project representative's request; prior hosted success is historical. Independent review pending. |
 | #165 | documentation/165-analytical-context / 75e9a79 | [#179](https://github.com/DatumLex/datumlex-core/pull/179) | Canonical contract and 12 hand-counted cases checked offline; no active API change. Independent API/model/UI/PDF review required before dependent implementation. |
 | #101 | documentation/101-bdjur-source-feasibility / 6949789 | [#180](https://github.com/DatumLex/datumlex-core/pull/180) | Six official-route probes returned 403; report separates indexed candidates from live access and rights. Source/PO review required; no approved BDJur corpus. |
 
@@ -230,10 +232,11 @@ coauthorship. #101/#165/#177 are In review; none was marked Done. #169 remains
 owned by ThiagoChaves13 with its original status. Main has not been merged or
 modified, and the original local staged/unstaged changes remain intact.
 
-The documentation PRs #179/#180 inherit main's root-level CI failure until the
-reviewed baseline fix is integrated; their directly applicable offline checks
-passed. The baseline PR alone has the repaired, passing hosted quality jobs.
-No authenticated real-data dashboard/PDF run or deployment acceptance is claimed.
+All three PRs now retain main's existing workflow; changes to CI are outside
+this delivery at the project representative's request. Local validation results
+remain valid. The earlier hosted backend/frontend success applies only to the
+earlier workflow revision. No current hosted CI success, authenticated real-data
+dashboard/PDF run or deployment acceptance is claimed.
 
 Remaining implementation requires the explicit reviewed inputs recorded in the
 matrix: source access/rights (#101/#162), model/link contracts (#104), annotation

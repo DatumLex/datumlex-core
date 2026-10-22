@@ -2,48 +2,24 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
-    branches: [main]
-
-permissions:
-  contents: read
+    branches: [ "main" ]
 
 jobs:
-  backend:
-    # The STJ collector currently uses Windows file locking (msvcrt).
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      DJANGO_SETTINGS_MODULE: config.test_settings
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: backend/requirements*.txt
-      - run: python -m pip install -r requirements-dev.txt
-      - run: python manage.py check
-      - run: python manage.py makemigrations --check --dry-run
-      - run: python manage.py test tests --verbosity 2
-      - run: python -m ruff check --config pyproject.toml . ../etl
-
-  frontend:
+  build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22.22.0'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm audit --audit-level=high
-      - run: npm run lint
-      - run: npm run build
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        
+    - name: Instalar dependências
+      run: npm install
+      
+    - name: Executar testes
+      run: npm test
