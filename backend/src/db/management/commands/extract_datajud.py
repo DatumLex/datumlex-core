@@ -1,5 +1,6 @@
 import json
-from datetime import date, datetime, timedelta, timezone as dt_timezone
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 from pathlib import Path
 
 from django.conf import settings

@@ -1,0 +1,697 @@
+{
+  "notice": "Synthetic hand-counted contract oracle. Not real judicial data or legal approval. Expected values are literals, never generated from the evaluator.",
+  "documents": [
+    {
+      "id": "TJDFT:t1",
+      "court": "TJDFT",
+      "source": "datajud",
+      "outcome": "granted",
+      "subject_codes": [
+        10433,
+        10439
+      ],
+      "filing_date": "2024-01-10"
+    },
+    {
+      "id": "TJDFT:t2",
+      "court": "TJDFT",
+      "source": "datajud",
+      "outcome": "denied",
+      "subject_codes": [
+        10433
+      ],
+      "filing_date": "2024-01-10"
+    },
+    {
+      "id": "TJDFT:t3",
+      "court": "TJDFT",
+      "source": "datajud",
+      "outcome": "partial",
+      "subject_codes": [
+        10433
+      ],
+      "filing_date": "2024-01-10"
+    },
+    {
+      "id": "TJDFT:t4",
+      "court": "TJDFT",
+      "source": "datajud",
+      "outcome": "unknown",
+      "subject_codes": [
+        10433
+      ],
+      "filing_date": "2024-01-10"
+    },
+    {
+      "id": "STJ:s1",
+      "court": "STJ",
+      "source": "datajud",
+      "outcome": "granted",
+      "subject_codes": [
+        10433
+      ],
+      "filing_date": "2024-01-10"
+    },
+    {
+      "id": "STJ:s2",
+      "court": "STJ",
+      "source": "datajud",
+      "outcome": "denied",
+      "subject_codes": [
+        10433
+      ],
+      "filing_date": "2024-01-10"
+    }
+  ],
+  "doctrine": [
+    {
+      "id": "BDJur:b1",
+      "source": "bdjur_doctrine",
+      "subject_codes": [
+        10433
+      ],
+      "publication_date": "2024-01-15"
+    }
+  ],
+  "cases": [
+    {
+      "name": "tjdft_only",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 4,
+        "granted": 1,
+        "denied": 1,
+        "binary_denominator": 2,
+        "grant_rate_fraction": [
+          1,
+          2
+        ],
+        "excluded": {
+          "partial": 1,
+          "unknown": 1
+        },
+        "displayed_ids": [
+          "TJDFT:t1",
+          "TJDFT:t2",
+          "TJDFT:t3",
+          "TJDFT:t4"
+        ],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "combined",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 6,
+        "granted": 2,
+        "denied": 2,
+        "binary_denominator": 4,
+        "grant_rate_fraction": [
+          1,
+          2
+        ],
+        "excluded": {
+          "partial": 1,
+          "unknown": 1
+        },
+        "displayed_ids": [
+          "STJ:s1",
+          "STJ:s2",
+          "TJDFT:t1",
+          "TJDFT:t2",
+          "TJDFT:t3",
+          "TJDFT:t4"
+        ],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "mixed_outcomes",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "partial"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 6,
+        "granted": 2,
+        "denied": 2,
+        "binary_denominator": 4,
+        "grant_rate_fraction": [
+          1,
+          2
+        ],
+        "excluded": {
+          "partial": 1,
+          "unknown": 1
+        },
+        "displayed_ids": [
+          "STJ:s1",
+          "TJDFT:t1",
+          "TJDFT:t3"
+        ],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "doctrine_only",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "bdjur_doctrine"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 0,
+        "granted": 0,
+        "denied": 0,
+        "binary_denominator": 0,
+        "grant_rate_fraction": null,
+        "excluded": {},
+        "displayed_ids": [],
+        "doctrine_count": 1,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "no_matches",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2025-01-01",
+        "end": "2025-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 0,
+        "granted": 0,
+        "denied": 0,
+        "binary_denominator": 0,
+        "grant_rate_fraction": null,
+        "excluded": {},
+        "displayed_ids": [],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "missing_source",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "datajud",
+          "bdjur_doctrine"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud"
+      ],
+      "expected": {
+        "population_count": 6,
+        "granted": 2,
+        "denied": 2,
+        "binary_denominator": 4,
+        "grant_rate_fraction": [
+          1,
+          2
+        ],
+        "excluded": {
+          "partial": 1,
+          "unknown": 1
+        },
+        "displayed_ids": [
+          "STJ:s1",
+          "STJ:s2",
+          "TJDFT:t1",
+          "TJDFT:t2",
+          "TJDFT:t3",
+          "TJDFT:t4"
+        ],
+        "doctrine_count": 0,
+        "missing_sources": [
+          "bdjur_doctrine"
+        ]
+      }
+    },
+    {
+      "name": "unauthorized_court",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "error_status": 403
+      }
+    },
+    {
+      "name": "empty_outcomes",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 6,
+        "granted": 2,
+        "denied": 2,
+        "binary_denominator": 4,
+        "grant_rate_fraction": [
+          1,
+          2
+        ],
+        "excluded": {
+          "partial": 1,
+          "unknown": 1
+        },
+        "displayed_ids": [],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "empty_sources",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 0,
+        "granted": 0,
+        "denied": 0,
+        "binary_denominator": 0,
+        "grant_rate_fraction": null,
+        "excluded": {},
+        "displayed_ids": [],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "empty_courts",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 0,
+        "granted": 0,
+        "denied": 0,
+        "binary_denominator": 0,
+        "grant_rate_fraction": null,
+        "excluded": {},
+        "displayed_ids": [],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "doctrine_without_courts",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [],
+        "outcomes": [
+          "granted",
+          "denied",
+          "partial",
+          "not_admitted",
+          "partial_knowledge",
+          "ambiguous",
+          "unknown",
+          "outside_appellate_degree"
+        ],
+        "sources": [
+          "bdjur_doctrine"
+        ],
+        "subject_codes": [
+          10433,
+          10439
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 0,
+        "granted": 0,
+        "denied": 0,
+        "binary_denominator": 0,
+        "grant_rate_fraction": null,
+        "excluded": {},
+        "displayed_ids": [],
+        "doctrine_count": 1,
+        "missing_sources": []
+      }
+    },
+    {
+      "name": "duplicates_and_order",
+      "context": {
+        "contract_version": "analytical-context-v1",
+        "courts": [
+          "STJ",
+          "TJDFT",
+          "STJ"
+        ],
+        "outcomes": [
+          "outside_appellate_degree",
+          "unknown",
+          "ambiguous",
+          "partial_knowledge",
+          "not_admitted",
+          "partial",
+          "denied",
+          "granted"
+        ],
+        "sources": [
+          "datajud"
+        ],
+        "subject_codes": [
+          10439,
+          10433,
+          10433
+        ],
+        "start": "2024-01-01",
+        "end": "2024-01-31"
+      },
+      "authorized_courts": [
+        "STJ",
+        "TJDFT"
+      ],
+      "available_sources": [
+        "datajud",
+        "bdjur_doctrine"
+      ],
+      "expected": {
+        "population_count": 6,
+        "granted": 2,
+        "denied": 2,
+        "binary_denominator": 4,
+        "grant_rate_fraction": [
+          1,
+          2
+        ],
+        "excluded": {
+          "partial": 1,
+          "unknown": 1
+        },
+        "displayed_ids": [
+          "STJ:s1",
+          "STJ:s2",
+          "TJDFT:t1",
+          "TJDFT:t2",
+          "TJDFT:t3",
+          "TJDFT:t4"
+        ],
+        "doctrine_count": 0,
+        "missing_sources": []
+      }
+    }
+  ],
+  "equivalent_contexts": [
+    [
+      "combined",
+      "duplicates_and_order"
+    ]
+  ]
+}

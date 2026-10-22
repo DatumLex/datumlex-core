@@ -8,7 +8,6 @@ from django.db import transaction
 from src.api.pangea_client import PangeaClient, PangeaError
 from src.db.models import LegalReference
 
-
 SOURCE_NAME = "Pangea/BNP — STJ Recurso Especial Repetitivo"
 SOURCE_URL = "https://pangeabnp.pdpj.jus.br/"
 RESOURCE = "recurso-repetitivo"
