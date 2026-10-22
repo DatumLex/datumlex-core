@@ -3,6 +3,10 @@
 Sprint 2 baseline: see the [2026-10-21 audit and 45-issue traceability matrix](docs/sprint-2-baseline-audit.md)
 for reproduced validation gaps, delivery dependencies and review boundaries.
 
+Sprint 2 filter design: [proposed canonical analytical-context contract](docs/analytical-context.md)
+and its independently calculated examples (#165). Existing API behavior remains
+unchanged until independent contract/model review and #166 implementation.
+
 Update 2026-09-27: analytics now require an approved session and authorized court. Login, registration, user management, immutable support provisioning, and audit are implemented. See [access control and deployment](docs/access-control.md), which supersedes earlier unauthenticated API/startup examples below.
 
 Update 2026-09-22: the backend now uses the resource dimensional schema based on
