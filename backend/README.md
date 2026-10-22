@@ -1,5 +1,8 @@
 # DatumLex backend
 
+BDJur integration: see the [bounded source-feasibility report](docs/bdjur-feasibility.md)
+(#101). Tested direct routes returned 403; no approved doctrine corpus is claimed.
+
 Sprint 2 baseline: see the [2026-10-21 audit and 45-issue traceability matrix](docs/sprint-2-baseline-audit.md)
 for reproduced validation gaps, delivery dependencies and review boundaries.
 
