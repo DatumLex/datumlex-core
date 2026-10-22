@@ -66,7 +66,11 @@ No Windows, instale a tarefa automática uma única vez executando
 desde 2023 para TJDFT e STJ, dois lotes de 100 registros por tribunal por execução. Se houver mais
 páginas, ela retoma o cursor salvo nas execuções diárias seguintes; depois de concluir o histórico,
 passa a buscar atualizações pela data de indexação (`dataHoraUltimaAtualizacao`) nos dois tribunais,
-com sobreposição de três dias. Os filtros iniciais são os assuntos 10431, 10433 e 10439.
+com sobreposição de três dias. A seleção ampliada inclui os ramos TPU de Direito Civil, Consumidor,
+Saúde, Previdenciário, Administrativo, Tributário, Processual Civil, Penal, Trabalho, Infância e
+Meio Ambiente, com códigos de subassuntos conhecidos para consumidor, saúde, previdenciário e
+processo civil. A lista inclui 10431, 10433 e 10439. A consulta usa códigos explícitos e não declara
+cobertura de todos os descendentes da TPU; a origem taxonômica é a [consulta pública do SGT/CNJ](https://www.cnj.jus.br/sgt/consulta_publica_assuntos.php).
 
 A tarefa é executada diariamente às 2h enquanto sua sessão do Windows estiver conectada, mesmo
 sem uma janela de terminal aberta, e tenta iniciar na instalação. Usa o `.env` e o banco já configurados para o backend. A saída fica em
@@ -77,19 +81,26 @@ jurídica das avaliações de precedentes.
 
 ### Integração Pangea/BNP
 
-A tarefa também consulta os Recursos Especiais Repetitivos do STJ no BNP/Pangea. Configure
-`BNP_API_CLIENT_ID` e `BNP_API_CLIENT_SECRET` no `backend/.env`; mantenha os segredos somente
-nesse arquivo local. A API oficial exige credenciais de serviço PDPJ-Br. Caso ainda não tenha
-uma client secret, solicite-a ao CNJ pelo [Portal de Suporte de TI](https://suporteti.cnj.jus.br/).
-Quando as credenciais não estiverem presentes, o agendador apenas registra que a integração foi
-ignorada; não interrompe a carga DataJud. Depois de configurar as credenciais, a importação
-Pangea acontece automaticamente na próxima execução diária. As referências importadas entram no
-corpus como pendentes de aprovação e não contam nos indicadores até revisão jurídica.
+A tarefa consulta a busca pública do Pangea/BNP, filtrando o órgão STJ e usando o catálogo público
+de espécies. Essa rota de pesquisa não exige credenciais OAuth; configure
+`PANGEA_SEARCH_BASE_URL` somente se precisar apontar para outro ambiente. A integração importa
+tese, questão, situação, metadados e processos paradigma explicitamente listados. Registra também
+execução, cobertura, paginação e hash do payload. `ultimaAtualizacao` é guardada como atualização
+da fonte, nunca como data de julgamento/publicação. As referências entram como pendentes de
+aprovação e não contam nos indicadores até revisão jurídica. A busca automática cobre
+responsabilidade civil, consumidor, saúde, previdenciário, administrativo, tributário e processo
+civil, até cinco páginas de 100 por tema a cada execução. Em uma coleta ao vivo, as sete buscas
+retornaram 2.414 resultados, consolidados em 815 referências STJ únicas. Resultados repetidos em temas diferentes
+atualizam a proveniência da mesma referência em vez de criar duplicatas.
 
 Para validar/conectar imediatamente pela aplicação, o comando é
-`manage.py sync_pangea --page-size 100 --max-pages 5`. A integração usa produção por padrão;
-para homologação, configure `BNP_API_BASE_URL` e `BNP_TOKEN_URL` com os endereços oficiais de
-staging documentados pela PDPJ-Br.
+`manage.py sync_pangea --query "direito do consumidor" --page-size 100 --max-pages 5`. Para reconciliar citações explícitas
+com os registros TJDFT carregados, use `manage.py match_stj_citations`; a tarefa diária executa
+essa reconciliação após sincronizar as fontes. Apenas números CNJ completos são comparados.
+Correspondências de identificador não são avaliações de aderência e ficam fora das taxas.
+O cliente OAuth legado (`BNP_API_*`) permanece disponível para outros recursos autenticados,
+mas não é usado por essa pesquisa pública. Consulte o [guia Pangea da PDPJ-Br](https://docs.pdpj.jus.br/servicos-negociais/pangeabnp/)
+para distinguir os recursos públicos do portal dos recursos negociais autenticados.
 
 Para administrar a tarefa depois da instalação, use o aplicativo **Agendador de Tarefas** do
 Windows e procure `DatumLex DataJud TJDFT-STJ`. Se a chave DataJud não estiver configurada no
@@ -111,7 +122,8 @@ Rejection reasons/source IDs are stored separately without retaining the rejecte
 
 - `10431`: Civil Liability; `10433`: Compensation for Non-Pecuniary Damage; `10439`: Compensation for Pecuniary Damage.
 - These are **explicit codes**, not a complete or automatically expanded descendant taxonomy.
-  The default without `--subjects` is only `10431`. Approve the full taxonomy before claiming
+  The default uses a curated list of explicit TPU roots and subtopics; it does not infer every
+  descendant. The complete scope is in `src/db/subject_catalog.py`. Approve the full taxonomy before claiming
   complete Civil Liability coverage. References: [CNJ hierarchy](https://www.cnj.jus.br/sgt/visualizar_sugestoes.php?codigo=366)
   and [TPU subject table](https://www.tjsp.jus.br/Download/GeraisIntranet/SPI/AreaConciliacao.pdf).
 - The period is the **filing date** (`dataAjuizamento`), not judgment date. Therefore this

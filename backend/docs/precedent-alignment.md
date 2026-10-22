@@ -7,6 +7,63 @@ existence of an STJ process. DataJud remains the source for process metadata;
 the legal reference corpus and each decision-to-reference assessment carry
 their own citation and approval lineage.
 
+## Cross-source citation reconciliation
+
+`sync_pangea` imports STJ precedent records and explicitly listed representative
+processes from Pangea's public search API. It reads the public catalog first,
+restricts the query to STJ, and saves the query, catalog version, page coverage,
+source update date, and a payload hash for audit. The scheduled source job then runs
+`match_stj_citations`, which compares a citation only when it contains the
+complete 20-digit CNJ identifier with a local TJDFT process number. The
+normalization removes punctuation; it does not infer CNJ digits from a short
+REsp/AREsp citation, title, subject, or textual similarity. Re-running the
+command is idempotent. Links retain both database endpoints, the cited source
+identifier and locator, rule version, confidence, and review status.
+
+An exact identifier match has confidence `1.0000` for **process identity only**;
+it does not measure legal similarity, adherence, or precedent applicability.
+Unmatched and non-CNJ citations are stored as unresolved with no confidence and
+remain separate from matched candidates. Reconciliation candidates do not
+create `DecisionAssessment` rows or affect adherence/divergence totals. The API
+does not apply the selected decision-date filter to these candidates because
+the current DataJud process facts do not provide a verified judgment date.
+
+### Initial evidence and limits
+
+The locally available, sourced STJ edition-125 sample contains citations such
+as `REsp 1771866/DF`, while DataJud stores CNJ process identifiers. Without
+retrieved decision text or an official mapping between those formats, these
+citations cannot be joined safely. The exact-CNJ rule therefore deliberately
+leaves them unresolved. The available local DataJud set has TJDFT process
+metadata but no TJDFT decision text; task #163 is still a prerequisite for
+full citation extraction. The integrated public Pangea search does not require
+OAuth credentials. The separate legacy client for authenticated BNP resources
+still supports client credentials. The official [PDPJ-Br Pangea integration
+guide](https://docs.pdpj.jus.br/servicos-negociais/pangeabnp/) documents the
+service and its authenticated resources.
+
+The reproducible matcher fixtures cover complete-ID matches, non-CNJ
+citations, malformed identifiers, duplicate citations and idempotent reruns.
+They do not estimate real-corpus precision/recall or resolve false negatives
+caused by missing full text. No fuzzy-match threshold is enabled. A reviewed
+real-source sample and the decision-text ingestion task are still required
+before widening matching beyond exact identifiers.
+
+The Pangea public catalog and STJ search endpoint were verified during integration.
+For the query `responsabilidade civil`, a live search returned 220 results and
+all were imported in three pages. Scheduled collection now also queries
+consumer, health, social-security, administrative, tax, and civil-procedure
+themes. Each topic is capped at five pages of 100 per run, and each result
+preserves which search terms returned it. One verified collection returned
+2,414 search hits consolidated into 815 unique STJ references. The totals can change as the source is
+updated. Public search does not require the
+PDPJ-Br OAuth credentials used by other BNP resources. Pangea's
+`ultimaAtualizacao` is only the source record's update date; it is not mapped to
+judgment or publication date. Paradigm-process citations are source evidence for
+identity matching only, not proof of precedent applicability or adherence. The
+official [PDPJ-Br Pangea integration guide](https://docs.pdpj.jus.br/servicos-negociais/pangeabnp/)
+describes the Pangea service and its authenticated resources.
+
 ## Review and indicator rules
 
 Only records with `LegalReference.approved=true` and

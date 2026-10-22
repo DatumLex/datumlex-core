@@ -234,6 +234,37 @@ class STJDocumentVersion(models.Model):
         constraints = [models.UniqueConstraint(fields=["document", "fingerprint"], name="unique_stj_version")]
 
 
+class PangeaImportRun(models.Model):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    STATUSES = [
+        (RUNNING, "Em andamento"),
+        (COMPLETED, "Concluída"),
+        (PARTIAL, "Parcial"),
+        (FAILED, "Falha"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True)
+    status = models.CharField(max_length=16, choices=STATUSES, default=RUNNING)
+    scope = models.JSONField(default=dict)
+    catalog_version = models.CharField(max_length=64, blank=True)
+    source_total = models.PositiveBigIntegerField(null=True)
+    pages = models.PositiveIntegerField(default=0)
+    fetched = models.PositiveIntegerField(default=0)
+    created = models.PositiveIntegerField(default=0)
+    updated = models.PositiveIntegerField(default=0)
+    skipped = models.PositiveIntegerField(default=0)
+    rejected = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "pangea_import_run"
+
+
 class LegalReference(models.Model):
     """Sourced precedent/doctrine entry admitted to the reviewed analysis corpus."""
 
@@ -255,6 +286,13 @@ class LegalReference(models.Model):
     source_url = models.URLField(max_length=1000)
     source_locator = models.CharField(max_length=300, blank=True)
     published_at = models.DateField(null=True)
+    source_updated_at = models.DateField(null=True)
+    source_metadata = models.JSONField(default=dict)
+    source_payload_hash = models.CharField(max_length=64, blank=True)
+    last_import_run = models.ForeignKey(
+        PangeaImportRun, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="legal_references",
+    )
     approval_reference = models.CharField(max_length=200)
     approved = models.BooleanField(default=False)
     imported_at = models.DateTimeField(auto_now_add=True)
@@ -299,3 +337,59 @@ class DecisionAssessment(models.Model):
         db_table = "decision_assessment"
         constraints = [models.UniqueConstraint(fields=["local_decision", "reference"], name="unique_decision_reference_assessment")]
         indexes = [models.Index(fields=["decision_date", "review_state", "relation"], name="decision_dt_review_rel_idx")]
+
+
+class CrossSourceLinkCandidate(models.Model):
+    """Auditable identifier matches; never a legal alignment assessment."""
+
+    PENDING = "pending"
+    UNRESOLVED = "unresolved"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+    SUPERSEDED = "superseded"
+    REVIEW_STATES = [
+        (PENDING, "Pendente"),
+        (UNRESOLVED, "Não resolvido"),
+        (CONFIRMED, "Confirmado"),
+        (REJECTED, "Rejeitado"),
+        (SUPERSEDED, "Substituído por correspondência posterior"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    candidate_key = models.CharField(max_length=64, unique=True)
+    local_decision = models.ForeignKey(
+        FactProcess, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="source_link_candidates",
+    )
+    reference = models.ForeignKey(
+        LegalReference, on_delete=models.PROTECT, related_name="source_link_candidates",
+    )
+    relationship_type = models.CharField(max_length=32, default="source_cited_decision")
+    cited_identifier = models.CharField(max_length=200)
+    normalized_identifier = models.CharField(max_length=20, blank=True)
+    method = models.CharField(max_length=64)
+    method_version = models.CharField(max_length=64)
+    confidence = models.DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)
+    review_status = models.CharField(max_length=16, choices=REVIEW_STATES, default=PENDING)
+    source_locator = models.CharField(max_length=500, blank=True)
+    explanation = models.TextField(blank=True)
+    reviewed_by = models.CharField(max_length=200, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "cross_source_link_candidate"
+        indexes = [
+            models.Index(fields=["review_status", "method"], name="cross_link_status_method_idx"),
+            models.Index(fields=["reference", "local_decision"], name="cross_link_ref_local_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(confidence__isnull=True)
+                    | models.Q(confidence__gte=0, confidence__lte=1)
+                ),
+                name="cross_link_confidence_range",
+            ),
+        ]

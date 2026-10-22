@@ -4,6 +4,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 
 from src.db.models import ExtractionRun
+from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
 
 
 class Command(BaseCommand):
@@ -11,7 +12,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--start", default="2023-01-01")
-        parser.add_argument("--subjects", default="10431,10433,10439")
+        parser.add_argument("--subjects", default=DEFAULT_DATAJUD_SUBJECT_CODES_CSV)
         parser.add_argument("--page-size", type=int, default=100)
         parser.add_argument("--max-pages", type=int, default=2)
         parser.add_argument("--overlap-days", type=int, default=3)

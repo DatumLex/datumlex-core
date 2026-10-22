@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from src.api.datajud_client import DataJudClient, DataJudError
 from src.db.models import ExtractionRun, RejectedRecord
+from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
 from src.etl.loader import load_record
 from src.etl.transformer import InvalidRecord, normalize
 
@@ -22,7 +23,8 @@ class Command(BaseCommand):
         parser.add_argument("--end", default=date.today().isoformat())
         parser.add_argument("--court", choices=["TJDFT", "STJ"], default="TJDFT")
         parser.add_argument(
-            "--subjects", default="10431", help="Exact CNJ codes; descendants are not inferred"
+            "--subjects", default=DEFAULT_DATAJUD_SUBJECT_CODES_CSV,
+            help="Explicit CNJ TPU codes; only listed codes are queried",
         )
         parser.add_argument("--page-size", type=int, default=100)
         parser.add_argument("--max-pages", type=int, default=5, help="Per invocation; 0 traverses all pages")
