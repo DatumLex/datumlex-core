@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 STJ_CODES = {
     237: "granted",
     972: "granted",
@@ -22,7 +21,6 @@ STJ_CODES = {
 
 def reclassify_stj(apps, schema_editor):
     FactProcess = apps.get_model("warehouse", "FactProcess")
-    ProcessMovement = apps.get_model("warehouse", "ProcessMovement")
     DimResult = apps.get_model("warehouse", "DimResult")
     result_ids = {
         name: DimResult.objects.get_or_create(name=name)[0].pk

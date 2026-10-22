@@ -3,7 +3,7 @@
 import json
 import sys
 from urllib.error import HTTPError
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 BASE = "http://127.0.0.1:8000"
 PASSED = []

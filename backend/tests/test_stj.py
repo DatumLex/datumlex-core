@@ -5,12 +5,12 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.http import QueryDict
 from django.test import TestCase
+
 from src.api.datajud_client import DataJudClient, DataJudError
 from src.db.models import ExtractionRun, FactProcess
 from src.etl.loader import load_record
 from src.etl.transformer import InvalidRecord, normalize
 from src.services.statistics_service import filtered_processes, metadata
-
 from tests.test_pipeline import SCOPE, hit
 
 
@@ -27,7 +27,7 @@ class STJTests(TestCase):
         self.assertEqual(FactProcess.objects.count(), 2)
         stj = FactProcess.objects.get(court="STJ")
         self.assertEqual(stj.organization.court, "STJ")
-        self.assertEqual(stj.result.name, "outside_degree")
+        self.assertEqual(stj.result.name, "unknown")
         for court, run in [("TJDFT", local_run), ("STJ", stj_run)]:
             query, selected = filtered_processes(QueryDict(f"court={court}"))
             self.assertEqual(query.count(), 1)
@@ -41,13 +41,30 @@ class STJTests(TestCase):
         opener.return_value = io.StringIO(
             json.dumps({"hits": {"hits": [], "total": {"value": 0, "relation": "eq"}}})
         )
-        DataJudClient("synthetic-key").search({**SCOPE, "court": "STJ"})
+        DataJudClient("synthetic-key", court="STJ").search({**SCOPE, "court": "STJ"})
         self.assertEqual(
             opener.call_args.args[0].full_url,
             "https://api-publica.datajud.cnj.jus.br/api_publica_stj/_search",
         )
         with self.assertRaises(DataJudError):
-            DataJudClient("synthetic-key").search({**SCOPE, "court": "INVALID"})
+            DataJudClient("synthetic-key", court="INVALID")
+
+    def test_stj_merits_use_only_supported_dated_movements(self):
+        scope = {**SCOPE, "court": "STJ"}
+        run = ExtractionRun.objects.create(scope=scope)
+        for code, expected in [
+            (12434, "granted"), (12435, "denied"), (12436, "not_admitted"),
+            (12438, "partial"), (12439, "partial_knowledge"),
+            (12437, "unknown"), (12441, "unknown"), (12442, "unknown"),
+        ]:
+            with self.subTest(code=code):
+                source = hit(str(code), degree="SUP")
+                source["_source"]["tribunal"] = "STJ"
+                source["_source"]["movimentos"] = [
+                    {"codigo": code, "dataHora": "2024-01-01T00:00:00Z"},
+                ]
+                load_record(normalize(source, scope), run)
+                self.assertEqual(FactProcess.objects.get(source_id=f"STJ:{code}").result.name, expected)
 
     def test_offline_command_accepts_stj_scope(self):
         import tempfile
