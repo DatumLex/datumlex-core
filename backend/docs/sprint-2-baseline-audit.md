@@ -156,3 +156,87 @@ status. No row below is labelled proven Done without its complete DoD evidence.
   recollected, modified or claimed as a fresh real-source validation.
 - Independent review, hosting decision and integrated release acceptance remain
   outstanding. This contribution does not close #169 or its parent story.
+
+## Live Project verification and execution handoff
+
+All 45 Sprint 2 issue Project sidebars were subsequently inspected through the
+authenticated GitHub UI. [Captured visible fields](evidence/sprint-2-project-fields-2026-10-21.json)
+include Status, Priority, Sprint, Estimate and Start/End; none was inferred from
+its epic. This is a later execution snapshot, after #101/#165 entered review.
+The API token lacks project scope; no credential permissions were expanded.
+
+Observed status totals: {'Backlog': 38, 'In progress': 1, 'Done': 3, 'In review': 2, 'Ready': 1}. Existing story estimates sum to 100 SP;
+three new stories remain unestimated. All 45 items have no Start/End dates.
+Dates, priorities and estimates were not changed by this work.
+
+| Issue | Project status | Priority | Estimate | Sprint |
+|---|---|---|---|---|
+| #96 | Backlog | Must Have | — | Sprint 2 |
+| #97 | In progress | Must Have | 8 | Sprint 2 |
+| #98 | Done | Must Have | — | Sprint 2 |
+| #99 | Done | Must Have | — | Sprint 2 |
+| #100 | Backlog | Must Have | 8 | Sprint 2 |
+| #101 | In review | Must Have | — | Sprint 2 |
+| #102 | Done | Must Have | — | Sprint 2 |
+| #103 | Backlog | Must Have | 13 | Sprint 2 |
+| #104 | Backlog | Must Have | — | Sprint 2 |
+| #105 | Backlog | Must Have | — | Sprint 2 |
+| #106 | Backlog | Must Have | — | Sprint 2 |
+| #107 | Backlog | Must Have | 13 | Sprint 2 |
+| #108 | Backlog | Must Have | — | Sprint 2 |
+| #109 | Backlog | Must Have | — | Sprint 2 |
+| #110 | Backlog | Must Have | 13 | Sprint 2 |
+| #111 | Backlog | Must Have | — | Sprint 2 |
+| #112 | Backlog | Must Have | — | Sprint 2 |
+| #113 | Backlog | Must Have | 8 | Sprint 2 |
+| #114 | Backlog | Must Have | — | Sprint 2 |
+| #115 | Backlog | Must Have | — | Sprint 2 |
+| #116 | Backlog | Must Have | — | Sprint 2 |
+| #117 | Backlog | Must Have | 13 | Sprint 2 |
+| #118 | Backlog | Must Have | — | Sprint 2 |
+| #119 | Backlog | Must Have | — | Sprint 2 |
+| #120 | Backlog | Should Have | 8 | Sprint 2 |
+| #121 | Backlog | Should Have | — | Sprint 2 |
+| #122 | Backlog | Should Have | — | Sprint 2 |
+| #123 | Backlog | Could Have | 8 | Sprint 2 |
+| #124 | Backlog | Could Have | — | Sprint 2 |
+| #125 | Backlog | Could Have | — | Sprint 2 |
+| #127 | Backlog | Must Have | 8 | Sprint 2 |
+| #128 | Backlog | Must Have | — | Sprint 2 |
+| #129 | Backlog | Must Have | — | Sprint 2 |
+| #160 | Backlog | Must Have | — | Sprint 2 |
+| #161 | Backlog | Must Have | — | Sprint 2 |
+| #162 | Ready | Must Have | — | Sprint 2 |
+| #163 | Backlog | Must Have | — | Sprint 2 |
+| #164 | Backlog | Must Have | — | Sprint 2 |
+| #165 | In review | Must Have | — | Sprint 2 |
+| #166 | Backlog | Must Have | — | Sprint 2 |
+| #167 | Backlog | Must Have | — | Sprint 2 |
+| #168 | Backlog | Must Have | — | Sprint 2 |
+| #169 | Backlog | Must Have | — | Sprint 2 |
+| #170 | Backlog | Must Have | — | Sprint 2 |
+| #171 | Backlog | Must Have | — | Sprint 2 |
+
+### Concrete deliveries
+
+| Task | Branch / commit | PR | Validation and completion boundary |
+|---|---|---|---|
+| #177, supporting #169 | fix/177-sprint2-baseline-validation / 8389dad | [#178](https://github.com/DatumLex/datumlex-core/pull/178) | 63 isolated Django tests, no migration drift, Ruff, frontend lint/build/audit passed; [hosted backend/frontend CI passed](https://github.com/DatumLex/datumlex-core/actions/runs/39696964908). Independent review pending. |
+| #165 | documentation/165-analytical-context / 75e9a79 | [#179](https://github.com/DatumLex/datumlex-core/pull/179) | Canonical contract and 12 hand-counted cases checked offline; no active API change. Independent API/model/UI/PDF review required before dependent implementation. |
+| #101 | documentation/101-bdjur-source-feasibility / 6949789 | [#180](https://github.com/DatumLex/datumlex-core/pull/180) | Six official-route probes returned 403; report separates indexed candidates from live access and rights. Source/PO review required; no approved BDJur corpus. |
+
+All commits use Bima0195's existing verified identity, without assistant
+coauthorship. #101/#165/#177 are In review; none was marked Done. #169 remains
+owned by ThiagoChaves13 with its original status. Main has not been merged or
+modified, and the original local staged/unstaged changes remain intact.
+
+The documentation PRs #179/#180 inherit main's root-level CI failure until the
+reviewed baseline fix is integrated; their directly applicable offline checks
+passed. The baseline PR alone has the repaired, passing hosted quality jobs.
+No authenticated real-data dashboard/PDF run or deployment acceptance is claimed.
+
+Remaining implementation requires the explicit reviewed inputs recorded in the
+matrix: source access/rights (#101/#162), model/link contracts (#104), annotation
+and legal-method guidance (#108/#118), independently reviewed NLP benchmark and
+release thresholds (#111/#112), and canonical context (#165). Do not bypass these
+inputs by inventing approval, thresholds, text coverage or production behavior.
