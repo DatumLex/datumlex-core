@@ -65,7 +65,7 @@ def scope(request):
     return {
         "metadata": metadata(query, selected),
         "subjects": list(
-            DimSubject.objects.filter(factprocess__court=selected["court"])
+            DimSubject.objects.filter(factprocess__court__in=selected["court"].split(","))
             .annotate(record_count=Count("factprocess", distinct=True))
             .filter(record_count__gt=0)
             .order_by("code")

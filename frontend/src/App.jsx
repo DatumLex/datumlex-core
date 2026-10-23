@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { BarChart3, Info, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { getData } from './api'
 
 const number = new Intl.NumberFormat('pt-BR')
@@ -121,7 +121,26 @@ function OutcomeChart({ series }) {
   </>
 }
 
-export default function App({ court, courts, onCourtChange }) {
+export default function App({ court: initialCourt, courts: authorizedCourts }) {
+  const [courts, setCourts] = useState(() => [initialCourt || authorizedCourts[0]])
+  const court = courts.join(',')
+  const [courtMenuOpen, setCourtMenuOpen] = useState(false)
+  const courtMenuRef = useRef(null)
+  const courtButtonRef = useRef(null)
+  useEffect(() => {
+    if (!courtMenuOpen) return
+    const closeOutside = (event) => {
+      if (!courtMenuRef.current?.contains(event.target)) setCourtMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    return () => document.removeEventListener('pointerdown', closeOutside)
+  }, [courtMenuOpen])
+  function selectCourts(next) {
+    if (!next.length) return
+    if (next.length === courts.length && next.every((code) => courts.includes(code))) return
+    setCourts(next)
+    setLoading(true); setError('')
+  }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [draft, setDraft] = useState({ start: '', end: '', subject: '' })
@@ -153,15 +172,18 @@ export default function App({ court, courts, onCourtChange }) {
     async function load() {
       try {
         setAlignment(null)
-        if (!courts.includes(court)) throw new Error('Você não possui acesso a este tribunal.')
-        if (!['TJDFT', 'STJ'].includes(court)) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
+        if (courts.some((code) => !authorizedCourts.includes(code))) throw new Error('Você não possui acesso a este tribunal.')
+        if (courts.some((code) => !['TJDFT', 'STJ'].includes(code))) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
         const scopeResults = await Promise.all(courts.map(async (courtCode) => [
           courtCode,
           await getData('scope', { court: courtCode }, controller.signal),
         ]))
         const courtScopes = Object.fromEntries(scopeResults)
-        const scope = courtScopes[court]
-        const available = scope.metadata.available_period
+        const periods = Object.values(courtScopes).map((scope) => scope.metadata.available_period)
+        const available = {
+          start: periods.map((period) => period.start).filter(Boolean).sort()[0],
+          end: periods.map((period) => period.end).filter(Boolean).sort().at(-1),
+        }
         const filters = applied || (available.start && available.end ? { start: available.start, end: available.end } : {})
         const [statistics, instances, distribution] = await Promise.all(
           ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court }, controller.signal)),
@@ -171,17 +193,13 @@ export default function App({ court, courts, onCourtChange }) {
           await getData('scope', { ...filters, court: courtCode }, controller.signal),
         ]))
         const filteredScopes = Object.fromEntries(filteredScopeResults)
-        const localPeriod = courtScopes.TJDFT?.metadata.available_period
-        const alignmentFilters = applied || (localPeriod?.start && localPeriod?.end
-          ? { start: localPeriod.start, end: localPeriod.end }
-          : filters)
         const alignmentResult = courts.includes('TJDFT')
-          ? await getData('alignment', { ...alignmentFilters, court: 'TJDFT' }, controller.signal)
+          ? await getData('alignment', { ...filters, court: 'TJDFT' }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
         setBounds(available)
-        if (!applied) setDraft({ start: available.start || '', end: available.end || '', subject: '' })
+        if (!applied) setDraft((current) => current.start ? current : { start: available.start || '', end: available.end || '', subject: '' })
         setData({ statistics, instances, distribution, courtScopes, filteredScopes })
         setAlignment(alignmentResult)
         setError('')
@@ -197,7 +215,7 @@ export default function App({ court, courts, onCourtChange }) {
     }
     load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [applied, retry, court, courts])
+  }, [applied, retry, court, courts, authorizedCourts])
 
   function apply(event) {
     event.preventDefault()
@@ -209,6 +227,7 @@ export default function App({ court, courts, onCourtChange }) {
   }
 
   function reset() {
+    setDraft({ start: '', end: '', subject: '' })
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
   }
 
@@ -242,13 +261,13 @@ export default function App({ court, courts, onCourtChange }) {
       </section>
       <form className="filter-panel" aria-label="Filtros do dashboard" onSubmit={apply}>
         <div className="filter-grid">
-          <label className="filter-field"><span>{activeTab === 'precedents' ? 'Tribunais da análise' : 'Tribunal'}</span><select disabled={activeTab === 'precedents'} value={activeTab === 'precedents' ? 'TJDFT + STJ' : court} onChange={(event) => onCourtChange(event.target.value)}>{activeTab === 'precedents' ? <option value="TJDFT + STJ">TJDFT + STJ</option> : courts.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+          <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{courts.length === authorizedCourts.length ? 'Todos os tribunais' : courts.join(', ')}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} aria-disabled={courts.length === 1 && courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
           <label className="filter-field"><span>Assunto</span><select value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label>
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
         <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button></div>
-        <p className="filter-help">Período por data de ajuizamento, não de julgamento. Tribunal, assunto e período atualizam as métricas e os gráficos; os assuntos disponíveis vêm dos registros locais.</p>
+        <p className="filter-help">Os filtros são compartilhados entre todas as abas; aplique uma vez e navegue mantendo a seleção. Período por data de ajuizamento, não de julgamento. A comparação de precedentes usa decisões locais do TJDFT e referências do STJ no mesmo assunto e período selecionados.</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
       <nav className="dashboard-tabs" role="tablist" aria-label="Seções do painel">

@@ -27,7 +27,9 @@ class AccessMiddleware:
                 return denied("Altere sua senha inicial para continuar.", code="password_change_required")
             if request.path in self.DATA_ROUTES:
                 court = request.GET.get("court", "TJDFT")
-                if not request.user.support and not request.user.courts.filter(code=court).exists():
+                requested_courts = set(court.split(","))
+                authorized_courts = set(request.user.courts.values_list("code", flat=True))
+                if not request.user.support and not requested_courts.issubset(authorized_courts):
                     return denied("Você não possui acesso a este tribunal.")
         response = self.get_response(request)
         if request.path.startswith("/api/"):

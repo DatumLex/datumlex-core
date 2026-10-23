@@ -17,7 +17,8 @@ def filtered_processes(params):
     if any(len(params.getlist(key)) > 1 for key in params):
         raise InvalidQuery("Repeated query parameters are not supported")
     court = params.get("court", "TJDFT")
-    if court not in {"TJDFT", "STJ"}:
+    courts = court.split(",")
+    if not courts or any(item not in {"TJDFT", "STJ"} for item in courts) or len(set(courts)) != len(courts):
         raise InvalidQuery("Only TJDFT and STJ are available")
     if params.get("outcome", "all") not in {"all", "granted", "denied"}:
         raise InvalidQuery("outcome must be all, granted or denied")
@@ -31,7 +32,7 @@ def filtered_processes(params):
             raise ValueError
     except ValueError:
         raise InvalidQuery("Invalid date range (2023..today) or subject code") from None
-    query = FactProcess.objects.filter(court=court, time__date__range=[start, end])
+    query = FactProcess.objects.filter(court__in=courts, time__date__range=[start, end])
     if subject:
         query = query.filter(
             Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code=subject))
@@ -49,7 +50,7 @@ def filtered_processes(params):
 
 
 def metadata(query, scope):
-    latest = ExtractionRun.objects.filter(scope__court=scope["court"]).order_by("-id").first()
+    latest = ExtractionRun.objects.filter(scope__court__in=scope["court"].split(",")).order_by("-id").first()
     dates = query.aggregate(first=Min("time__date"), last=Max("time__date"), refreshed=Max("collected_at"))
     return {
         "source": "DataJud / CNJ",
