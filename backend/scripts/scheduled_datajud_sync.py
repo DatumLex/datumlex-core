@@ -7,6 +7,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND))
+from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
+
 PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
 LOG_DIR = BACKEND / "data"
 LOG_DIR.mkdir(exist_ok=True)
@@ -51,18 +54,32 @@ def main() -> int:
         "--start",
         "2023-01-01",
         "--subjects",
-        "10431,10433,10439",
+        DEFAULT_DATAJUD_SUBJECT_CODES_CSV,
         "--page-size",
         "100",
         "--max-pages",
         "2",
     ]
     datajud_result = run_source("DataJud TJDFT/STJ", datajud)
-    pangea_result = run_source(
-        "Pangea/BNP STJ Repetitivos",
-        ["sync_pangea", "--page-size", "100", "--max-pages", "5", "--if-configured"],
-    )
-    return 1 if datajud_result or pangea_result else 0
+    pangea_topics = [
+        "responsabilidade civil",
+        "direito do consumidor",
+        "direito da saúde",
+        "direito previdenciário",
+        "direito administrativo",
+        "direito tributário",
+        "direito processual civil",
+    ]
+    pangea_results = [
+        run_source(
+            f"Pangea/BNP STJ · {topic}",
+            ["sync_pangea", "--query", topic, "--page-size", "100", "--max-pages", "5"],
+        )
+        for topic in pangea_topics
+    ]
+    pangea_result = int(any(pangea_results))
+    match_result = run_source("Reconciliação de citações STJ/TJDFT", ["match_stj_citations"])
+    return 1 if datajud_result or pangea_result or match_result else 0
 
 
 if __name__ == "__main__":
