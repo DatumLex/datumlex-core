@@ -201,6 +201,66 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .related-item small { color: var(--muted); }
 .related-item > a { flex: 0 0 auto; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none; }
 .related-item > a:hover { text-decoration: underline; }
+.related-item .alignment-badge { margin-bottom: 4px; }
+.precedent-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.precedent-heading-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.precedent-heading-row .alignment-heading { flex: 1; margin-bottom: 22px; }
+.precedent-heading-row .precedent-limits { position: relative; flex: 0 0 auto; margin-top: 14px; padding: 0; background: transparent; }
+.precedent-heading-row .precedent-limits summary { padding: 9px 12px; border: 1px solid var(--border); background: #fff; font-size: 13px; }
+.precedent-heading-row .precedent-limits p { position: absolute; z-index: 5; top: calc(100% + 6px); right: 0; width: min(340px, 80vw); margin: 0; padding: 14px; border: 1px solid var(--border); background: #fffefa; box-shadow: 0 8px 24px rgb(0 0 0 / 12%); }
+.precedent-card-heading h3 { margin-top: 5px; }
+.precedent-card-heading p { margin: 5px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.design-badge { flex: 0 0 auto; padding: 5px 9px; border: 1px solid #c9d6d4; border-radius: 999px; color: var(--navy); background: #f5f8f7; font-size: 12px; font-weight: 700; }
+.thesis-list { gap: 0; margin-top: 6px; }
+.thesis-list .thesis-row { padding: 16px 12px 14px; border-bottom: 1px solid #ece9e0; border-left: 3px solid transparent; transition: background-color .2s ease, border-color .2s ease; }
+.thesis-list .thesis-row.is-selected { border-left-color: var(--gold); background: #fffaf0; }
+.thesis-row-main { display: flex; align-items: center; width: 100%; padding: 0; border: 0; background: transparent; color: var(--deep-navy); text-align: left; cursor: pointer; }
+.thesis-row-main > strong { color: var(--deep-navy); font-size: 15px; line-height: 1.35; }
+.thesis-row-main:hover > strong, .thesis-row-main[aria-pressed="true"] > strong { color: var(--navy); text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 3px; }
+.thesis-row-main:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.thesis-statement { margin: 8px 0 12px !important; color: #45515c; font-size: 14px; line-height: 1.65 !important; text-align: justify; text-justify: inter-word; hyphens: auto; }
+.thesis-distribution { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.thesis-distribution .thesis-track { display: block; width: 100%; height: 9px; margin: 0; overflow: hidden; border-radius: 999px; background: #edeae0; }
+.thesis-track-fill { height: 100%; min-width: 0; border-radius: inherit; background: #1f4e5f; transition: width .25s ease, background-color .2s ease; }
+.thesis-row.is-selected .thesis-track-fill { background: #3f7d58; }
+.thesis-count { color: var(--deep-navy); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.thesis-row-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.thesis-row-meta small { color: var(--muted); font-size: 12px; }
+.review-pending-badge { display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 999px; color: #765600; background: #fff3cf; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.thesis-full-text { margin-top: 7px; color: #52616a; font-size: 12px; }
+.thesis-full-text summary { width: fit-content; cursor: pointer; }
+.thesis-full-text p { margin: 6px 0 0; line-height: 1.5; }
+.evidence-item { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.evidence-status-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #316846; background: #e9f2ec; font-size: 15px; font-weight: 800; }
+.evidence-status-icon--divergent, .evidence-status-icon--pending { color: #765600; background: #fff3cf; }
+.evidence-status-icon--uncertain { color: #52616a; background: #eef0f0; }
+.evidence-item-content { min-width: 0; }
+.evidence-item-content h4 { margin-top: 4px; }
+.evidence-item-content p { margin-bottom: 4px; }
+.evidence-item-content small { color: var(--muted); font-size: 12px; }
+.source-drawer-button, .text-button { padding: 0; border: 0; color: var(--navy); background: transparent; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.source-drawer-button:hover, .text-button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.pending-summary { margin: 14px 0 8px; padding: 13px 15px; border-left: 3px solid var(--gold); background: #fffaf0; }
+.pending-summary strong { color: var(--deep-navy); }
+.pending-summary p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.thesis-selection-note { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+.candidate-no-links { margin: 10px 0 0; padding: 13px 15px; border: 1px solid var(--border); color: var(--muted); background: #fff; font-size: 14px; }
+.precedent-limits { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--border); background: #fbfaf6; color: #45515c; }
+.precedent-limits summary { color: var(--deep-navy); font-weight: 700; cursor: pointer; }
+.precedent-limits p { margin: 10px 0 0; line-height: 1.5; }
+.evidence-drawer-backdrop { position: fixed; z-index: 50; inset: 0; display: flex; justify-content: flex-end; background: rgb(19 34 42 / 42%); }
+.evidence-drawer { display: flex; flex-direction: column; gap: 18px; width: min(520px, 94vw); height: 100%; overflow-y: auto; padding: 26px; background: #fffefa; box-shadow: -12px 0 36px rgb(0 0 0 / 16%); }
+.evidence-drawer-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.evidence-drawer-heading h3 { margin: 6px 0 0; color: var(--deep-navy); font: 700 24px/1.2 Georgia, "Times New Roman", serif; }
+.evidence-drawer-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
+.evidence-drawer-fields > div { min-width: 0; padding-bottom: 8px; border-bottom: 1px solid #ece9e0; }
+.evidence-drawer-fields dt { color: var(--muted); font-size: 12px; }
+.evidence-drawer-fields dd { margin: 4px 0 0; color: var(--deep-navy); font-size: 14px; overflow-wrap: anywhere; }
+.evidence-drawer-excerpt h4 { margin: 0 0 6px; color: var(--deep-navy); font-size: 14px; }
+.evidence-drawer-excerpt p, .evidence-drawer-excerpt blockquote { margin: 0; color: #45515c; font-size: 14px; line-height: 1.55; }
+.evidence-drawer-excerpt blockquote { padding-left: 12px; border-left: 3px solid var(--gold); }
+.evidence-drawer-note { margin: 0; padding: 12px; background: #fff3cf; color: #765600; font-size: 13px; line-height: 1.45; }
+.evidence-source-link { align-self: flex-start; color: var(--navy); font-weight: 700; }
 .source-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .source-card { border-left-color: var(--teal); }
 .source-card dl { margin: 18px 0 10px; }
@@ -214,7 +274,7 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .source-links li { margin: 9px 0; }
 .tab-content .chart-empty { min-height: 190px; }
 @media (max-width: 900px) { .precedent-grid, .source-cards { grid-template-columns: 1fr; } .corpus-card { grid-column: auto; } }
-@media (max-width: 600px) { .dashboard-tabs button { padding-inline: 12px; } .tab-content { padding: 18px 14px; } .thesis-card, .related-card, .source-card { padding: 17px; } .related-item { flex-direction: column; } .source-card dl > div { grid-template-columns: 1fr; gap: 4px; } }
+@media (max-width: 600px) { .dashboard-tabs button { padding-inline: 12px; } .tab-content { padding: 18px 14px; } .thesis-card, .related-card, .source-card { padding: 17px; } .related-item { flex-direction: column; } .source-card dl > div { grid-template-columns: 1fr; gap: 4px; } .thesis-distribution { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; } .thesis-count { font-size: 12px; } .precedent-card-heading { flex-direction: column; } .precedent-heading-row { flex-direction: column; gap: 0; } .precedent-heading-row .alignment-heading { margin-bottom: 8px; } .precedent-heading-row .precedent-limits { margin: 0 0 18px; } .evidence-item { grid-template-columns: 28px minmax(0, 1fr); } .evidence-item .source-drawer-button { grid-column: 2; justify-self: start; } .evidence-drawer { padding: 20px 16px; } .evidence-drawer-fields { grid-template-columns: 1fr; } }
 .instance-bars { max-height: 350px; overflow-y: auto; padding: 8px 4px 8px 0; }
 .instance-row { display: grid; grid-template-columns: 120px 1fr 40px; align-items: center; gap: 10px; margin: 10px 0; font-size: 13px; }
 .instance-row strong { text-align: right; }
