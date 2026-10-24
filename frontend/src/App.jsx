@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { BarChart3, Info, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { getData } from './api'
+import NlpPanel from './NlpPanel'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -121,10 +122,29 @@ function OutcomeChart({ series }) {
   </>
 }
 
-export default function App({ court, courts, onCourtChange }) {
+export default function App({ court: initialCourt, courts: authorizedCourts }) {
+  const [courts, setCourts] = useState(() => [initialCourt || authorizedCourts[0]])
+  const court = courts.join(',')
+  const [courtMenuOpen, setCourtMenuOpen] = useState(false)
+  const courtMenuRef = useRef(null)
+  const courtButtonRef = useRef(null)
+  useEffect(() => {
+    if (!courtMenuOpen) return
+    const closeOutside = (event) => {
+      if (!courtMenuRef.current?.contains(event.target)) setCourtMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    return () => document.removeEventListener('pointerdown', closeOutside)
+  }, [courtMenuOpen])
+  function selectCourts(next) {
+    if (!next.length) return
+    if (next.length === courts.length && next.every((code) => courts.includes(code))) return
+    setCourts(next)
+    setLoading(true); setError('')
+  }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
-  const [draft, setDraft] = useState({ start: '', end: '' })
+  const [draft, setDraft] = useState({ start: '', end: '', subject: '' })
   const [applied, setApplied] = useState(null)
   const [bounds, setBounds] = useState(null)
   const [data, setData] = useState(null)
@@ -153,31 +173,35 @@ export default function App({ court, courts, onCourtChange }) {
     async function load() {
       try {
         setAlignment(null)
-        if (!courts.includes(court)) throw new Error('Você não possui acesso a este tribunal.')
-        if (!['TJDFT', 'STJ'].includes(court)) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
+        if (courts.some((code) => !authorizedCourts.includes(code))) throw new Error('Você não possui acesso a este tribunal.')
+        if (courts.some((code) => !['TJDFT', 'STJ'].includes(code))) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
         const scopeResults = await Promise.all(courts.map(async (courtCode) => [
           courtCode,
           await getData('scope', { court: courtCode }, controller.signal),
         ]))
         const courtScopes = Object.fromEntries(scopeResults)
-        const scope = courtScopes[court]
-        const available = scope.metadata.available_period
+        const periods = Object.values(courtScopes).map((scope) => scope.metadata.available_period)
+        const available = {
+          start: periods.map((period) => period.start).filter(Boolean).sort()[0],
+          end: periods.map((period) => period.end).filter(Boolean).sort().at(-1),
+        }
         const filters = applied || (available.start && available.end ? { start: available.start, end: available.end } : {})
         const [statistics, instances, distribution] = await Promise.all(
           ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court }, controller.signal)),
         )
-        const localPeriod = courtScopes.TJDFT?.metadata.available_period
-        const alignmentFilters = applied || (localPeriod?.start && localPeriod?.end
-          ? { start: localPeriod.start, end: localPeriod.end }
-          : filters)
+        const filteredScopeResults = await Promise.all(courts.map(async (courtCode) => [
+          courtCode,
+          await getData('scope', { ...filters, court: courtCode }, controller.signal),
+        ]))
+        const filteredScopes = Object.fromEntries(filteredScopeResults)
         const alignmentResult = courts.includes('TJDFT')
-          ? await getData('alignment', { ...alignmentFilters, court: 'TJDFT' }, controller.signal)
+          ? await getData('alignment', { ...filters, court: 'TJDFT' }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
         setBounds(available)
-        if (!applied) setDraft({ start: available.start || '', end: available.end || '' })
-        setData({ statistics, instances, distribution, courtScopes })
+        if (!applied) setDraft((current) => current.start ? current : { start: available.start || '', end: available.end || '', subject: '' })
+        setData({ statistics, instances, distribution, courtScopes, filteredScopes })
         setAlignment(alignmentResult)
         setError('')
       } catch (failure) {
@@ -192,7 +216,7 @@ export default function App({ court, courts, onCourtChange }) {
     }
     load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [applied, retry, court, courts])
+  }, [applied, retry, court, courts, authorizedCourts])
 
   function apply(event) {
     event.preventDefault()
@@ -204,6 +228,7 @@ export default function App({ court, courts, onCourtChange }) {
   }
 
   function reset() {
+    setDraft({ start: '', end: '', subject: '' })
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
   }
 
@@ -214,12 +239,20 @@ export default function App({ court, courts, onCourtChange }) {
   const unavailableNote = loading ? 'Consultando a base local.' : error ? 'A consulta falhou. Tente novamente.' : 'Sem documentos com resultado binário identificável neste período.'
   const rateNote = metrics?.binary_denominator ? `Base: ${formatNumber(metrics.binary_denominator)} documentos com resultado mais recente identificado. Indicador por documento, não por recurso individual.` : unavailableNote
   const refreshed = metadata?.last_record_refresh
+  const subjectOptions = [...Object.values(data?.courtScopes || {}).flatMap((scope) => scope.subjects || []).reduce((subjects, subject) => {
+    const current = subjects.get(subject.code)
+    subjects.set(subject.code, current
+      ? { ...current, record_count: current.record_count + subject.record_count }
+      : { ...subject })
+    return subjects
+  }, new Map()).values()].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
+  const selectedSubjectName = subjectOptions.find((subject) => String(subject.code) === String(applied?.subject || draft.subject))?.name
 
   return <div className="app-shell"><div className="top-rule" />
     <header className="site-header"><a className="brand" href="#main-content" aria-label="DatumLex, ir ao conteúdo"><span className="brand-mark"><img src="/assets/datumlex-logo.jpeg" alt="" /></span><span>DatumLex</span></a><span className="header-context">Análise de Recursos</span></header>
     <main id="main-content" className="dashboard">
-      <section className="hero" aria-labelledby="page-title"><span className="eyebrow">Inteligência jurídica · Responsabilidade Civil</span>
-        <div className="hero-title-row"><h1 id="page-title">{courts.includes('TJDFT') && courts.includes('STJ') ? 'Responsabilidade Civil — TJDFT × STJ' : `Responsabilidade Civil — ${court}`}</h1>
+      <section className="hero" aria-labelledby="page-title"><span className="eyebrow">Inteligência jurídica · {selectedSubjectName || 'Todos os assuntos'}</span>
+        <div className="hero-title-row"><h1 id="page-title">{selectedSubjectName ? `${selectedSubjectName} — ` : ''}{courts.includes('TJDFT') && courts.includes('STJ') ? 'TJDFT × STJ' : court}</h1>
           <div className="methodology-trigger"><button className="info-button" type="button" aria-label="Ver metodologia de cálculo" aria-expanded={isMethodologyOpen} aria-controls="methodology-popover" onClick={() => setIsMethodologyOpen(!isMethodologyOpen)}><Info aria-hidden="true" size={21} /></button>
             {isMethodologyOpen && <aside id="methodology-popover" className="methodology-popover" onKeyDown={(event) => { if (event.key === 'Escape') setIsMethodologyOpen(false) }}><div className="popover-heading"><strong>Como interpretar os dados</strong><button type="button" aria-label="Fechar metodologia" onClick={() => setIsMethodologyOpen(false)}><X aria-hidden="true" size={18} /></button></div>
               <p>Os valores contam documentos do DataJud por data de ajuizamento. Um processo pode aparecer em mais de uma instância. Ter vários assuntos não multiplica a contagem.</p><p>Provimento = providos ÷ (providos + desprovidos). Desprovimento usa a mesma base. No TJDFT, são usados resultados TPU mapeados em G2/TR; no STJ, em SUP, incluindo movimentos específicos de recurso especial com resultado expresso. Resultados parciais, de admissibilidade, não conhecidos e sem evidência datada ficam fora da base binária. Em empate de data e horário, usamos o maior ID do movimento no banco (desempate técnico). Cada documento conta uma vez. Não representa recursos individuais nem a taxa geral do tribunal.</p>
@@ -229,13 +262,13 @@ export default function App({ court, courts, onCourtChange }) {
       </section>
       <form className="filter-panel" aria-label="Filtros do dashboard" onSubmit={apply}>
         <div className="filter-grid">
-          <label className="filter-field"><span>{activeTab === 'precedents' ? 'Tribunais da análise' : 'Tribunal'}</span><select disabled={activeTab === 'precedents'} value={activeTab === 'precedents' ? 'TJDFT + STJ' : court} onChange={(event) => onCourtChange(event.target.value)}>{activeTab === 'precedents' ? <option value="TJDFT + STJ">TJDFT + STJ</option> : courts.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-          <label className="filter-field"><span>Assunto</span><select disabled value="civil"><option value="civil">Responsabilidade Civil</option></select></label>
+          <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{courts.length === authorizedCourts.length ? 'Todos os tribunais' : courts.join(', ')}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} aria-disabled={courts.length === 1 && courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
+          <label className="filter-field"><span>Assunto</span><select value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label>
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
         <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button></div>
-        <p className="filter-help">Período por data de ajuizamento, não de julgamento. A seleção do tribunal atualiza o painel. Assunto fixo neste recorte.</p>
+        <p className="filter-help">Os filtros são compartilhados entre todas as abas; aplique uma vez e navegue mantendo a seleção. Período por data de ajuizamento, não de julgamento. A comparação de precedentes usa decisões locais do TJDFT e referências do STJ no mesmo assunto e período selecionados.</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
       <nav className="dashboard-tabs" role="tablist" aria-label="Seções do painel">
@@ -264,45 +297,44 @@ export default function App({ court, courts, onCourtChange }) {
       </section>
       </div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
-        <div className="alignment-heading"><span className="eyebrow">Evidência revisada · TJDFT × STJ</span><h2 id="alignment-title">Precedentes e teses</h2><p>Teses identificadas em decisões vinculadas a precedentes do STJ, com trechos e fontes de apoio. Apenas avaliações humanas validadas compõem os indicadores; vínculo ausente não significa inexistência de precedente aplicável.</p></div>
+        <div className="alignment-heading"><span className="eyebrow">Fontes rastreáveis · TJDFT × STJ</span><h2 id="alignment-title">Precedentes e teses</h2><p>Teses iguais agrupadas e decisões citadas pelo STJ. A correspondência local é identificada separadamente e não significa aderência.</p></div>
         {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
-          <div className="alignment-metrics">
+          <div className="precedent-grid">
+            <article className="thesis-card"><span className="section-kicker">Frequência · Pangea/STJ</span><h3>Principais teses no recorte</h3><p>Contagem de precedentes com a mesma tese em todas as referências importadas. Como o Pangea não fornece código TPU para classificar cada tese, o assunto selecionado filtra os vínculos e decisões locais, não o catálogo de teses.</p>
+              {alignment.thesis_groups?.length ? <ol className="thesis-list">{alignment.thesis_groups.map((group) => <li key={group.id}>
+                <div className="thesis-title"><strong title={group.title}>{group.title}</strong><span>{formatNumber(group.case_count)} {group.case_count === 1 ? 'referência' : 'referências'}</span></div>
+                <div className="thesis-track"><span style={{ width: `${Math.max(4, group.case_count / Math.max(...alignment.thesis_groups.map((item) => item.case_count)) * 100)}%` }} /></div>
+                <small>{group.source_references.map((ref) => <a key={ref.identifier} href={ref.source_url} target="_blank" rel="noreferrer">{ref.identifier}</a>).reduce((prev, curr) => prev ? <>{prev} · {curr}</> : curr, null)}{!group.approved && ' · revisão pendente'}</small>
+              </li>)}</ol> : <ChartState title="Nenhuma tese disponível">As teses aparecem após a importação das fontes do STJ.</ChartState>}
+            </article>
+            <article className="related-card"><span className="section-kicker">Citações · TJDFT + STJ</span><h3>Decisões relacionadas</h3><p>Julgados que o Pangea associa a cada tese, com fonte para conferência.</p>
+              {alignment.thesis_groups?.length ? <div className="related-list">{alignment.thesis_groups.slice(0, 6).map((group) => {
+                const cited = group.related_decisions || []
+                const sourceLinks = group.source_references || []
+                return <article className="related-item" key={`related-${group.id}`}>
+                  <div><h4>{group.title}</h4>
+                    <p>{cited.length ? cited.slice(0, 2).map((decision) => decision.identifier).join(' · ') : 'Sem processo paradigma listado pela fonte'}{cited.length > 2 ? ` · +${cited.length - 2}` : ''}</p>
+                    <small>{formatNumber(group.matched_local_decisions)} processos TJDFT localizados por identificador · {formatNumber(group.unresolved_citations)} citações sem correspondência local</small>
+                  </div>{sourceLinks[0] && <a href={sourceLinks[0].source_url} target="_blank" rel="noreferrer">Ver fontes ↗</a>}
+                </article>
+              })}</div> : <ChartState title="Nenhuma decisão relacionada">As citações aparecem quando a fonte STJ as informa.</ChartState>}
+            </article>
+          </div>
+          <details className="chart-table precedent-indicators"><summary>Indicadores de aderência e tendências</summary><div className="alignment-metrics">
             <IndicatorCard label="Aderência entre vínculos comparáveis" value={formatRate(alignment.metrics.adherence_rate)} accent="green" note={`${formatNumber(alignment.metrics.aligned)} vínculos validados como aderentes`} />
             <IndicatorCard label="Possíveis divergências" value={formatNumber(alignment.metrics.divergent)} accent="gold" note={`${formatRate(alignment.metrics.possible_divergence_rate)} dos vínculos comparáveis; exigem revisão jurídica`} />
             <IndicatorCard label="Vínculos avaliados" value={formatNumber(alignment.metrics.validated_links)} accent="navy" note={`${formatNumber(alignment.metrics.local_decisions)} decisões locais distintas; unidade do indicador é o vínculo decisão-referência`} />
             <IndicatorCard label="Distinguishing justificado / inconclusivo" value={`${formatNumber(alignment.metrics.distinguished)} / ${formatNumber(alignment.metrics.uncertain)}`} accent="slate" note="Apresentados separadamente; não entram na taxa de aderência ou divergência" />
           </div>
-          {alignment.trend.length > 0 && <details className="chart-table alignment-trend" open><summary>Tendência trimestral das avaliações</summary><table><caption>Vínculos validados por trimestre da decisão local</caption><thead><tr><th scope="col">Trimestre</th><th scope="col">Aderentes</th><th scope="col">Possíveis divergências</th><th scope="col">Distinguishing</th><th scope="col">Inconclusivos</th></tr></thead><tbody>{alignment.trend.map((row) => <tr key={row.period}><td>{row.period.slice(0, 7)}</td><td>{formatNumber(row.aligned)}</td><td>{formatNumber(row.divergent)}</td><td>{formatNumber(row.distinguished)}</td><td>{formatNumber(row.uncertain)}</td></tr>)}</tbody></table></details>}
-          <div className="precedent-grid">
-            <article className="thesis-card"><span className="section-kicker">Frequência · TJDFT</span><h3>Principais teses no recorte</h3><p>Teses importadas de fontes do STJ. A contagem mostra decisões locais distintas com vínculo aprovado no período; os julgados citados pela fonte ficam separados.</p>
-              {alignment.source_theses?.length ? <ol className="thesis-list">{alignment.source_theses.map((thesis) => <li key={thesis.id}>
-                <div className="thesis-title"><strong>{thesis.title}</strong><span>{formatNumber(thesis.local_decisions)} {thesis.local_decisions === 1 ? 'caso' : 'casos'}</span></div>
-                <div className="thesis-track"><span style={{ width: `${thesis.local_decisions && Math.max(...alignment.source_theses.map((item) => item.local_decisions)) ? Math.max(5, thesis.local_decisions / Math.max(...alignment.source_theses.map((item) => item.local_decisions)) * 100) : 0}%` }} /></div>
-                <p>{thesis.thesis}</p><small>{formatNumber(thesis.validated_links)} vínculos revisados · <a href={thesis.source_url} target="_blank" rel="noreferrer">{thesis.source_name} · {thesis.identifier}</a>{thesis.source_locator ? ` · ${thesis.source_locator}` : ''}{!thesis.approved && ' · fonte pendente de aprovação do corpus'}</small>
-              </li>)}</ol> : <ChartState title="Corpus STJ ainda não carregado">Execute o comando load_stj_responsabilidade_civil após aplicar as migrações.</ChartState>}
-            </article>
-            <article className="related-card"><span className="section-kicker">Síntese das evidências</span><h3>Decisões relacionadas</h3><p>Resumo dos julgados relacionados na fonte de cada tese e das decisões TJDFT com vínculo validado.</p>
-              {alignment.source_theses?.length ? <div className="related-list">{alignment.source_theses.map((thesis) => {
-                const cited = thesis.related_decisions || []
-                const localRows = alignment.assessments.filter((row) => row.reference.identifier === thesis.identifier)
-                const citedSummary = cited.slice(0, 3).map((decision) => decision.identifier).join(' · ')
-                return <article className="related-item" key={`related-${thesis.id}`}>
-                  <div><span className="alignment-badge alignment-badge--uncertain">{formatNumber(cited.length)} julgados STJ citados</span><h4>{thesis.title}</h4>
-                    <p>{citedSummary || 'A fonte não lista julgados associados.'}{cited.length > 3 ? ` · +${cited.length - 3} outros` : ''}</p>
-                    <small>{formatNumber(thesis.local_decisions)} decisões TJDFT com vínculo validado no recorte{localRows.length ? ` · ${localRows.slice(0, 3).map((row) => `${row.local_process_number} (${relationLabels[row.relation]})`).join(' · ')}` : ''}</small>
-                  </div><a href={thesis.source_url} target="_blank" rel="noreferrer">Ver fontes ↗</a>
-                </article>
-              })}</div> : <ChartState title="Nenhuma decisão relacionada">As relações aparecerão quando houver teses e julgados rastreáveis no corpus.</ChartState>}
-              <small>Os julgados refletem as relações informadas pela fonte consultada; não comprovam, isoladamente, aderência das decisões locais.</small>
-            </article>
-          </div>
+          {alignment.trend.length > 0 && <details className="chart-table alignment-trend"><summary>Tendência trimestral das avaliações</summary><table><caption>Vínculos validados por trimestre da decisão local</caption><thead><tr><th scope="col">Trimestre</th><th scope="col">Aderentes</th><th scope="col">Possíveis divergências</th><th scope="col">Distinguishing</th><th scope="col">Inconclusivos</th></tr></thead><tbody>{alignment.trend.map((row) => <tr key={row.period}><td>{row.period.slice(0, 7)}</td><td>{formatNumber(row.aligned)}</td><td>{formatNumber(row.divergent)}</td><td>{formatNumber(row.distinguished)}</td><td>{formatNumber(row.uncertain)}</td></tr>)}</tbody></table></details>}
+          </details>
           {alignment.assessments.length > 0 && <details className="chart-table alignment-evidence"><summary>Ver tabela completa das evidências (até 100)</summary><table><caption>Vínculos e evidências jurídicas validados</caption><thead><tr><th scope="col">Decisão local</th><th scope="col">Classificação revisada</th><th scope="col">Precedente do STJ</th><th scope="col">Fundamentação e evidência</th></tr></thead><tbody>{alignment.assessments.map((row) => <tr key={`${row.local_source_id}-${row.reference.identifier}`}><td><strong>{row.local_process_number}</strong><br />{formatDate(row.decision_date)}</td><td><span className={`alignment-badge alignment-badge--${row.relation}`}>{relationLabels[row.relation]}</span><br /><small>Revisor: {row.reviewer}</small></td><td><a href={row.reference.source_url} target="_blank" rel="noreferrer">{row.reference.identifier} · {row.reference.title}</a><p>{row.reference.thesis}</p><small>{row.reference.source_name} · {row.reference.source_locator} · aprovação {row.reference.approval_reference}</small></td><td><p>{row.rationale}</p>{row.evidence_excerpt && <blockquote>{row.evidence_excerpt}</blockquote>}<small>{row.evidence_locator && `Localizador: ${row.evidence_locator} · `}Validação: {row.approval_reference}</small></td></tr>)}</tbody></table></details>}
         </>}
       </section>}
       {activeTab === 'sources' && <section id="panel-sources" className="tab-content" role="tabpanel" aria-labelledby="tab-sources">
         <div className="alignment-heading"><span className="eyebrow">Rastreabilidade</span><h2>Fontes, cobertura e limitações</h2><p>Consulte origem, período disponível e situação de cada extração. As contagens abaixo refletem os dados carregados localmente, não a cobertura total dos tribunais.</p></div>
         <div className="source-cards">{courts.map((courtCode) => {
-          const sourceData = data?.courtScopes?.[courtCode]?.metadata
+          const sourceData = data?.filteredScopes?.[courtCode]?.metadata
           const latest = sourceData?.latest_run
           const available = sourceData?.available_period
           return <article className="source-card" key={courtCode}><span className="section-kicker">DataJud · CNJ</span><h3>{courtCode}</h3>
@@ -321,10 +353,13 @@ export default function App({ court, courts, onCourtChange }) {
         </div>
           <p>Última importação de referência aprovada: {alignment.metadata.last_corpus_import ? new Date(alignment.metadata.last_corpus_import).toLocaleString('pt-BR') : 'nenhuma'}.</p>
           <p>{alignment.metadata.coverage}</p><ul className="limitations-list">{alignment.metadata.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
+          {alignment.metadata.pangea_imports?.length > 0 && <details className="chart-table"><summary>Histórico de importação Pangea (últimas 5 execuções)</summary><table><caption>Consulta pública de precedentes do STJ; totais informados pela fonte</caption><thead><tr><th scope="col">Execução</th><th scope="col">Consulta</th><th scope="col">Estado</th><th scope="col">Cobertura</th><th scope="col">Registros</th><th scope="col">Catálogo</th><th scope="col">Erro</th></tr></thead><tbody>{alignment.metadata.pangea_imports.map((run) => <tr key={run.id}><td>#{run.id}<br />{run.started_at ? new Date(run.started_at).toLocaleString('pt-BR') : '—'}</td><td>{run.scope?.query || '—'} · {run.scope?.organs?.join(', ') || '—'}</td><td>{run.status}</td><td>{formatNumber(run.pages)} páginas · {formatNumber(run.fetched)} de {run.source_total == null ? '—' : formatNumber(run.source_total)}</td><td>{formatNumber(run.created)} novos · {formatNumber(run.updated)} atualizados · {formatNumber(run.rejected)} rejeitados</td><td>{run.catalog_version || '—'}</td><td>{run.error || '—'}</td></tr>)}</tbody></table></details>}
+          <p>As teses e decisões relacionadas exibem até 300 referências para inspeção. Fontes importadas do Pangea permanecem não aprovadas até revisão humana.</p>
           {alignment.metadata.sources.length > 0 ? <ul className="source-links">{alignment.metadata.sources.map((source) => <li key={`${source.source_institution}-${source.source_name}-${source.identifier}`}><a href={source.source_url} target="_blank" rel="noreferrer">{source.source_institution} · {source.source_name}: {source.identifier} · {source.title}</a>{source.source_locator && ` — ${source.source_locator}`}{source.approval_reference && ` · aprovação ${source.approval_reference}`}</li>)}</ul> : <ChartState title="Corpus aprovado ainda não importado">Precedentes, teses e doutrina só aparecerão após a importação das fontes aprovadas pelo fluxo BDJur.</ChartState>}
         </div>}
       </section>}
       <footer className="dashboard-footer"><p>Fonte: <a href={metadata?.source_url || 'https://api-publica.datajud.cnj.jus.br/'} target="_blank" rel="noreferrer">{metadata?.source || 'DataJud · Conselho Nacional de Justiça'}</a>. {metadata?.coverage || 'Cobertura parcial dos registros locais.'}</p><p>Última atualização dos registros: {refreshed ? new Date(refreshed).toLocaleString('pt-BR') : '—'} · Painel atualizado a cada 5 minutos enquanto aberto.</p></footer>
+      {!loading && data ? <NlpPanel contextKey={JSON.stringify({ courts, ...(metadata?.scope?.start ? { start: metadata.scope.start, end: metadata.scope.end } : {}), ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })} /> : <section className="nlp-panel"><h2>Teses e fundamentos com evidências</h2><p role="status">{loading ? 'Aguardando o recorte aplicado do dashboard…' : 'Recorte indisponível. Atualize a consulta para carregar as evidências.'}</p></section>}
     </main>
   </div>
 }

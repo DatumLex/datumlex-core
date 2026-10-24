@@ -1,6 +1,7 @@
 """Authenticated client for the official PDPJ-Br BNP/Pangea integration API."""
 
 import json
+import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -32,7 +33,16 @@ class PangeaClient:
             with urlopen(request, timeout=timeout) as response:
                 return json.load(response)
         except HTTPError as exc:
-            raise PangeaError(f"BNP/Pangea HTTP {exc.code}.") from None
+            # Keycloak exposes a useful OAuth error code; never log its body,
+            # which may contain provider details beyond the sanitized code.
+            try:
+                payload = json.loads(exc.read())
+                error_code = payload.get("error", "") if isinstance(payload, dict) else ""
+                error_code = re.sub(r"[^A-Za-z0-9_.-]", "", str(error_code))[:64]
+            except (ValueError, OSError):
+                error_code = ""
+            suffix = f" ({error_code})" if error_code else ""
+            raise PangeaError(f"BNP/Pangea HTTP {exc.code}{suffix}.") from None
         except (URLError, TimeoutError, OSError):
             raise PangeaError("BNP/Pangea indisponível ou conexão interrompida.") from None
         except (ValueError, TypeError):
@@ -73,4 +83,85 @@ class PangeaClient:
         result = self._read_json(request, self.timeout)
         if not isinstance(result, (dict, list)):
             raise PangeaError("BNP/Pangea retornou estrutura de página inesperada.")
+        return result
+
+
+class PangeaPublicSearchClient:
+    """Public Pangea frontend search API, restricted to STJ records."""
+
+    def __init__(self, timeout=45):
+        self.base_url = settings.PANGEA_SEARCH_BASE_URL.rstrip("/")
+        self.timeout = timeout
+        self._catalog = None
+
+    def _get_json(self, url):
+        request = Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": "DatumLex-Pangea-Connector/1.0"},
+        )
+        return PangeaClient._read_json(request, self.timeout)
+
+    def get_catalog(self):
+        catalog = self._get_json(f"{self.base_url}/api/v1/parametros")
+        if not isinstance(catalog, dict):
+            raise PangeaError("Pangea retornou catálogo em formato inesperado.")
+        for field in ("orgaos", "especies"):
+            entries = catalog.get(field)
+            if not isinstance(entries, list) or not entries:
+                raise PangeaError(f"Catálogo Pangea vazio ou inválido: {field}.")
+            if any(not isinstance(item, dict) or not item.get("sigla") for item in entries):
+                raise PangeaError(f"Catálogo Pangea sem sigla válida: {field}.")
+        organs = {str(item["sigla"]).upper() for item in catalog["orgaos"]}
+        if "STJ" not in organs:
+            raise PangeaError("Catálogo Pangea não disponibiliza o órgão STJ.")
+        self._catalog = catalog
+        return catalog
+
+    def search_page(self, query, page_index, page_size):
+        if not isinstance(query, str) or not query.strip():
+            raise PangeaError("Informe o termo de pesquisa do Pangea.")
+        if page_index < 0 or not 1 <= page_size <= 100:
+            raise PangeaError("Pangea requer página zero-based >= 0 e tamanho entre 1 e 100.")
+        catalog = self._catalog or self.get_catalog()
+        filter_data = {
+            "buscaGeral": query.strip(),
+            "todasPalavras": "",
+            "quaisquerPalavras": "",
+            "semPalavras": "",
+            "trechoExato": "",
+            "atualizacaoDesde": "",
+            "atualizacaoAte": "",
+            "nr": "",
+            "orgaos": ["STJ"],
+            "tipos": [str(item["sigla"]) for item in catalog["especies"]],
+            "cancelados": False,
+            "ordenacao": "Text",
+            "pagina": page_index + 1,
+            "tamanhoPagina": page_size,
+        }
+        payload = json.dumps({"filtro": filter_data}, ensure_ascii=False).encode("utf-8")
+        request = Request(
+            f"{self.base_url}/api/v1/precedentes",
+            data=payload,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": "DatumLex-Pangea-Connector/1.0",
+            },
+            method="POST",
+        )
+        result = PangeaClient._read_json(request, self.timeout)
+        if not isinstance(result, dict):
+            raise PangeaError("Pangea retornou página em formato inesperado.")
+        rows, total = result.get("resultados"), result.get("total")
+        if (
+            not isinstance(rows, list)
+            or isinstance(total, bool)
+            or not isinstance(total, int)
+            or total < 0
+            or len(rows) > page_size
+            or any(not isinstance(row, dict) for row in rows)
+        ):
+            raise PangeaError("Pangea retornou resultados ou total inválido.")
+        result["resultados"] = [row for row in rows if str(row.get("orgao", "")).upper() == "STJ"]
         return result

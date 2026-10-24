@@ -2,6 +2,22 @@
 
 Integração STJ: consulte [arquitetura, linhagem, execução e limites](STJ-ARCHITECTURE.md).
 `run.py --court STJ` coleta metadados; `stj_documents.py` coleta textos oficiais.
+`pangea.py` importa precedentes públicos do STJ pelo Pangea.
+
+## Coleta Pangea
+
+Com o mesmo ambiente e banco configurados abaixo, execute na pasta `etl/`:
+
+```powershell
+.venv/Scripts/python.exe pangea.py --query "responsabilidade civil" --page-size 100 --max-pages 5
+```
+
+O comando consulta até cinco páginas e registra cobertura, origem e contadores
+em `PangeaImportRun`. Consulte `pangea.py --help` para ajustar os limites.
+As referências importadas ficam pendentes de aprovação jurídica e não criam
+automaticamente vínculos de aderência. O ponto de entrada reutiliza o comando
+`sync_pangea` do backend, assim como `run.py` reutiliza `extract_datajud`, sem
+duplicar as regras de transformação ou os modelos. Não há agendamento automático.
 
 Ponto de entrada separado para executar **DataJud → validação e normalização →
 banco dimensional**, sem iniciar o servidor do backend ou o frontend.

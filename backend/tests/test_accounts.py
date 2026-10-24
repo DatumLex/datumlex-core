@@ -9,7 +9,7 @@ from src.accounts.provisioning import provision_support
 
 class AccessTests(TestCase):
     def setUp(self):
-        self.court = Court.objects.create(code="TJDFT", name="TJDFT")
+        self.court, _ = Court.objects.get_or_create(code="TJDFT", defaults={"name": "TJDFT"})
         self.master = User.objects.create_user(
             username="master",
             name="Test Master",
@@ -49,6 +49,18 @@ class AccessTests(TestCase):
         return getattr(client or self.client, method)(
             "/api/" + path + "/", data=data or {}, content_type="application/json"
         )
+
+    def test_multiple_courts_require_permission_for_every_court(self):
+        stj, _ = Court.objects.get_or_create(code="STJ", defaults={"name": "STJ"})
+        self.standard.courts.add(self.court)
+        self.client.force_login(self.standard)
+        url = "/api/statistics/?court=TJDFT,STJ"
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.standard.courts.add(stj)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["metadata"]["scope"]["court"], "TJDFT,STJ")
+        self.assertEqual(self.client.get("/api/statistics/?court=TJDFT,STJ,UNKNOWN").status_code, 403)
 
     def test_register_pending_hash_and_no_privilege_assignment(self):
         result = self.send("auth/register", self.payload)

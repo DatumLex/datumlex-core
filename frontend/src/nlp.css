@@ -1,0 +1,20 @@
+.nlp-panel { margin: 32px 0; padding: 24px; background: white; border: 1px solid var(--border); color: var(--deep-navy); overflow-wrap: anywhere; }
+.nlp-panel h2 { font: 700 28px/1.2 Georgia, serif; }
+.nlp-panel p, .nlp-panel blockquote { line-height: 1.6; }
+.nlp-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 24px 0; }
+.nlp-controls fieldset { min-width: 0; border: 1px solid var(--border); }
+.nlp-controls label { display: flex; gap: 8px; align-items: center; min-height: 44px; flex-wrap: wrap; }
+.nlp-controls input { width: 20px; height: 20px; accent-color: var(--navy); }
+.nlp-controls select { width: 100%; min-height: 44px; background: white; color: var(--deep-navy); }
+.nlp-panel :is(button, select, input, summary, a):focus-visible { outline: 3px solid var(--navy); outline-offset: 3px; }
+.nlp-panel :is(button, summary) { min-height: 44px; cursor: pointer; }
+.nlp-ranking { padding-left: 24px; }
+.nlp-thesis { margin: 24px 0; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.nlp-thesis h3 { font-size: 18px; line-height: 1.5; }
+.nlp-source { padding: 16px; margin: 16px 0; background: var(--cream); border-left: 4px solid var(--teal); }
+.nlp-source blockquote { margin: 16px 0; white-space: pre-wrap; }
+.nlp-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.nlp-panel dd { margin: 0 0 12px; }.nlp-panel dt { font-weight: bold; }
+.nlp-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 1000px) { .nlp-controls { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .nlp-panel { padding: 16px; }.nlp-panel button { max-width: 100%; white-space: normal; } }

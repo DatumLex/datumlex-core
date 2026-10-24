@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-def main():
+def main(command="extract_datajud"):
     etl_dir = Path(__file__).resolve().parent
     backend_dir = etl_dir.parent / "backend"
     if not (backend_dir / "manage.py").is_file():
@@ -23,7 +23,7 @@ def main():
 
     from django.core.management import execute_from_command_line
 
-    execute_from_command_line([str(etl_dir / "run.py"), "extract_datajud", *sys.argv[1:]])
+    execute_from_command_line([sys.argv[0], command, *sys.argv[1:]])
 
 
 if __name__ == "__main__":
