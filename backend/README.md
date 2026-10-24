@@ -220,9 +220,15 @@ full taxonomy, outcome methodology, and frontend integration are separate work.
 .venv/Scripts/python.exe manage.py check
 .venv/Scripts/python.exe manage.py makemigrations --check --dry-run
 .venv/Scripts/python.exe manage.py test tests -v 2
+.venv/Scripts/python.exe -m pytest
 .venv/Scripts/ruff.exe check .
 .venv/Scripts/ruff.exe format --check .
 ```
+
+Pytest discovers the backend suite in `tests/` and uses `config.test_settings` via pytest-django.
+That configuration uses an in-memory SQLite database and removes support-account credentials, so
+pytest does not connect to or modify the local development database. Install pytest and pytest-django
+along with the other development tools using `pip install -r requirements-dev.txt`.
 
 Tests use a separate temporary database and explicitly synthetic fixtures. They cover normalization,
 privacy/scope rejection, leading zeroes, pagination/retries, interrupted-page rollback, resume,
