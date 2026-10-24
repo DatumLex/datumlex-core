@@ -2,6 +2,16 @@
 
 from django.db import models
 
+from .evidence_models import (  # noqa: F401
+    NlpDocument,
+    NlpEvidence,
+    NlpExtraction,
+    NlpRevision,
+    NlpSnapshot,
+    NlpSourceObservation,
+    NlpTextVersion,
+)
+
 
 class DimTime(models.Model):
     id = models.BigAutoField(primary_key=True, db_column="id_time")

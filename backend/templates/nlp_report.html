@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DatumLex — evidências NLP congeladas</title>
+<style>
+body { color:#0d2436; background:#fff; font:16px/1.6 system-ui,sans-serif; max-width:1000px; margin:32px auto; padding:16px; overflow-wrap:anywhere; }
+h1,h2 { font-family:Georgia,serif; } h2 { border-bottom:1px solid #d9d5ca; margin-top:32px; }
+blockquote { white-space:pre-wrap; border-left:3px solid #1f4e5f; margin:16px 0; padding-left:16px; }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; } a { color:#14324d; } a:focus-visible,button:focus-visible { outline:3px solid #14324d; outline-offset:3px; }
+button { min-height:44px; padding:8px 16px; background:#14324d; color:white; border:0; font:inherit; cursor:pointer; }
+article { border-bottom:1px solid #d9d5ca; padding:16px 0; } table { border-collapse:collapse; width:100%; } th,td { text-align:left; padding:8px; border-bottom:1px solid #d9d5ca; }
+@page { size:A4; margin:18mm; } @media print { body { margin:0; padding:0; font-size:10pt; max-width:none; } button,.print-help { display:none; } h2,h3,h4 { break-after:avoid; } blockquote, tr { break-inside:avoid; } thead { display:table-header-group; } }
+</style></head><body>
+<h1>DatumLex — teses, fundamentos e fontes</h1>
+<p class="print-help">Relatório completo do snapshot. Use a impressão do navegador para salvar em PDF. Confira destino e páginas antes de salvar.</p>
+<button type="button" onclick="window.print()">Imprimir ou salvar em PDF</button>
+{% if data_mode != 'live' %}<p><strong>FIXTURE: dados sintéticos; sem validade jurídica. {{ fixture_ids|join:', ' }}</strong></p>{% endif %}
+<p>{{ disclaimer }}</p><p>Corpus carregado parcial; não representa censo judicial. Agrupamento por texto literal, sem equivalência jurídica inferida.</p>
+<p>Snapshot: {{ snapshot_id }}<br>Consulta: {{ query_id }}<br>SHA-256: {{ sha256 }}<br>Gerado em: {{ generated_local }}<br>Política: {{ ranking_policy }}<br>Estado: {{ status_label }}</p>
+<h2>Contexto aplicado</h2><pre>{{ context_json }}</pre>
+<h2>Populações e rankings</h2>
+{% for name,population in populations.items %}<section><h3>{{ population.display_name }}</h3>
+<p>Unidade: {{ population.unit_label }}. Campo temporal: {{ population.period_field_label }}. Documentos no recorte mapeado: {{ population.documents_in_scope }}; liberados: {{ population.documents_quality_released }}; denominador exibido: {{ population.denominator }}. Estado: {{ population.status_label }}.</p>
+<h4>Teses</h4><ol>{% for group in population.theses %}<li>{{ group.label }} — {{ group.document_count }} documentos distintos; {{ group.evidence_count }} trechos. Grupo: {{ group.id }}</li>{% empty %}<li>Nenhuma tese liberada neste recorte. Ausência de extração não prova ausência de tese.</li>{% endfor %}</ol>
+<h4>Fundamentos</h4><ol>{% for group in population.grounds %}<li>{{ group.label }} — {{ group.document_count }} documentos distintos; {{ group.evidence_count }} trechos. Grupo: {{ group.id }}</li>{% empty %}<li>Nenhum fundamento liberado neste recorte.</li>{% endfor %}</ol>
+</section>{% endfor %}
+<h2>Cobertura e exclusões</h2><ul>{% for row in exclusion_rows %}<li>{{ row.label }}: {{ row.count }}</li>{% endfor %}</ul>
+<p>Qualidade: {{ quality_label }}. {% if quality.reason %}Aguardando mapeamento revisado e decisão de qualidade.{% endif %}</p>
+<p>Limitações do snapshot: {{ warnings|join:', ' }}.</p>
+<h2>Fontes e trechos exatos — todas as páginas</h2>
+{% for item in items %}<article><h3>{{ item.document_metadata.title|default:item.document_id }}</h3>
+<p>Documento: {{ item.document_id }} · {{ item.court }} · {{ item.population }} · {{ item.source_id }}</p>
+{% for segment in item.effective.segments %}<blockquote>{{ segment.text }}</blockquote><p>Intervalo Unicode [{{ segment.start }}, {{ segment.end }}). {% if segment.locator.page %}Página: {{ segment.locator.page }}.{% else %}Página não localizada.{% endif %}</p>{% endfor %}
+{% if item.official_url %}<p>Fonte oficial: <a href="{{ item.official_url }}">{{ item.official_url }}</a></p>{% else %}<p>Link oficial específico não disponível.</p>{% endif %}
+<p>Estado da fonte: {{ item.source_state }}; observação: {{ item.source_observation_id }}; consultada em: {{ item.source_checked_at }}.</p>
+<p>Versão da fonte: {{ item.source.source_version|default:'não informada' }}. Limitações registradas: {{ item.warnings|join:', ' }}.</p>
+<p>Evidência: {{ item.id }}; revisão: {{ item.revision }} ({{ item.revision_id }}); estado: {{ item.review_status }}.<br>Extração: {{ item.extraction_id }}; hash do resultado: {{ item.result_sha256 }}.<br>Texto: {{ item.text_version_id }}; SHA-256: {{ item.text_sha256 }}.</p>
+<p>Pontuação da extração: {{ item.effective.confidence.score|default_if_none:'não disponível' }}. Não estima êxito judicial. Adoção pelo julgador não inferida pela frequência.</p>
+<pre>{{ item.pipeline_json }}</pre>
+<p>Cobertura da extração:</p><pre>{{ item.coverage_json }}</pre>
+</article>{% empty %}<p>Não há evidências liberadas. Consulte a decisão de qualidade e a disponibilidade das fontes.</p>{% endfor %}
+</body></html>

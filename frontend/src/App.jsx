@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { getData } from './api'
+import NlpPanel from './NlpPanel'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -358,6 +359,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </div>}
       </section>}
       <footer className="dashboard-footer"><p>Fonte: <a href={metadata?.source_url || 'https://api-publica.datajud.cnj.jus.br/'} target="_blank" rel="noreferrer">{metadata?.source || 'DataJud · Conselho Nacional de Justiça'}</a>. {metadata?.coverage || 'Cobertura parcial dos registros locais.'}</p><p>Última atualização dos registros: {refreshed ? new Date(refreshed).toLocaleString('pt-BR') : '—'} · Painel atualizado a cada 5 minutos enquanto aberto.</p></footer>
+      {!loading && data ? <NlpPanel contextKey={JSON.stringify({ courts, ...(metadata?.scope?.start ? { start: metadata.scope.start, end: metadata.scope.end } : {}), ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })} /> : <section className="nlp-panel"><h2>Teses e fundamentos com evidências</h2><p role="status">{loading ? 'Aguardando o recorte aplicado do dashboard…' : 'Recorte indisponível. Atualize a consulta para carregar as evidências.'}</p></section>}
     </main>
   </div>
 }

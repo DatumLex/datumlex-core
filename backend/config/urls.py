@@ -1,9 +1,22 @@
 from django.urls import path
 
 from src.accounts import views as accounts
-from src.routes import statistics
+from src.routes import nlp_dashboard, nlp_evidence, statistics
 
 urlpatterns = [
+    path('api/v2/filter-options/', nlp_dashboard.options),
+    path('api/v2/analysis-snapshots/', nlp_dashboard.snapshots),
+    path('api/v2/analysis-snapshots/<uuid:snapshot_id>/', nlp_dashboard.detail),
+    path('api/v2/analysis-snapshots/<uuid:snapshot_id>/export/', nlp_dashboard.export),
+    path('api/v2/analysis-snapshots/<uuid:snapshot_id>/report/', nlp_dashboard.report),
+    path('api/v2/analysis-snapshots/<uuid:snapshot_id>/<str:resource>/', nlp_dashboard.ranking),
+    path('api/v2/analysis-snapshots/<uuid:snapshot_id>/<str:resource>/<str:group_id>/sources/', nlp_dashboard.ranking),
+    path('api/v1/extractions/<uuid:extraction_id>/', nlp_evidence.extraction),
+    path('api/v1/extractions/<uuid:extraction_id>/evidences/', nlp_evidence.extraction_evidences),
+    path('api/v1/evidences/<uuid:evidence_id>/', nlp_evidence.detail),
+    path('api/v1/evidences/<uuid:evidence_id>/revisions/', nlp_evidence.revisions),
+    path('api/v1/evidence-snapshots/', nlp_evidence.snapshots),
+    path('api/v1/evidence-snapshots/<uuid:snapshot_id>/', nlp_evidence.snapshot_detail),
     path("api/auth/csrf/", accounts.csrf),
     path("api/auth/register/", accounts.register),
     path("api/auth/login/", accounts.login),
