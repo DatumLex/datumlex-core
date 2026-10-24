@@ -7,8 +7,12 @@ const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
 const formatRate = (value) => value == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 }).format(value)
 const formatDate = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : '—'
+const shortThesisLabel = (thesis) => {
+  const label = thesis.label || thesis.titulo || thesis.title || 'Tese sem título'
+  return label.trim().split(/\s+/).slice(0, 4).join(' ')
+}
 const degrees = { G1: '1ª instância', G2: '2ª instância', JE: 'Juizados especiais', TR: 'Turmas recursais', SUP: 'Tribunal superior' }
-const relationLabels = { aligned: 'Aderente', divergent: 'Possível divergência', distinguished: 'Distinguishing justificado', uncertain: 'Inconclusivo' }
+const relationLabels = { aligned: 'Adesão identificada', divergent: 'Divergência sinalizada', distinguished: 'Distinção registrada', uncertain: 'Inconclusivo' }
 
 function IndicatorCard({ label, value, accent, note }) {
   return <article className={`indicator-card indicator-card--${accent}`}>
@@ -25,6 +29,39 @@ function ChartCard({ title, description, children }) {
 
 function ChartState({ title, children }) {
   return <div className="chart-empty"><div className="empty-chart-icon"><BarChart3 aria-hidden="true" size={30} /></div><strong>{title}</strong><p>{children}</p></div>
+}
+
+function EvidenceDrawer({ item, onClose }) {
+  const drawerRef = useRef(null)
+  useEffect(() => { if (item) drawerRef.current?.focus() }, [item])
+  if (!item) return null
+  const candidate = item.kind === 'candidate'
+  const confidence = item.confidence == null
+    ? 'Não informado pela API'
+    : `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(Number(item.confidence) * 100)}%`
+  const identifier = candidate ? item.reference_identifier : item.reference?.identifier
+  const sourceUrl = candidate ? item.reference_url : item.reference?.source_url
+  const title = candidate ? item.reference_title : item.reference?.title
+  const sourceLocator = candidate ? item.source_locator : item.reference?.source_locator
+  const excerpt = candidate ? null : item.evidence_excerpt
+
+  return <div className="evidence-drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <aside ref={drawerRef} tabIndex={-1} className="evidence-drawer" role="dialog" aria-modal="true" aria-labelledby="evidence-drawer-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose() }}>
+      <div className="evidence-drawer-heading"><div><span className="eyebrow">Fonte rastreável</span><h3 id="evidence-drawer-title">{title || identifier || 'Evidência'}</h3></div><button type="button" className="secondary-button" onClick={onClose} aria-label="Fechar fontes">Fechar</button></div>
+      <dl className="evidence-drawer-fields">
+        <div><dt>Identificador da fonte</dt><dd>{identifier || 'Não informado pela API'}</dd></div>
+        <div><dt>Órgão</dt><dd>{candidate ? 'Não informado no item candidato' : item.reference?.source_institution || 'Não informado pela API'}</dd></div>
+        <div><dt>Data da decisão</dt><dd>{candidate ? 'Não informada para esta sugestão' : formatDate(item.decision_date)}</dd></div>
+        <div><dt>Nível de confiança</dt><dd>{confidence}</dd></div>
+        <div><dt>Processo local</dt><dd>{item.local_process_number || 'Não informado pela API'}</dd></div>
+        <div><dt>Localizador</dt><dd>{sourceLocator || 'Não informado pela API'}</dd></div>
+      </dl>
+      {excerpt ? <section className="evidence-drawer-excerpt"><h4>Trecho da decisão</h4><blockquote>{excerpt}</blockquote></section> : <section className="evidence-drawer-excerpt"><h4>{candidate ? 'Detalhes da associação' : 'Trecho da decisão'}</h4><p>{candidate ? item.explanation || 'A API não retornou detalhes para esta sugestão.' : 'A API não retornou trecho para esta avaliação.'}</p></section>}
+      {!candidate && item.rationale && <section className="evidence-drawer-excerpt"><h4>Fundamentação da revisão</h4><p>{item.rationale}</p></section>}
+      {candidate && <p className="evidence-drawer-note">Esta é uma sugestão de correspondência por identificador. Não representa avaliação de aderência jurídica.</p>}
+      {sourceUrl && <a className="evidence-source-link" href={sourceUrl} target="_blank" rel="noreferrer">Abrir fonte original ↗</a>}
+    </aside>
+  </div>
 }
 
 const degreeColors = { G1: '#1f4e5f', G2: '#c9a227', JE: '#3f7452', TR: '#718496', SUP: '#866a96' }
@@ -149,6 +186,8 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const [bounds, setBounds] = useState(null)
   const [data, setData] = useState(null)
   const [alignment, setAlignment] = useState(null)
+  const [selectedThesisId, setSelectedThesisId] = useState(null)
+  const [evidenceDrawerItem, setEvidenceDrawerItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [validation, setValidation] = useState('')
@@ -173,6 +212,8 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     async function load() {
       try {
         setAlignment(null)
+        setSelectedThesisId(null)
+        setEvidenceDrawerItem(null)
         if (courts.some((code) => !authorizedCourts.includes(code))) throw new Error('Você não possui acesso a este tribunal.')
         if (courts.some((code) => !['TJDFT', 'STJ'].includes(code))) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
         const scopeResults = await Promise.all(courts.map(async (courtCode) => [
@@ -297,38 +338,68 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
       </section>
       </div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
-        <div className="alignment-heading"><span className="eyebrow">Fontes rastreáveis · TJDFT × STJ</span><h2 id="alignment-title">Precedentes e teses</h2><p>Teses iguais agrupadas e decisões citadas pelo STJ. A correspondência local é identificada separadamente e não significa aderência.</p></div>
+        <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">NLP explicável</span><h2 id="alignment-title">Precedentes e teses</h2><p>Teses identificadas em decisões com seus trechos e fontes de apoio.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
         {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
+          {(() => {
+            const groups = alignment.thesis_groups || []
+            const selectedGroup = groups.find((group) => group.id === selectedThesisId)
+            const normalizeText = (value) => (value || '').trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+            const selectedKey = selectedGroup ? normalizeText(selectedGroup.title) : null
+            const selectedReferenceIds = selectedGroup ? new Set([
+              ...(alignment.source_theses || [])
+                .filter((reference) => normalizeText(reference.thesis || reference.title) === selectedKey)
+                .map((reference) => reference.identifier),
+              ...(selectedGroup.source_references || []).map((reference) => reference.identifier),
+            ]) : null
+            const belongsToSelectedGroup = (identifier) => !selectedReferenceIds || selectedReferenceIds.has(identifier)
+            const visibleAssessments = (alignment.assessments || []).filter((item) => belongsToSelectedGroup(item.reference?.identifier))
+            const candidateLinks = (alignment.candidate_links || []).map((item) => ({ ...item, kind: 'candidate' }))
+            const unresolvedCandidates = (alignment.unresolved_candidates || []).map((item) => ({ ...item, kind: 'candidate', candidate_type: 'unresolved' }))
+            const visibleCandidates = [...candidateLinks, ...unresolvedCandidates].filter((item) => belongsToSelectedGroup(item.reference_identifier))
+            const maxCount = Math.max(1, ...groups.map((group) => group.case_count || 0))
+            const pendingReviews = alignment.metadata?.review_queue?.pending_or_unreviewed ?? 0
+            const candidateLimit = alignment.metadata?.candidate_link_coverage?.display_limit
+            const candidateTotals = alignment.metadata?.candidate_link_coverage
+            const candidateTotal = selectedGroup ? visibleCandidates.length : (candidateTotals?.matched || 0) + (candidateTotals?.unresolved || 0)
+            const selectedCourts = ['TJDFT', 'STJ'].filter((courtCode) => courts.includes(courtCode))
+            const evidenceBadge = selectedCourts.length > 1 ? selectedCourts.join(' + ') : `Somente ${selectedCourts[0]}`
+
+            return <>
           <div className="precedent-grid">
-            <article className="thesis-card"><span className="section-kicker">Frequência · Pangea/STJ</span><h3>Principais teses no recorte</h3><p>Contagem de precedentes com a mesma tese em todas as referências importadas. Como o Pangea não fornece código TPU para classificar cada tese, o assunto selecionado filtra os vínculos e decisões locais, não o catálogo de teses.</p>
-              {alignment.thesis_groups?.length ? <ol className="thesis-list">{alignment.thesis_groups.map((group) => <li key={group.id}>
-                <div className="thesis-title"><strong title={group.title}>{group.title}</strong><span>{formatNumber(group.case_count)} {group.case_count === 1 ? 'referência' : 'referências'}</span></div>
-                <div className="thesis-track"><span style={{ width: `${Math.max(4, group.case_count / Math.max(...alignment.thesis_groups.map((item) => item.case_count)) * 100)}%` }} /></div>
-                <small>{group.source_references.map((ref) => <a key={ref.identifier} href={ref.source_url} target="_blank" rel="noreferrer">{ref.identifier}</a>).reduce((prev, curr) => prev ? <>{prev} · {curr}</> : curr, null)}{!group.approved && ' · revisão pendente'}</small>
-              </li>)}</ol> : <ChartState title="Nenhuma tese disponível">As teses aparecem após a importação das fontes do STJ.</ChartState>}
+            <article className="thesis-card"><header className="precedent-card-heading"><div><span className="section-kicker">FREQUÊNCIA</span><h3>Principais teses no recorte</h3><p>Exemplo de agrupamento por tese identificada.</p></div><span className="design-badge">NLP + revisão</span></header>
+              {groups.length ? <ol className="thesis-list">{groups.map((group) => {
+                const fullTitle = group.title || group.label || group.titulo || 'Tese sem título'
+                const sourceReferences = group.source_references || []
+                const selected = selectedThesisId === group.id
+                return <li key={group.id} className={`thesis-row${selected ? ' is-selected' : ''}`}>
+                  <button type="button" className="thesis-row-main" aria-pressed={selected} title={fullTitle} onClick={() => setSelectedThesisId((current) => current === group.id ? null : group.id)}>
+                    <strong>{shortThesisLabel(group)}</strong>
+                  </button>
+                  <div className="thesis-distribution"><div className="thesis-track" role="progressbar" aria-label={`Quantidade de referências: ${formatNumber(group.case_count)}`} aria-valuemin="0" aria-valuemax={maxCount} aria-valuenow={group.case_count || 0}><div className="thesis-track-fill" style={{ width: `${Math.max(0, ((group.case_count || 0) / maxCount) * 100)}%` }} /></div><span className="thesis-count">{formatNumber(group.case_count)} {group.case_count === 1 ? 'referência' : 'referências'}</span></div>
+                  <div className="thesis-row-meta"><small>Fontes: {sourceReferences.map((reference) => <a key={reference.identifier} href={reference.source_url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{reference.identifier}</a>).reduce((previous, current) => previous ? <>{previous} · {current}</> : current, null)}</small>{!group.approved && <span className="review-pending-badge">Revisão pendente</span>}</div>
+                  <details className="thesis-full-text"><summary>Ver enunciado completo</summary><p className="thesis-statement">{fullTitle}</p></details>
+                </li>
+              })}</ol> : <ChartState title="Nenhuma tese disponível">As teses aparecem após a importação das fontes do STJ.</ChartState>}
             </article>
-            <article className="related-card"><span className="section-kicker">Citações · TJDFT + STJ</span><h3>Decisões relacionadas</h3><p>Julgados que o Pangea associa a cada tese, com fonte para conferência.</p>
-              {alignment.thesis_groups?.length ? <div className="related-list">{alignment.thesis_groups.slice(0, 6).map((group) => {
-                const cited = group.related_decisions || []
-                const sourceLinks = group.source_references || []
-                return <article className="related-item" key={`related-${group.id}`}>
-                  <div><h4>{group.title}</h4>
-                    <p>{cited.length ? cited.slice(0, 2).map((decision) => decision.identifier).join(' · ') : 'Sem processo paradigma listado pela fonte'}{cited.length > 2 ? ` · +${cited.length - 2}` : ''}</p>
-                    <small>{formatNumber(group.matched_local_decisions)} processos TJDFT localizados por identificador · {formatNumber(group.unresolved_citations)} citações sem correspondência local</small>
-                  </div>{sourceLinks[0] && <a href={sourceLinks[0].source_url} target="_blank" rel="noreferrer">Ver fontes ↗</a>}
-                </article>
-              })}</div> : <ChartState title="Nenhuma decisão relacionada">As citações aparecem quando a fonte STJ as informa.</ChartState>}
+            <article className="related-card"><header className="precedent-card-heading"><div><span className="section-kicker">EVIDÊNCIAS</span><h3>Decisões relacionadas</h3><p>O usuário sempre consegue inspecionar a fonte do indicador.</p></div><span className="design-badge">{evidenceBadge}</span></header>
+              {visibleAssessments.length ? <div className="related-list">{visibleAssessments.slice(0, 5).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference.identifier}`}>
+                <span className={`evidence-status-icon evidence-status-icon--${item.relation}`} aria-hidden="true">{item.relation === 'aligned' ? '✓' : item.relation === 'divergent' ? '!' : 'i'}</span>
+                <div className="evidence-item-content"><h4>{relationLabels[item.relation]} · {item.local_process_number}</h4><p>{item.reference.title}</p><small>{item.reference.identifier}</small></div>
+                <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'assessment' })}>Ver fontes →</button>
+              </article>)}</div> : <div className="candidate-empty-state">
+                <div className="pending-summary"><strong>{formatNumber(pendingReviews)} evidências aguardando revisão</strong><p>Classificação assistida; evidência insuficiente não é tratada como conclusão.</p><p>{formatNumber(candidateTotal)} relações candidatas{selectedGroup ? ` retornadas para “${shortThesisLabel(selectedGroup)}”` : ' no recorte'}{candidateLimit ? ` · a lista exibe até ${formatNumber(candidateLimit)}` : ''}.</p></div>
+                {visibleCandidates.length ? <div className="related-list">{visibleCandidates.slice(0, 8).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference_identifier}-${item.cited_identifier}`}>
+                  <span className="evidence-status-icon evidence-status-icon--pending" aria-hidden="true">!</span>
+                  <div className="evidence-item-content"><span className="review-pending-badge">Pendente de revisão</span><h4>{item.local_process_number || item.cited_identifier}</h4><p>{item.reference_title}</p><small>{item.reference_identifier}{item.candidate_type === 'unresolved' ? ' · citação sem correspondência local' : item.review_status === 'confirmed' ? ' · identificador confirmado; pertinência ainda não revisada' : ' · sugestão de correspondência'}</small></div>
+                  <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'candidate' })}>Ver fontes →</button>
+                </article>)}</div> : <p className="candidate-no-links">{selectedGroup ? 'Nenhuma relação candidata retornada para esta tese. Limpe a seleção para ver o recorte completo.' : 'Nenhuma relação candidata retornada pela API neste recorte.'}</p>}
+              </div>}
             </article>
           </div>
-          <details className="chart-table precedent-indicators"><summary>Indicadores de aderência e tendências</summary><div className="alignment-metrics">
-            <IndicatorCard label="Aderência entre vínculos comparáveis" value={formatRate(alignment.metrics.adherence_rate)} accent="green" note={`${formatNumber(alignment.metrics.aligned)} vínculos validados como aderentes`} />
-            <IndicatorCard label="Possíveis divergências" value={formatNumber(alignment.metrics.divergent)} accent="gold" note={`${formatRate(alignment.metrics.possible_divergence_rate)} dos vínculos comparáveis; exigem revisão jurídica`} />
-            <IndicatorCard label="Vínculos avaliados" value={formatNumber(alignment.metrics.validated_links)} accent="navy" note={`${formatNumber(alignment.metrics.local_decisions)} decisões locais distintas; unidade do indicador é o vínculo decisão-referência`} />
-            <IndicatorCard label="Distinguishing justificado / inconclusivo" value={`${formatNumber(alignment.metrics.distinguished)} / ${formatNumber(alignment.metrics.uncertain)}`} accent="slate" note="Apresentados separadamente; não entram na taxa de aderência ou divergência" />
-          </div>
-          {alignment.trend.length > 0 && <details className="chart-table alignment-trend"><summary>Tendência trimestral das avaliações</summary><table><caption>Vínculos validados por trimestre da decisão local</caption><thead><tr><th scope="col">Trimestre</th><th scope="col">Aderentes</th><th scope="col">Possíveis divergências</th><th scope="col">Distinguishing</th><th scope="col">Inconclusivos</th></tr></thead><tbody>{alignment.trend.map((row) => <tr key={row.period}><td>{row.period.slice(0, 7)}</td><td>{formatNumber(row.aligned)}</td><td>{formatNumber(row.divergent)}</td><td>{formatNumber(row.distinguished)}</td><td>{formatNumber(row.uncertain)}</td></tr>)}</tbody></table></details>}
-          </details>
-          {alignment.assessments.length > 0 && <details className="chart-table alignment-evidence"><summary>Ver tabela completa das evidências (até 100)</summary><table><caption>Vínculos e evidências jurídicas validados</caption><thead><tr><th scope="col">Decisão local</th><th scope="col">Classificação revisada</th><th scope="col">Precedente do STJ</th><th scope="col">Fundamentação e evidência</th></tr></thead><tbody>{alignment.assessments.map((row) => <tr key={`${row.local_source_id}-${row.reference.identifier}`}><td><strong>{row.local_process_number}</strong><br />{formatDate(row.decision_date)}</td><td><span className={`alignment-badge alignment-badge--${row.relation}`}>{relationLabels[row.relation]}</span><br /><small>Revisor: {row.reviewer}</small></td><td><a href={row.reference.source_url} target="_blank" rel="noreferrer">{row.reference.identifier} · {row.reference.title}</a><p>{row.reference.thesis}</p><small>{row.reference.source_name} · {row.reference.source_locator} · aprovação {row.reference.approval_reference}</small></td><td><p>{row.rationale}</p>{row.evidence_excerpt && <blockquote>{row.evidence_excerpt}</blockquote>}<small>{row.evidence_locator && `Localizador: ${row.evidence_locator} · `}Validação: {row.approval_reference}</small></td></tr>)}</tbody></table></details>}
+          {selectedGroup && <p className="thesis-selection-note">Filtrando evidências por: <strong>{shortThesisLabel(selectedGroup)}</strong> <button type="button" className="text-button" onClick={() => setSelectedThesisId(null)}>Limpar seleção</button></p>}
+          <EvidenceDrawer item={evidenceDrawerItem} onClose={() => setEvidenceDrawerItem(null)} />
+            </>
+          })()}
         </>}
       </section>}
       {activeTab === 'sources' && <section id="panel-sources" className="tab-content" role="tabpanel" aria-labelledby="tab-sources">
