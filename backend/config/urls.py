@@ -1,9 +1,10 @@
 from django.urls import path
 
 from src.accounts import views as accounts
-from src.routes import nlp_dashboard, nlp_evidence, statistics
+from src.routes import nlp_dashboard, nlp_evidence, pdf_report, statistics
 
 urlpatterns = [
+    path("api/report.pdf/", pdf_report.report),
     path('api/v2/filter-options/', nlp_dashboard.options),
     path('api/v2/analysis-snapshots/', nlp_dashboard.snapshots),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/', nlp_dashboard.detail),

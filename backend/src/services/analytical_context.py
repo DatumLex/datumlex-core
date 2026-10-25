@@ -31,7 +31,7 @@ def resolve(actor, supplied):
         raise ValueError('context_object_required')
     defaults = {'contract_version': 'analytical-context-v1', 'courts': sorted(permitted(actor)),
                 'outcomes': sorted(OUTCOMES), 'sources': sorted(SOURCES),
-                'subject_codes': list(SUBJECTS), 'start': '2023-01-01', 'end': today().isoformat()}
+                'subject_codes': list(SUBJECTS), 'start': '2016-01-01', 'end': today().isoformat()}
     if set(supplied) - set(defaults):
         raise ValueError('unknown_context_field')
     result = defaults | supplied
@@ -48,7 +48,7 @@ def resolve(actor, supplied):
         value = result[field]
         if not isinstance(value, str) or len(value) != 10 or date.fromisoformat(value).isoformat() != value:
             raise ValueError(f'invalid_{field}')
-    if not '2023-01-01' <= result['start'] <= result['end'] <= today().isoformat():
+    if not '2016-01-01' <= result['start'] <= result['end'] <= today().isoformat():
         raise ValueError('invalid_period')
     authorize(actor, result)
     return result

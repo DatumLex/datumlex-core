@@ -4,6 +4,7 @@ from django.db.models import Count, Exists, F, Max, Min, OuterRef
 
 from src.db.models import ExtractionRun, FactProcess, FactProcessSubject
 from src.services.outcomes import summarize
+from src.services.period import EARLIEST_DATE, EARLIEST_DATE_ISO
 
 
 class InvalidQuery(ValueError):
@@ -23,15 +24,15 @@ def filtered_processes(params):
     if params.get("outcome", "all") not in {"all", "granted", "denied"}:
         raise InvalidQuery("outcome must be all, granted or denied")
     try:
-        start = date.fromisoformat(params.get("start", "2023-01-01"))
+        start = date.fromisoformat(params.get("start", EARLIEST_DATE_ISO))
         end = date.fromisoformat(params.get("end", date.today().isoformat()))
-        if start < date(2023, 1, 1) or start > end or end > date.today():
+        if start < EARLIEST_DATE or start > end or end > date.today():
             raise ValueError
         subject = int(params["subject"]) if params.get("subject") else None
         if subject is not None and subject < 1:
             raise ValueError
     except ValueError:
-        raise InvalidQuery("Invalid date range (2023..today) or subject code") from None
+        raise InvalidQuery("Invalid date range (2016..today) or subject code") from None
     query = FactProcess.objects.filter(court__in=courts, time__date__range=[start, end])
     if subject:
         query = query.filter(

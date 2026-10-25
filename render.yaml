@@ -14,8 +14,7 @@ services:
     plan: free
     region: virginia
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    preDeployCommand: python manage.py migrate && python manage.py bootstrap_support
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py bootstrap_support
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     healthCheckPath: /api/health/
     envVars:

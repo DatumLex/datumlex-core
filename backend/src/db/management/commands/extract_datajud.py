@@ -13,13 +13,14 @@ from src.db.models import ExtractionRun, RejectedRecord
 from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
 from src.etl.loader import load_record
 from src.etl.transformer import InvalidRecord, normalize
+from src.services.period import EARLIEST_DATE, EARLIEST_DATE_ISO
 
 
 class Command(BaseCommand):
     help = "Extract public TJDFT or STJ metadata into the local dimensional warehouse."
 
     def add_arguments(self, parser):
-        parser.add_argument("--start", default="2023-01-01")
+        parser.add_argument("--start", default=EARLIEST_DATE_ISO)
         parser.add_argument("--end", default=date.today().isoformat())
         parser.add_argument("--court", choices=["TJDFT", "STJ"], default="TJDFT")
         parser.add_argument(
@@ -79,11 +80,11 @@ class Command(BaseCommand):
                     start, end = None, None
                 else:
                     start, end = date.fromisoformat(options["start"]), date.fromisoformat(options["end"])
-                    if start < date(2023, 1, 1) or start > end or end > date.today():
+                    if start < EARLIEST_DATE or start > end or end > date.today():
                         raise ValueError
             except ValueError:
                 raise CommandError(
-                    "Use valid dates from 2023 to today, positive subject codes and page-size 1..1000"
+                    "Use valid dates from 2016 to today, positive subject codes and page-size 1..1000"
                 ) from None
             scope = {
                 "court": options["court"],

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
-import { getData } from './api'
+import { downloadReport, getData } from './api'
 import NlpPanel from './NlpPanel'
 
 const number = new Intl.NumberFormat('pt-BR')
@@ -191,6 +191,8 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [validation, setValidation] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
   const [retry, setRetry] = useState(0)
 
   useEffect(() => {
@@ -273,6 +275,16 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
   }
 
+  async function exportPdf() {
+    if (!data || loading || exporting) return
+    const scope = data.statistics.metadata.scope
+    setExporting(true); setExportError('')
+    try {
+      await downloadReport({ court: scope.court, start: scope.start, end: scope.end, ...(scope.subject ? { subject: scope.subject } : {}) })
+    } catch (failure) { setExportError(failure.message) }
+    finally { setExporting(false) }
+  }
+
   const metrics = data?.statistics.metrics
   const metadata = data?.statistics.metadata
   const empty = data?.statistics.status === 'empty'
@@ -305,10 +317,11 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         <div className="filter-grid">
           <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{courts.length === authorizedCourts.length ? 'Todos os tribunais' : courts.join(', ')}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} aria-disabled={courts.length === 1 && courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
           <label className="filter-field"><span>Assunto</span><select value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label>
-          <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
-          <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min={bounds?.start || '2023-01-01'} max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
+          <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
+          <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
-        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button></div>
+        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={exportPdf}>{exporting ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button></div>
+        {exportError && <p role="alert">{exportError}</p>}
         <p className="filter-help">Os filtros são compartilhados entre todas as abas; aplique uma vez e navegue mantendo a seleção. Período por data de ajuizamento, não de julgamento. A comparação de precedentes usa decisões locais do TJDFT e referências do STJ no mesmo assunto e período selecionados.</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
