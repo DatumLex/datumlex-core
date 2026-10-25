@@ -254,7 +254,7 @@ class ApiTests(TestCase):
     def test_invalid_parameters_and_read_only(self):
         for query in [
             "court=TJSP",
-            "start=2022-01-01",
+            "start=2015-12-31",
             "start=wrong",
             "start=2025-01-01&end=2024-01-01",
             "subject=abc",
