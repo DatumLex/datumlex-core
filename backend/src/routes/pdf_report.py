@@ -2,6 +2,7 @@ from django.db import DatabaseError, connection, transaction
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET
 
+from src.services.pangea_report import report_references
 from src.services.pdf_report import build_report
 from src.services.statistics_service import (
     InvalidQuery,
@@ -21,7 +22,7 @@ def report(request):
                     cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             query, selected = filtered_processes(request.GET)
             content = build_report(
-                selected, metrics(query), metadata(query, selected), instance_series(query)
+                selected, metrics(query), metadata(query, selected), instance_series(query), report_references(selected)
             )
         response = HttpResponse(content, content_type="application/pdf")
         response["Content-Disposition"] = (

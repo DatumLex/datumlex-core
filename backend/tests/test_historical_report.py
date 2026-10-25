@@ -6,7 +6,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
-from src.db.models import ExtractionRun
+from src.db.models import ExtractionRun, LegalReference, PangeaImportRun
 from src.etl.loader import load_record
 from src.etl.transformer import normalize
 from src.services.analytical_context import resolve
@@ -85,3 +85,49 @@ class HistoricalReportTests(TestCase):
         self.assertIn("Sem registros", text)
         self.client.logout()
         self.assertEqual(self.client.get("/api/report.pdf/").status_code, 401)
+
+    def test_pangea_dates_pending_review_and_court_scope(self):
+        from pypdf import PdfReader
+
+        from src.accounts.models import Court, User
+        from src.services.pangea_report import report_references
+
+        run = PangeaImportRun.objects.create(scope={"query": "responsabilidade civil"})
+        defaults = dict(
+            reference_type="precedent",
+            source_institution="STJ",
+            thesis="Tese pública de teste <b>literal</b>",
+            source_name="Pangea BNP — pesquisa pública STJ",
+            source_url="https://pangeabnp.pdpj.jus.br/pesquisa",
+            last_import_run=run,
+            approval_reference="Pendente",
+            approved=False,
+        )
+        LegalReference.objects.create(
+            identifier="undated", title="Precedente sem data", source_updated_at="2026-01-01", **defaults
+        )
+        LegalReference.objects.create(
+            identifier="dated",
+            title="Precedente datado",
+            published_at="2016-05-01",
+            subject_code=10433,
+            **defaults,
+        )
+        LegalReference.objects.create(
+            identifier="outside", title="Fora do período", published_at="2010-01-01", **defaults
+        )
+        selected = {"court": "STJ", "start": "2016-01-01", "end": "2016-12-31", "subject": 10433}
+        section = report_references(selected)
+        self.assertEqual(section["dated_count"], 1)
+        self.assertEqual(section["undated_count"], 1)
+        self.assertEqual({row["identifier"] for row in section["items"]}, {"dated", "undated"})
+        self.assertIsNone(report_references({**selected, "court": "TJDFT"}))
+        user = User.objects.get(username="analyst")
+        user.courts.add(Court.objects.get_or_create(code="STJ", defaults={"name": "STJ"})[0])
+        response = self.client.get("/api/report.pdf/?court=STJ&start=2016-01-01&end=2016-12-31&subject=10433")
+        self.assertEqual(response.status_code, 200)
+        text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(response.content)).pages)
+        self.assertIn("Precedente sem data", text)
+        self.assertIn("pendente de aprovação jurídica", text)
+        self.assertIn("período não confirmado", text)
+        self.assertNotIn("Fora do período", text)
