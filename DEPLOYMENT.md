@@ -48,6 +48,14 @@ collection can make it differ from a dashboard loaded earlier. It does not merge
 references or unreviewed NLP evidence into the DataJud metrics. The existing NLP snapshot
 report remains available separately for reviewed textual evidence.
 
+When STJ is selected, the PDF also includes a separate Pangea inventory summary and
+up to ten source-linked thesis excerpts with review status. Unknown publication dates
+are disclosed and excluded from temporal counts; source update dates are never used as
+judgment dates. Unclassified TPU subjects are explicitly labeled as contextual material,
+without asserting that they match the selected subject. References with a known publication
+date outside the requested period are omitted from the excerpt sample. Pangea entries do
+not change the DataJud denominator or rates.
+
 `GET /api/report.pdf/` uses the same query validation and court permissions as statistics.
 Reports are marked `no-store`; no judicial record, user account or password is modified.
 

@@ -8,10 +8,18 @@ from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    KeepTogether,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 
-def build_report(scope, totals, provenance, series):
+def build_report(scope, totals, provenance, series, pangea=None):
     output = BytesIO()
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="Note", fontSize=9, leading=13, textColor=colors.HexColor("#405263")))
@@ -116,6 +124,67 @@ def build_report(scope, totals, provenance, series):
             "Note",
         ),
     ]
+
+    if pangea is not None:
+        story += [
+            PageBreak(),
+            paragraph("Pangea | Precedentes e teses do STJ", "Heading2"),
+            paragraph(
+                "Inventário complementar, separado das taxas DataJud. Referências pendentes não constituem "
+                "aprovação jurídica nem prova de aderência a um processo. A data de atualização da fonte "
+                "não é data de julgamento ou publicação.",
+                "Note",
+            ),
+            table(
+                [
+                    ["Cobertura Pangea", "Referências"],
+                    [
+                        "Inventário no assunto informado ou sem classificação TPU",
+                        count(pangea["inventory_count"]),
+                    ],
+                    ["Com publicação informada dentro do período", count(pangea["dated_count"])],
+                    ["Sem data de publicação (fora da contagem temporal)", count(pangea["undated_count"])],
+                    [
+                        "Sem classificação TPU (correspondência ao assunto não confirmada)",
+                        count(pangea["unmapped_subject_count"]),
+                    ],
+                ],
+                [320, 180],
+            ),
+            paragraph(
+                f"Amostra: {len(pangea['items'])} de {pangea['sample_count']} referências com publicação no período "
+                "ou sem data de publicação, ordenadas por atualização da fonte e identificador. "
+                "Itens sem data ou assunto classificados são complementos sem correspondência confirmada ao recorte.",
+                "Note",
+            ),
+        ]
+        if not pangea["items"]:
+            story.append(paragraph("Nenhuma referência Pangea disponível neste recorte."))
+        for item in pangea["items"]:
+            story.append(
+                KeepTogether(
+                    [
+                        paragraph(item["title"], "Heading3"),
+                        paragraph(
+                            f"Revisão: {'aprovada' if item['approved'] else 'pendente de aprovação jurídica'}. "
+                            f"Publicação: {item['published_at'] or 'não informada - período não confirmado'}. "
+                            f"Atualização da fonte: {item['source_updated_at'] or 'não informada'}. "
+                            f"Assunto TPU: {item['subject_code'] or 'não classificado'}. "
+                            f"Identificador: {item['identifier']}.",
+                            "Note",
+                        ),
+                        paragraph(
+                            item["thesis"][:800]
+                            + (
+                                " [Trecho limitado a 800 caracteres; consulte a fonte.]"
+                                if len(item["thesis"]) > 800
+                                else ""
+                            )
+                        ),
+                        paragraph(f"Fonte: {item['source_url']}", "Note"),
+                    ]
+                )
+            )
 
     def footer(canvas, document):
         canvas.setFont("Helvetica", 8)
