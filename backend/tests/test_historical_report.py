@@ -71,6 +71,8 @@ class HistoricalReportTests(TestCase):
         text = "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(response.content)).pages)
         self.assertIn("2016-01-01 a 2016-12-31", text)
         self.assertIn("Indisponível (sem base binária)", text)
+        self.assertIn("Registros processuais para conferência", text)
+        self.assertIn("00000000020238070001", text)
         self.assertNotIn("historical-2016", text)
         self.assertEqual(self.client.get("/api/report.pdf/?court=STJ").status_code, 403)
         self.assertEqual(self.client.get("/api/report.pdf/?court=TJDFT,STJ").status_code, 403)

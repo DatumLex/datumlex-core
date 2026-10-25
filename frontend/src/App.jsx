@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { downloadReport, getData } from './api'
 import NlpPanel from './NlpPanel'
+import SourceDecisions from './SourceDecisions'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -394,19 +395,20 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
                 </li>
               })}</ol> : <ChartState title="Nenhuma tese disponível">As teses aparecem após a importação das fontes do STJ.</ChartState>}
             </article>
-            <article className="related-card"><header className="precedent-card-heading"><div><span className="section-kicker">EVIDÊNCIAS</span><h3>Decisões relacionadas</h3><p>O usuário sempre consegue inspecionar a fonte do indicador.</p></div><span className="design-badge">{evidenceBadge}</span></header>
+            <article className="related-card"><header className="precedent-card-heading"><div><span className="section-kicker">EVIDÊNCIAS</span><h3>Decisões relacionadas</h3><p>Processos citados pelas fontes e avaliações locais, apresentados separadamente.</p></div><span className="design-badge">{evidenceBadge}</span></header>
               {visibleAssessments.length ? <div className="related-list">{visibleAssessments.slice(0, 5).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference.identifier}`}>
                 <span className={`evidence-status-icon evidence-status-icon--${item.relation}`} aria-hidden="true">{item.relation === 'aligned' ? '✓' : item.relation === 'divergent' ? '!' : 'i'}</span>
                 <div className="evidence-item-content"><h4>{relationLabels[item.relation]} · {item.local_process_number}</h4><p>{item.reference.title}</p><small>{item.reference.identifier}</small></div>
                 <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'assessment' })}>Ver fontes →</button>
               </article>)}</div> : <div className="candidate-empty-state">
-                <div className="pending-summary"><strong>{formatNumber(pendingReviews)} evidências aguardando revisão</strong><p>Classificação assistida; evidência insuficiente não é tratada como conclusão.</p><p>{formatNumber(candidateTotal)} relações candidatas{selectedGroup ? ` retornadas para “${shortThesisLabel(selectedGroup)}”` : ' no recorte'}{candidateLimit ? ` · a lista exibe até ${formatNumber(candidateLimit)}` : ''}.</p></div>
+                <div className="pending-summary"><strong>{pendingReviews ? `${formatNumber(pendingReviews)} avaliações aguardando revisão` : 'Nenhuma avaliação jurídica cadastrada'}</strong><p>As avaliações jurídicas dependem de revisão. As citações disponíveis na fonte aparecem abaixo, mesmo sem vínculo com um processo local.</p><p>{formatNumber(candidateTotal)} relações candidatas{selectedGroup ? ` retornadas para “${shortThesisLabel(selectedGroup)}”` : ' no recorte'}{candidateLimit ? ` · a lista exibe até ${formatNumber(candidateLimit)}` : ''}.</p></div>
                 {visibleCandidates.length ? <div className="related-list">{visibleCandidates.slice(0, 8).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference_identifier}-${item.cited_identifier}`}>
                   <span className="evidence-status-icon evidence-status-icon--pending" aria-hidden="true">!</span>
                   <div className="evidence-item-content"><span className="review-pending-badge">Pendente de revisão</span><h4>{item.local_process_number || item.cited_identifier}</h4><p>{item.reference_title}</p><small>{item.reference_identifier}{item.candidate_type === 'unresolved' ? ' · citação sem correspondência local' : item.review_status === 'confirmed' ? ' · identificador confirmado; pertinência ainda não revisada' : ' · sugestão de correspondência'}</small></div>
                   <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'candidate' })}>Ver fontes →</button>
                 </article>)}</div> : <p className="candidate-no-links">{selectedGroup ? 'Nenhuma relação candidata retornada para esta tese. Limpe a seleção para ver o recorte completo.' : 'Nenhuma relação candidata retornada pela API neste recorte.'}</p>}
               </div>}
+              <SourceDecisions references={alignment.source_theses || []} selectedIdentifiers={selectedReferenceIds} />
             </article>
           </div>
           {selectedGroup && <p className="thesis-selection-note">Filtrando evidências por: <strong>{shortThesisLabel(selectedGroup)}</strong> <button type="button" className="text-button" onClick={() => setSelectedThesisId(null)}>Limpar seleção</button></p>}

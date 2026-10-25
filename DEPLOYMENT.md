@@ -49,7 +49,7 @@ references or unreviewed NLP evidence into the DataJud metrics. The existing NLP
 report remains available separately for reviewed textual evidence.
 
 When STJ is selected, the PDF also includes a separate Pangea inventory summary and
-up to ten source-linked thesis excerpts with review status. Unknown publication dates
+up to five source-linked thesis excerpts with review status and cited process identifiers. Unknown publication dates
 are disclosed and excluded from temporal counts; source update dates are never used as
 judgment dates. Unclassified TPU subjects are explicitly labeled as contextual material,
 without asserting that they match the selected subject. References with a known publication

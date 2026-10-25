@@ -326,3 +326,7 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .tribunal-options button { display: inline-flex; align-items: center; gap: 5px; width: auto; }
 @media (max-width: 1000px) { .chart-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .chart-card { padding: 20px 16px; } .outcome-donut { height: 310px; } }
+/* Source citations are separate from human-reviewed local assessments. */
+.source-citations { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #ded8cb; }
+.source-citations > p { font-size: .9rem; line-height: 1.6; }
+.source-citations a { overflow-wrap: anywhere; }

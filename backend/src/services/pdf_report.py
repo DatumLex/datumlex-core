@@ -19,7 +19,7 @@ from reportlab.platypus import (
 )
 
 
-def build_report(scope, totals, provenance, series, pangea=None):
+def build_report(scope, totals, provenance, series, pangea=None, cases=None):
     output = BytesIO()
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="Note", fontSize=9, leading=13, textColor=colors.HexColor("#405263")))
@@ -51,9 +51,21 @@ def build_report(scope, totals, provenance, series, pangea=None):
 
     generated = timezone.now().strftime("%d/%m/%Y %H:%M UTC")
     story += [
-        paragraph("DatumLex | Relatório resumido", "Title"),
+        paragraph("DatumLex | Relatório de pesquisa jurídica", "Title"),
         paragraph(f"Emitido em {generated}", "Note"),
         Spacer(1, 12),
+    ]
+    story += [
+        paragraph("1. Síntese da pesquisa", "Heading2"),
+        paragraph(
+            f"Foram encontrados {count(totals['process_records'])} documentos processuais no recorte, "
+            f"correspondentes a {count(totals['distinct_process_numbers'])} números CNJ distintos. "
+            f"Em {count(totals['binary_denominator'])} documentos foi identificado um resultado binário: "
+            f"{count(totals['granted'])} providos e {count(totals['denied'])} desprovidos. "
+            "Esses números descrevem somente a base carregada. Não medem probabilidade de êxito e "
+            "não substituem a leitura do inteiro teor."
+        ),
+        Spacer(1, 10),
     ]
     story += [
         paragraph("Recorte aplicado", "Heading2"),
@@ -68,11 +80,8 @@ def build_report(scope, totals, provenance, series, pangea=None):
         table(
             [
                 ["Indicador", "Valor"],
-                ["Documentos DataJud", count(totals["process_records"])],
-                ["Números CNJ distintos no recorte", count(totals["distinct_process_numbers"])],
-                ["Documentos classificados como providos", count(totals["granted"])],
-                ["Documentos classificados como desprovidos", count(totals["denied"])],
-                ["Denominador binário (providos + desprovidos)", count(totals["binary_denominator"])],
+                ["Documentos consultados", count(totals["process_records"])],
+                ["Base usada nas duas taxas (providos + desprovidos)", count(totals["binary_denominator"])],
                 ["Taxa de provimento por documento", rate(totals["grant_rate"])],
                 ["Taxa de desprovimento por documento", rate(totals["denial_rate"])],
             ],
@@ -87,23 +96,16 @@ def build_report(scope, totals, provenance, series, pangea=None):
         "unknown": "Sem resultado identificado",
         "outside_appellate_degree": "Fora do grau recursal",
     }
-    story += [
-        paragraph("Exclusões do denominador binário", "Heading2"),
-        table(
-            [["Categoria", "Documentos"]]
-            + [[labels.get(key, key), count(value)] for key, value in totals["excluded"].items()],
-            [320, 180],
-        ),
-    ]
     annual = defaultdict(int)
     for row in series:
         annual[row["time__year"]] += row["count"]
     story += [
-        paragraph("Volume por ano de ajuizamento", "Heading2"),
-        table(
-            [["Ano", "Documentos"]]
-            + ([[year, count(value)] for year, value in sorted(annual.items())] or [["Sem registros", "0"]]),
-            [320, 180],
+        paragraph("Como usar este relatório", "Heading2"),
+        paragraph(
+            "Use as teses e seus processos citados como ponto de partida para localizar precedentes. "
+            "Confira o inteiro teor, a situação atual do precedente e a pertinência aos fatos do caso. "
+            "Uma citação do Pangea não demonstra, por si só, que o TJDFT adotou ou afastou aquela tese. "
+            "As fontes ainda não revisadas são identificadas expressamente."
         ),
     ]
     story += [
@@ -128,33 +130,23 @@ def build_report(scope, totals, provenance, series, pangea=None):
     if pangea is not None:
         story += [
             PageBreak(),
-            paragraph("Pangea | Precedentes e teses do STJ", "Heading2"),
+            paragraph("2. Teses e precedentes para consulta | Pangea - STJ", "Heading2"),
             paragraph(
                 "Inventário complementar, separado das taxas DataJud. Referências pendentes não constituem "
                 "aprovação jurídica nem prova de aderência a um processo. A data de atualização da fonte "
                 "não é data de julgamento ou publicação.",
                 "Note",
             ),
-            table(
-                [
-                    ["Cobertura Pangea", "Referências"],
-                    [
-                        "Inventário no assunto informado ou sem classificação TPU",
-                        count(pangea["inventory_count"]),
-                    ],
-                    ["Com publicação informada dentro do período", count(pangea["dated_count"])],
-                    ["Sem data de publicação (fora da contagem temporal)", count(pangea["undated_count"])],
-                    [
-                        "Sem classificação TPU (correspondência ao assunto não confirmada)",
-                        count(pangea["unmapped_subject_count"]),
-                    ],
-                ],
-                [320, 180],
-            ),
             paragraph(
                 f"Amostra: {len(pangea['items'])} de {pangea['sample_count']} referências com publicação no período "
-                "ou sem data de publicação, ordenadas por atualização da fonte e identificador. "
+                "ou sem data de publicação; aprovadas primeiro, depois atualização da fonte e identificador. "
                 "Itens sem data ou assunto classificados são complementos sem correspondência confirmada ao recorte.",
+                "Note",
+            ),
+            paragraph(
+                f"{count(pangea['dated_count'])} referências têm publicação confirmada no período; "
+                f"{count(pangea['undated_count'])} não informam publicação e "
+                f"{count(pangea['unmapped_subject_count'])} não têm assunto TPU classificado.",
                 "Note",
             ),
         ]
@@ -174,17 +166,79 @@ def build_report(scope, totals, provenance, series, pangea=None):
                             "Note",
                         ),
                         paragraph(
-                            item["thesis"][:800]
+                            item["thesis"][:1800]
                             + (
-                                " [Trecho limitado a 800 caracteres; consulte a fonte.]"
-                                if len(item["thesis"]) > 800
+                                " [Trecho limitado a 1.800 caracteres; consulte o enunciado completo na fonte.]"
+                                if len(item["thesis"]) > 1800
                                 else ""
                             )
+                        ),
+                        paragraph(
+                            "Processos citados pela fonte: "
+                            + (
+                                "; ".join(
+                                    str(decision.get("identifier", ""))
+                                    for decision in item.get("related_decisions", [])[:3]
+                                )
+                                or "não informados"
+                            )
+                            + ". A citação não confirma vínculo com um processo local.",
+                            "Note",
                         ),
                         paragraph(f"Fonte: {item['source_url']}", "Note"),
                     ]
                 )
             )
+
+    if cases is not None:
+        story += [
+            PageBreak(),
+            paragraph("Registros processuais para conferência", "Heading2"),
+            paragraph(
+                "Até cinco documentos do recorte, priorizando resultados identificados e depois o ajuizamento mais recente. "
+                "São metadados para localizar os autos; não representam uma seleção de precedentes mais relevantes.",
+                "Note",
+            ),
+        ]
+        if not cases:
+            story.append(paragraph("Sem registros processuais no período selecionado."))
+        results = {"granted": "Provido", "denied": "Desprovido", "partial": "Parcial"}
+        for item in cases:
+            story.append(
+                KeepTogether(
+                    [
+                        paragraph(
+                            f"{item['court']} | Processo {item['process_dimension__number_process']}",
+                            "Heading3",
+                        ),
+                        paragraph(
+                            f"Classe: {item['process_class__name']}. Órgão: {item['organization__name']}. "
+                            f"Ajuizamento: {item['time__date']}. Resultado identificado: "
+                            f"{results.get(item['result__name'], 'sem resultado recursal conclusivo')}."
+                        ),
+                    ]
+                )
+            )
+    story += [
+        paragraph("Notas de leitura e cobertura", "Heading2"),
+        paragraph(
+            "Excluídos das taxas: "
+            + "; ".join(
+                f"{labels.get(key, key)}: {count(value)}" for key, value in totals["excluded"].items()
+            )
+            + ".",
+            "Note",
+        ),
+        paragraph(
+            "Volume por ano de ajuizamento: "
+            + (
+                "; ".join(f"{year}: {count(value)}" for year, value in sorted(annual.items()))
+                or "Sem registros"
+            )
+            + ".",
+            "Note",
+        ),
+    ]
 
     def footer(canvas, document):
         canvas.setFont("Helvetica", 8)
@@ -198,7 +252,7 @@ def build_report(scope, totals, provenance, series, pangea=None):
         leftMargin=47,
         topMargin=38,
         bottomMargin=44,
-        title="DatumLex - Relatório resumido",
+        title="DatumLex - Relatório de pesquisa jurídica",
         author="DatumLex",
     ).build(story, onFirstPage=footer, onLaterPages=footer)
     return output.getvalue()

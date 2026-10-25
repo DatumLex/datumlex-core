@@ -2,12 +2,12 @@
 
 from .adapters import read_source
 from .contracts import SCHEMA_VERSION, fingerprint, validate_result
-from .extraction import extract, replay_predictions
+from .extraction import RULES_VERSION, extract, replay_predictions
 
 
 def process(row, root, manifest, journal, model_record=None):
     metadata = {k: v for k, v in row.items() if k not in ("source_text", "human_annotations", "adjudication")}
-    key = fingerprint({"input": metadata, "pipeline": manifest, "model_record": model_record})
+    key = fingerprint({"input": metadata, "pipeline": manifest, "model_record": model_record, "extractor_rules": RULES_VERSION})
     result = {
         "schema_version": SCHEMA_VERSION, "job_key": key,
         "document_id": row.get("document_id"), "source_version": row.get("source_version"),
