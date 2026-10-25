@@ -4,16 +4,17 @@ import re
 
 from .contracts import fingerprint, unknown, validate_annotation
 
-RULES_VERSION = "0.1.0"
+RULES_VERSION = "0.2.0"
+NUMBER_PREFIX = r"(?:n(?:[.º°o]|\s)*\s*)?"
 AUTHORITY_RULES = {
-    "sumula": r"\bS[úu]mula\s+(?:n[.º°o]*\s*)?\d+\s*(?:do\s+|/\s*)(?:STJ|STF)\b",
-    "judgment": r"\b(?:REsp|AREsp)\s+(?:n[.º°o]*\s*)?\d[\d.]*\s*/\s*[A-Z]{2}\b",
-    "statute": r"\bLei\s+(?:n[.º°o]*\s*)?\d[\d.]*(?:\s*/\s*\d{2,4})?\b",
-    "provision": r"\bart(?:igo|\.)\s*\d+[A-Za-zº°]*(?:\s*,\s*§\s*\d+[º°]*)?\s+(?:do|da)\s+(?:CPC|CC|CDC|CF)\b",
+    "sumula": rf"\bS[úu]mula\s+{NUMBER_PREFIX}\d+\s*,?\s*(?:do\s+|/\s*)(?:STJ|STF)\b",
+    "judgment": rf"\b(?:REsp|AREsp)\s+{NUMBER_PREFIX}\d[\d.]*(?:\s*/\s*[A-Z]{{2}})\b",
+    "statute": rf"\bLei\s+{NUMBER_PREFIX}\d[\d.]*(?:\s*/\s*\d{{2,4}})?\b",
+    "provision": r"\bart(?:igo|\.)\s*\d+[A-Za-zº°]*(?:\s*,\s*(?:§\s*\d+[º°]*|[IVXLCDM]+))*\s*,?\s+(?:do|da)\s+(?:CPC|CC|CDC|CF)\b",
 }
 TOPIC = re.compile(
-    r"responsabilidade\s+civil|nexo\s+causal|danos?\s+(?:mora(?:l|is)|materia(?:l|is))|"
-    r"dever\s+de\s+indenizar|culpa\s+(?:exclusiva|concorrente)|risco\s+da\s+atividade",
+    r"\b(?:responsabilidade\s+civil|nexo\s+causal|danos?\s+(?:mora(?:l|is)|materia(?:l|is))|"
+    r"dever\s+de\s+indenizar|culpa\s+(?:exclusiva|concorrente)|risco\s+da\s+atividade)\b",
     re.I,
 )
 THESIS = re.compile(r"\b(?:exige|depende|independe|pressupõe|configura|necessári[oa]|deve[m]?|somente)\b", re.I)
@@ -67,13 +68,21 @@ def extract(text, max_paragraph=6000):
         if len(fragment) > max_paragraph:
             skipped.append([start, end])
             continue
-        if not TOPIC.search(fragment):
-            continue
-        for label, trigger in (("LEGAL_THESIS", THESIS), ("LEGAL_GROUND", GROUND)):
-            if trigger.search(fragment):
-                item = annotation(text, [label], [(start, end, fragment)], "weak_rule", label)
-                item["warnings"] = ["paragraph_candidate_not_minimal_proposition", "attribution_unresolved"]
-                annotations.append(item)
+        # A keyword elsewhere in the paragraph must not classify an unrelated sentence.
+        # Do not rewrite text or remove negation; all spans reference the original bytes' text.
+        sentence_start = start
+        boundaries = list(re.finditer(r"(?<=[.!?])[ \t\r\n]+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])", fragment))
+        sentence_ends = [(start + boundary.start(), start + boundary.end()) for boundary in boundaries]
+        sentence_ends.append((end, end))
+        for sentence_end, next_start in sentence_ends:
+            sentence = text[sentence_start:sentence_end]
+            if TOPIC.search(sentence):
+                for label, trigger in (("LEGAL_THESIS", THESIS), ("LEGAL_GROUND", GROUND)):
+                    if trigger.search(sentence):
+                        item = annotation(text, [label], [(sentence_start, sentence_end, sentence)], "weak_rule", label)
+                        item["warnings"] = ["sentence_candidate_requires_context_review", "attribution_unresolved"]
+                        annotations.append(item)
+            sentence_start = next_start
     return annotations, skipped
 
 

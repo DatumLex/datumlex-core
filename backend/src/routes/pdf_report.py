@@ -4,6 +4,7 @@ from django.views.decorators.http import require_GET
 
 from src.services.pangea_report import report_references
 from src.services.pdf_report import build_report
+from src.services.report_cases import case_summaries
 from src.services.statistics_service import (
     InvalidQuery,
     filtered_processes,
@@ -22,7 +23,12 @@ def report(request):
                     cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             query, selected = filtered_processes(request.GET)
             content = build_report(
-                selected, metrics(query), metadata(query, selected), instance_series(query), report_references(selected)
+                selected,
+                metrics(query),
+                metadata(query, selected),
+                instance_series(query),
+                report_references(selected),
+                case_summaries(query),
             )
         response = HttpResponse(content, content_type="application/pdf")
         response["Content-Disposition"] = (

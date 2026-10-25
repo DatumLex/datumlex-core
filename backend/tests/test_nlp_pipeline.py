@@ -63,6 +63,38 @@ class LegalNLPTests(unittest.TestCase):
             self.assertEqual(item["authority"]["resolution_status"], "unresolved")
             self.assertEqual(item["context"]["adoption"]["value_status"], "unknown")
 
+    def test_numbered_citations_and_statutory_subsections(self):
+        text = "Súmula n.º 7, do STJ; REsp n. 1.234.567/DF; art. 927, III, do CPC; Lei nº 10.406/2002."
+        items, _ = extract(text)
+        self.assertEqual({item["authority"]["kind"] for item in items}, {"sumula", "judgment", "provision", "statute"})
+        for item in items:
+            span = item["segments"][0]
+            self.assertEqual(text[span["start"]:span["end"]], span["text"])
+            self.assertEqual(item["context"]["adoption"]["value_status"], "unknown")
+
+    def test_topic_and_trigger_must_be_in_the_same_sentence(self):
+        text = "Relatório sobre dano moral. O prazo depende da intimação."
+        items, _ = extract(text)
+        self.assertEqual(items, [])
+        sentence = "A responsabilidade civil não depende de culpa."
+        items, _ = extract(sentence + " O prazo depende da intimação.")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["segments"][0]["text"], sentence)
+        self.assertEqual(extract("O dano moralista depende do prazo.")[0], [])
+
+    def test_exact_evaluation_counts_errors_without_fabricating_quality(self):
+        from src.nlp.evaluation import evaluate_annotations
+
+        first = annotation("abc def", ["LEGAL_THESIS"], [(0, 3, "abc")], "test")
+        second = annotation("abc def", ["LEGAL_GROUND"], [(4, 7, "def")], "test")
+        result = evaluate_annotations([first, first], [first, second])
+        self.assertEqual(result["true_positive"], 1)
+        self.assertEqual(result["false_negative"], 1)
+        self.assertEqual(result["precision"], 1)
+        self.assertEqual(result["recall"], .5)
+        self.assertEqual(result["legal_validation"], "not_established")
+        self.assertIsNone(evaluate_annotations([], [])["f1"])
+
     def test_thesis_ground_candidates_keep_negation(self):
         text = "A responsabilidade civil não depende de culpa, pois o regime exige dano."
         items, _ = extract(text)
