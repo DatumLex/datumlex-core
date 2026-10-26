@@ -23,16 +23,18 @@ export default function SourceDecisions({ references = [], selectedIdentifiers =
     })
   return <section className="source-citations" aria-label="Processos citados pela fonte">
     <h4>Processos citados pela fonte</h4>
-    <p>São processos indicados nas referências do Pangea. A citação não comprova relação com um processo TJDFT nem aderência à tese. Datas de julgamento não informadas não recebem o filtro de período.</p>
+    <p>Consulte os processos indicados nas referências do Pangea.</p>
+    <details><summary>Como interpretar estas citações</summary><p>A citação não comprova relação com um processo TJDFT nem aderência à tese. Datas de julgamento não informadas não recebem o filtro de período.</p></details>
     {citations.length ? <><p>{citations.length} citações nas referências carregadas{selectedIdentifiers ? ' da tese selecionada' : ''}; mostrando até 8.</p>
       <div className="related-list">{citations.slice(0, 8).map(item => {
         const decisionUrl = safeOfficialUrl(item.url)
         const referenceUrl = sourceUrl(item.reference.source_url)
-        return <article className="related-item evidence-item" key={`${item.reference.identifier}:${item.identifier}`}>
-          <div className="evidence-item-content"><span className="review-pending-badge">Citado na fonte · vínculo local não confirmado</span>
-            <h4>{item.identifier}</h4><p>{item.reference.title}</p><small>{item.locator || 'Localizador não informado'}</small>
+        return <article className="related-item source-citation-item" key={`${item.reference.identifier}:${item.identifier}`}>
+          <div className="source-citation-content"><span className="review-pending-badge">Citação do Pangea</span>
+            <h4>{item.identifier}</h4><p>{item.reference.title}</p>
             {decisionUrl ? <p><a href={decisionUrl} target="_blank" rel="noreferrer">Consultar processo no STJ ↗</a></p> : <p>Link específico do processo não disponibilizado.</p>}
             {referenceUrl && <a href={referenceUrl} target="_blank" rel="noreferrer">Ver referência no Pangea ↗</a>}
+            {item.locator && <details><summary>Rastreabilidade</summary><small>{item.locator}</small></details>}
           </div>
         </article>
       })}</div></> : <p>Nenhum processo citado nas referências carregadas para esta seleção. Isso não significa ausência de decisões sobre o tema.</p>}

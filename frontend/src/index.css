@@ -330,3 +330,9 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .source-citations { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #ded8cb; }
 .source-citations > p { font-size: .9rem; line-height: 1.6; }
 .source-citations a { overflow-wrap: anywhere; }
+.source-citation-item { display: block; }
+.source-citation-content { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.source-citation-content h4 { display: block; overflow: visible; -webkit-line-clamp: unset; line-clamp: unset; }
+.source-citation-content .review-pending-badge { display: inline-block; white-space: normal; }
+.source-citation-content details { margin-top: 10px; }
+.source-citations > details { margin-bottom: 14px; font-size: .9rem; }
