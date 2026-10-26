@@ -5,6 +5,7 @@ from django.views.decorators.http import require_GET
 from src.services.pangea_report import report_references
 from src.services.pdf_report import build_report
 from src.services.report_cases import case_summaries
+from src.services.report_context import report_context
 from src.services.statistics_service import (
     InvalidQuery,
     filtered_processes,
@@ -29,6 +30,7 @@ def report(request):
                 instance_series(query),
                 report_references(selected),
                 case_summaries(query),
+                report_context(query, selected),
             )
         response = HttpResponse(content, content_type="application/pdf")
         response["Content-Disposition"] = (
