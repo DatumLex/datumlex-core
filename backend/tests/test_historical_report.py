@@ -68,8 +68,18 @@ class HistoricalReportTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertEqual(response["Cache-Control"], "no-store")
         self.assertTrue(response.content.startswith(b"%PDF-"))
-        text = "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(response.content)).pages)
-        self.assertIn("2016-01-01 a 2016-12-31", text)
+        pages = PdfReader(io.BytesIO(response.content)).pages
+        self.assertEqual(len(pages), 5)
+        text = "\n".join(page.extract_text() for page in pages)
+        for section in (
+            "Panorama da pesquisa",
+            "Mérito recursal",
+            "Relação com o STJ",
+            "Evidências da pesquisa",
+            "Como ler este relatório",
+        ):
+            self.assertIn(section, text)
+        self.assertIn("01/01/2016 a 31/12/2016", text)
         self.assertIn("Indisponível (sem base binária)", text)
         self.assertIn("Registros processuais para conferência", text)
         self.assertIn("00000000020238070001", text)
@@ -133,3 +143,16 @@ class HistoricalReportTests(TestCase):
         self.assertIn("pendente de aprovação jurídica", text)
         self.assertIn("período não confirmado", text)
         self.assertNotIn("Fora do período", text)
+
+    def test_annual_report_counts_use_filtered_results(self):
+        from django.http import QueryDict
+
+        from src.services.report_context import report_context
+        from src.services.statistics_service import filtered_processes
+
+        self.record["_source"]["movimentos"] = [{"codigo": 237, "dataHora": "2016-05-01T00:00:00Z"}]
+        load_record(normalize(self.record, self.scope), ExtractionRun.objects.first())
+        query, scope = filtered_processes(QueryDict("court=TJDFT&start=2016-01-01&end=2016-12-31"))
+        context = report_context(query, scope)
+        self.assertEqual(context["annual"], [{"time__year": 2016, "documents": 1, "granted": 1, "denied": 0}])
+        self.assertEqual(context["assessments"], {})

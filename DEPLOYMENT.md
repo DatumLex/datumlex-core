@@ -59,6 +59,14 @@ not change the DataJud denominator or rates.
 `GET /api/report.pdf/` uses the same query validation and court permissions as statistics.
 Reports are marked `no-store`; no judicial record, user account or password is modified.
 
+The five-page PDF follows the supplied Sprint 2 research report layout: overview,
+results and annual trend, precedents/theses, traceability, and source limitations.
+Illustrative values from the reference are never reused. Annual rates use filtered
+DataJud binary outcomes; missing denominators leave gaps in the chart. Reviewed
+adherence uses eligible human assessments by decision date, explicitly separate from
+filing-date DataJud volumes. NLP frequency and coverage remain unavailable here until
+a reviewed evidence snapshot is integrated; the separate NLP evidence report remains available.
+
 ## Limitations of the free configuration
 
 The Blueprint uses free plans for an initial academic demonstration. Render's free PostgreSQL
