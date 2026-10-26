@@ -14,12 +14,13 @@ const { default: SourceDecisions } = await import('/src/SourceDecisions.jsx');
 import '/src/index.css';
 const refs=[{identifier:'theme-1',title:'Tema de teste',source_url:'https://pangeabnp.pdpj.jus.br/pesquisa?nr=1',related_decisions:[{identifier:'REsp 123/DF',url:'https://www.stj.jus.br/processo',locator:'processosParadigma[0]'},{identifier:'REsp 123/DF',url:'https://www.stj.jus.br/processo'},{identifier:'REsp 456/SP',url:'javascript:alert(1)'}]}];
 const root=ReactDOM.createRoot(document.getElementById('root'));
-window.showSources=(selection)=>root.render(React.createElement(SourceDecisions,{references:refs,selectedIdentifiers:selection ? new Set(selection) : null}));
+window.showSources=(selection)=>root.render(React.createElement('main',{className:'dashboard'},React.createElement('div',{className:'precedent-grid'},React.createElement('article',{className:'thesis-card'},'Teses selecionadas'),React.createElement('article',{className:'related-card'},React.createElement('h3',null,'Decisões relacionadas'),React.createElement(SourceDecisions,{references:refs,selectedIdentifiers:selection ? new Set(selection) : null})))));
 window.showSources();
 </script></body></html>` }))
 try {
   await page.goto(`${origin}/__source_test__`)
-  await page.getByRole('heading', { name: 'Processos citados pela fonte' }).waitFor()
+  await page.getByRole('heading', { name: 'Processos citados no Pangea' }).waitFor()
+  assert.equal(await page.evaluate(async () => (await import('/src/processIdentifier.js')).formatProcessIdentifier('40091737820168240000')), '4009173-78.2016.8.24.0000')
   assert.equal(await page.locator('.related-item').count(), 2)
   for (const width of [320, 760, 1100]) {
     await page.setViewportSize({ width, height: 900 })
@@ -30,7 +31,7 @@ try {
   }
   assert.equal(await page.getByRole('link', { name: 'Consultar processo no STJ' }).count(), 1)
   assert.equal(await page.locator('a[href^="javascript:"]').count(), 0)
-  await page.getByText('Link específico do processo não disponibilizado.').waitFor()
+  assert.equal(await page.locator('a[href^="https://pangeabnp.pdpj.jus.br/"]').count(), 2)
   await page.getByText('Como interpretar estas citações', { exact: true }).click()
   assert.match(await page.locator('.source-citations').innerText(), /não comprova relação/)
   await page.getByText('Como interpretar estas citações', { exact: true }).click()
@@ -39,6 +40,6 @@ try {
   await page.getByText(/Nenhum processo citado nas referências/).waitFor()
   assert.equal(await page.locator('.related-item').count(), 0)
   await page.evaluate(() => window.showSources(['theme-1']))
-  await page.getByRole('heading', { name: 'REsp 123/DF' }).waitFor()
+  await page.getByRole('heading', { name: 'Processo REsp 123/DF' }).waitFor()
   console.log('Source decisions checks passed: citations without local links, deduplication, selection and safe URLs.')
 } finally { await browser.close() }

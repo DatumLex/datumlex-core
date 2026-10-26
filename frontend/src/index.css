@@ -336,3 +336,6 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .source-citation-content .review-pending-badge { display: inline-block; white-space: normal; }
 .source-citation-content details { margin-top: 10px; }
 .source-citations > details { margin-bottom: 14px; font-size: .9rem; }
+.local-review-details { margin-top: 18px; padding: 12px 14px; background: #f6f8f8; font-size: .9rem; }
+.local-review-details > summary { cursor: pointer; color: var(--muted); }
+.source-citation-content h4 { font-variant-numeric: tabular-nums; }
