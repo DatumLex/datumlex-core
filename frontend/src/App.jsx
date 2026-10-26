@@ -400,14 +400,14 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
                 <span className={`evidence-status-icon evidence-status-icon--${item.relation}`} aria-hidden="true">{item.relation === 'aligned' ? '✓' : item.relation === 'divergent' ? '!' : 'i'}</span>
                 <div className="evidence-item-content"><h4>{relationLabels[item.relation]} · {item.local_process_number}</h4><p>{item.reference.title}</p><small>{item.reference.identifier}</small></div>
                 <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'assessment' })}>Ver fontes →</button>
-              </article>)}</div> : <div className="candidate-empty-state">
+              </article>)}</div> : <details className="candidate-empty-state local-review-details"><summary>Avaliações locais TJDFT × STJ{pendingReviews ? ` · ${formatNumber(pendingReviews)} pendentes` : ' · ainda não cadastradas'}</summary>
                 <div className="pending-summary"><strong>{pendingReviews ? `${formatNumber(pendingReviews)} avaliações aguardando revisão` : 'Nenhuma avaliação jurídica cadastrada'}</strong><p>As avaliações jurídicas dependem de revisão. As citações disponíveis na fonte aparecem abaixo, mesmo sem vínculo com um processo local.</p><p>{formatNumber(candidateTotal)} relações candidatas{selectedGroup ? ` retornadas para “${shortThesisLabel(selectedGroup)}”` : ' no recorte'}{candidateLimit ? ` · a lista exibe até ${formatNumber(candidateLimit)}` : ''}.</p></div>
                 {visibleCandidates.length ? <div className="related-list">{visibleCandidates.slice(0, 8).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference_identifier}-${item.cited_identifier}`}>
                   <span className="evidence-status-icon evidence-status-icon--pending" aria-hidden="true">!</span>
                   <div className="evidence-item-content"><span className="review-pending-badge">Pendente de revisão</span><h4>{item.local_process_number || item.cited_identifier}</h4><p>{item.reference_title}</p><small>{item.reference_identifier}{item.candidate_type === 'unresolved' ? ' · citação sem correspondência local' : item.review_status === 'confirmed' ? ' · identificador confirmado; pertinência ainda não revisada' : ' · sugestão de correspondência'}</small></div>
                   <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'candidate' })}>Ver fontes →</button>
                 </article>)}</div> : <p className="candidate-no-links">{selectedGroup ? 'Nenhuma relação candidata retornada para esta tese. Limpe a seleção para ver o recorte completo.' : 'Nenhuma relação candidata retornada pela API neste recorte.'}</p>}
-              </div>}
+              </details>}
               <SourceDecisions references={alignment.source_theses || []} selectedIdentifiers={selectedReferenceIds} />
             </article>
           </div>
