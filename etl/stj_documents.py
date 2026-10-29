@@ -262,7 +262,7 @@ def collect(
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--start", type=date.fromisoformat, default=date(2023, 1, 1))
+    parser.add_argument("--start", type=date.fromisoformat, default=date(2016, 1, 1))
     parser.add_argument("--end", type=date.fromisoformat, required=True)
     parser.add_argument("--subjects", default="10431,10433,10439")
     parser.add_argument("--max-batches", type=int, default=0)

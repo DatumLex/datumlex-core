@@ -13,16 +13,17 @@ from src.db.models import ExtractionRun, RejectedRecord
 from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
 from src.etl.loader import load_record
 from src.etl.transformer import InvalidRecord, normalize
-from src.services.period import EARLIEST_DATE, EARLIEST_DATE_ISO
+from src.services.period import HISTORY_START, today
+from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 
 class Command(BaseCommand):
     help = "Extract public TJDFT or STJ metadata into the local dimensional warehouse."
 
     def add_arguments(self, parser):
-        parser.add_argument("--start", default=EARLIEST_DATE_ISO)
-        parser.add_argument("--end", default=date.today().isoformat())
-        parser.add_argument("--court", choices=["TJDFT", "STJ"], default="TJDFT")
+        parser.add_argument("--start", default=HISTORY_START.isoformat())
+        parser.add_argument("--end", default=today().isoformat())
+        parser.add_argument("--court", choices=COURTS, default="TJDFT")
         parser.add_argument(
             "--subjects", default=DEFAULT_DATAJUD_SUBJECT_CODES_CSV,
             help="Explicit CNJ TPU codes; only listed codes are queried",
@@ -80,7 +81,7 @@ class Command(BaseCommand):
                     start, end = None, None
                 else:
                     start, end = date.fromisoformat(options["start"]), date.fromisoformat(options["end"])
-                    if start < EARLIEST_DATE or start > end or end > date.today():
+                    if start < HISTORY_START or start > end or end > today():
                         raise ValueError
             except ValueError:
                 raise CommandError(
@@ -120,17 +121,14 @@ class Command(BaseCommand):
                             break
             if run is None:
                 run = ExtractionRun.objects.create(scope=scope)
-        if imported is None:
-            try:
+        try:
+            if imported is None:
                 # A resumed STJ run must keep using its saved tribunal endpoint even
                 # when --court is omitted from the resume command.
                 client = DataJudClient(settings.DATAJUD_API_KEY, court=run.scope.get("court", "TJDFT"))
-            except DataJudError as exc:
-                raise CommandError(str(exc)) from None
-        self.stdout.write(f"Run {run.pk}: {json.dumps(run.scope)}")
-        if resumed_matching_scope:
-            self.stdout.write("Resuming the paused/failed run for this exact scope from its saved cursor.")
-        try:
+            self.stdout.write(f"Run {run.pk}: {json.dumps(run.scope)}")
+            if resumed_matching_scope:
+                self.stdout.write("Resuming the paused/failed run for this exact scope from its saved cursor.")
             invocation_pages = 0
             while True:
                 page = (

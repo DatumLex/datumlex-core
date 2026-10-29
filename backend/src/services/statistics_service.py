@@ -4,7 +4,8 @@ from django.db.models import Count, Exists, F, Max, Min, OuterRef
 
 from src.db.models import ExtractionRun, FactProcess, FactProcessSubject
 from src.services.outcomes import summarize
-from src.services.period import EARLIEST_DATE, EARLIEST_DATE_ISO
+from src.services.period import HISTORY_START, today
+from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 
 class InvalidQuery(ValueError):
@@ -19,14 +20,14 @@ def filtered_processes(params):
         raise InvalidQuery("Repeated query parameters are not supported")
     court = params.get("court", "TJDFT")
     courts = court.split(",")
-    if not courts or any(item not in {"TJDFT", "STJ"} for item in courts) or len(set(courts)) != len(courts):
-        raise InvalidQuery("Only TJDFT and STJ are available")
+    if not courts or any(item not in COURTS for item in courts) or len(set(courts)) != len(courts):
+        raise InvalidQuery("Unsupported or repeated DataJud court")
     if params.get("outcome", "all") not in {"all", "granted", "denied"}:
         raise InvalidQuery("outcome must be all, granted or denied")
     try:
-        start = date.fromisoformat(params.get("start", EARLIEST_DATE_ISO))
-        end = date.fromisoformat(params.get("end", date.today().isoformat()))
-        if start < EARLIEST_DATE or start > end or end > date.today():
+        start = date.fromisoformat(params.get("start", HISTORY_START.isoformat()))
+        end = date.fromisoformat(params.get("end", today().isoformat()))
+        if start < HISTORY_START or start > end or end > today():
             raise ValueError
         subject = int(params["subject"]) if params.get("subject") else None
         if subject is not None and subject < 1:
@@ -55,6 +56,8 @@ def metadata(query, scope):
     dates = query.aggregate(first=Min("time__date"), last=Max("time__date"), refreshed=Max("collected_at"))
     return {
         "source": "DataJud / CNJ",
+        "outcome_supported_courts": ['TJDFT', 'STJ'],
+        "unvalidated_outcome_courts": [c for c in scope['court'].split(',') if c not in ('TJDFT', 'STJ')],
         "source_url": "https://api-publica.datajud.cnj.jus.br/",
         "loaded_records": query.count(),
         "scope": scope,
@@ -78,6 +81,21 @@ def metadata(query, scope):
         "merit_status": "document_proxy",
         "merit_reason": "Latest dated mapped TPU outcome per DataJud document (G2/TR for TJDFT; SUP for STJ); timestamp ties use highest local movement ID. Partial, partial-knowledge and non-admitted outcomes remain outside the binary denominator. Filing-date filter, not judgment-date filter; not a count of individual appeals.",
     }
+
+
+def metadata_by_court(query, scope):
+    """Bulk source-card metadata, avoiding one HTTP request per selected tribunal."""
+    selected = scope['court'].split(',')
+    counts = {r['court']: r for r in query.order_by().values('court').annotate(
+        total=Count('pk'), first=Min('time__date'), last=Max('time__date'))}
+    latest = {}
+    for run in ExtractionRun.objects.filter(scope__court__in=selected).order_by('-pk').values(
+            'id', 'scope', 'status', 'fetched', 'rejected'):
+        latest.setdefault(run['scope']['court'], {k: v for k, v in run.items() if k != 'scope'})
+    return {court: {'source': 'DataJud / CNJ', 'loaded_records': counts.get(court, {}).get('total', 0),
+        'available_period': {'start': counts.get(court, {}).get('first'), 'end': counts.get(court, {}).get('last')},
+        'latest_run': latest.get(court), 'coverage': 'Somente documentos carregados; cadastro do tribunal não comprova cobertura.'}
+        for court in selected}
 
 
 def metrics(query):

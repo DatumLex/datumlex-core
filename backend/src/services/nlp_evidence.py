@@ -16,6 +16,7 @@ from src.db.models import (
     NlpTextVersion,
 )
 from src.nlp.contracts import bytes_hash, fingerprint, validate_annotation, validate_result
+from src.db.court_catalog import COURTS
 
 
 class Conflict(ValueError):
@@ -57,7 +58,7 @@ def persist_result(result, text, *, request_key, previous_id=None, reason=''):
         source = result['source']
         if not result['document_id'] or source['document_id'] != result['document_id']:
             raise ValueError('document_identity_mismatch')
-        if source['court'] not in ('STJ', 'TJDFT'):
+        if source['court'] not in COURTS:
             raise ValueError('unsupported_court')
         if result['text']['offset_unit'] != 'unicode_code_point':
             raise ValueError('unsupported_offsets')

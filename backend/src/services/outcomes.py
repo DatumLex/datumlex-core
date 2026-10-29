@@ -36,6 +36,9 @@ def _code_map(court):
 
 def classify(process):
     court = getattr(process, "court", "TJDFT")
+    if court not in ('TJDFT', 'STJ'):
+        return {'outcome': 'unknown', 'evidence': [], 'selected_evidence': [],
+                'rule_version': VERSION, 'reason': 'court_outcome_mapping_not_validated'}
     code_map = _code_map(court)
     evidence = [
         {"movement_id": movement.pk, "code": movement.code, "date": movement.occurred_at}

@@ -4,13 +4,13 @@ from src.db.models import LegalReference
 
 
 def report_references(scope):
-    if "STJ" not in scope["court"].split(","):
-        return None
     inventory = LegalReference.objects.filter(
-        source_institution="STJ",
+        source_institution__in=scope["court"].split(","),
         last_import_run__isnull=False,
         source_name__startswith="Pangea",
     )
+    if not inventory.exists():
+        return None
     if scope["subject"]:
         inventory = inventory.filter(Q(subject_code=scope["subject"]) | Q(subject_code__isnull=True))
     dated = inventory.filter(published_at__range=[scope["start"], scope["end"]])

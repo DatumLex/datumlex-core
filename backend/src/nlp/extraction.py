@@ -4,7 +4,7 @@ import re
 
 from .contracts import fingerprint, unknown, validate_annotation
 
-RULES_VERSION = "0.2.0"
+RULES_VERSION = "0.2.1"
 NUMBER_PREFIX = r"(?:n(?:[.º°o]|\s)*\s*)?"
 AUTHORITY_RULES = {
     "sumula": rf"\bS[úu]mula\s+{NUMBER_PREFIX}\d+\s*,?\s*(?:do\s+|/\s*)(?:STJ|STF)\b",
@@ -44,7 +44,8 @@ def annotation(text, labels, segments, method, rule_id=None):
 def paragraphs(text):
     # Keep original intervals; trimming affects selection only, never source text.
     start = 0
-    for boundary in re.finditer(r"(?:\r?\n)[ \t\r]*(?:\n)", text):
+    # Preserve original offsets while recognizing HTML breaks in archived STJ TXT.
+    for boundary in re.finditer(r"(?:\r?\n)[ \t\r]*(?:\n)|<br\s*/?>|</p\s*>", text, re.I):
         if boundary.start() > start:
             yield start, boundary.start()
         start = boundary.end()

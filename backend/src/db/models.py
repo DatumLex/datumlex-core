@@ -281,7 +281,7 @@ class LegalReference(models.Model):
     PRECEDENT = "precedent"
     DOCTRINE = "doctrine"
     SOURCE_TYPES = [(PRECEDENT, "Precedente"), (DOCTRINE, "Doutrina")]
-    SOURCE_INSTITUTIONS = [("STJ", "STJ"), ("BDJur", "BDJur")]
+    SOURCE_INSTITUTIONS = [(code, code) for code in ("STJ", "TJDFT", "TJSP", "TJMG", "TJRJ", "TJRS", "TJPR", "TRF1", "TRF3", "TST")] + [("BDJur", "BDJur"), ("Senado", "Senado Federal")]
 
     id = models.BigAutoField(primary_key=True)
     reference_type = models.CharField(max_length=16, choices=SOURCE_TYPES)
@@ -403,3 +403,35 @@ class CrossSourceLinkCandidate(models.Model):
                 name="cross_link_confidence_range",
             ),
         ]
+
+
+class LegalCorpusItem(models.Model):
+    """Rebuildable discovery index; never a legal assessment or NLP approval."""
+    origin_key = models.CharField(max_length=500, unique=True)
+    category = models.CharField(max_length=20, choices=[('jurisprudence','Jurisprudencia'), ('precedent','Precedente'), ('doctrine','Doutrina')])
+    court = models.CharField(max_length=16, blank=True, db_index=True)
+    title = models.CharField(max_length=500)
+    source_name = models.CharField(max_length=200)
+    source_url = models.URLField(max_length=2000, blank=True)
+    content_kind = models.CharField(max_length=40)
+    date = models.DateField(null=True, db_index=True)
+    date_kind = models.CharField(max_length=32, blank=True)
+    excerpt = models.TextField(blank=True)
+    authors = models.JSONField(default=list)
+    review_status = models.CharField(max_length=24, default='pending')
+    fingerprint = models.CharField(max_length=64)
+    provenance = models.JSONField(default=dict)
+    indexed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['category','court','date'], name='legal_corpus_scope_idx')]
+
+
+class LegalCorpusTopicMatch(models.Model):
+    item = models.ForeignKey(LegalCorpusItem, on_delete=models.CASCADE, related_name='topic_matches')
+    topic = models.CharField(max_length=48, db_index=True)
+    matched_terms = models.JSONField(default=list)
+    method = models.CharField(max_length=48, default='lexical_candidate_v1')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['item','topic'], name='legal_corpus_topic_unique')]

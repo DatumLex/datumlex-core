@@ -108,6 +108,15 @@ class LegalNLPTests(unittest.TestCase):
         self.assertEqual(result["status"], "partial")
         self.assertTrue(result["coverage"]["semantic_skipped_intervals"])
 
+    def test_stj_html_breaks_keep_source_offsets_and_candidates(self):
+        text = 'Cabeçalho longo. ' * 500 + '<br>A responsabilidade civil depende do nexo causal, pois o dano exige prova.<BR />Fim.'
+        result, _ = process(self.source(text), self.root, self.manifest, self.journal)
+        labels = {label for item in result['annotations'] for label in item['labels']}
+        self.assertTrue({'LEGAL_THESIS', 'LEGAL_GROUND'} <= labels)
+        for item in result['annotations']:
+            for segment in item['segments']:
+                self.assertEqual(text[segment['start']:segment['end']], segment['text'])
+
     def test_missing_text_not_negative_prediction(self):
         result, _ = process(self.source(""), self.root, self.manifest, self.journal)
         self.assertEqual(result["status"], "missing_text")

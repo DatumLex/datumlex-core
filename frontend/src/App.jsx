@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { downloadReport, getData } from './api'
 import NlpPanel from './NlpPanel'
+import CorpusPanel from './CorpusPanel'
 import SourceDecisions from './SourceDecisions'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
 const formatRate = (value) => value == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 }).format(value)
 const formatDate = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : '—'
+const supportedPeriod = () => ({ start: '2016-01-01', end: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()) })
 const shortThesisLabel = (thesis) => {
   const label = thesis.label || thesis.titulo || thesis.title || 'Tese sem título'
   return label.trim().split(/\s+/).slice(0, 4).join(' ')
@@ -161,7 +163,7 @@ function OutcomeChart({ series }) {
 }
 
 export default function App({ court: initialCourt, courts: authorizedCourts }) {
-  const [courts, setCourts] = useState(() => [initialCourt || authorizedCourts[0]])
+  const [courts, setCourts] = useState(() => authorizedCourts.length ? [...authorizedCourts] : [initialCourt])
   const court = courts.join(',')
   const [courtMenuOpen, setCourtMenuOpen] = useState(false)
   const courtMenuRef = useRef(null)
@@ -181,10 +183,10 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     setLoading(true); setError('')
   }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('corpus')
   const [draft, setDraft] = useState({ start: '', end: '', subject: '' })
   const [applied, setApplied] = useState(null)
-  const [bounds, setBounds] = useState(null)
+  const bounds = supportedPeriod()
   const [data, setData] = useState(null)
   const [alignment, setAlignment] = useState(null)
   const [selectedThesisId, setSelectedThesisId] = useState(null)
@@ -218,32 +220,20 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         setSelectedThesisId(null)
         setEvidenceDrawerItem(null)
         if (courts.some((code) => !authorizedCourts.includes(code))) throw new Error('Você não possui acesso a este tribunal.')
-        if (courts.some((code) => !['TJDFT', 'STJ'].includes(code))) throw new Error('A consulta deste tribunal ainda não está disponível. Selecione outro tribunal autorizado.')
-        const scopeResults = await Promise.all(courts.map(async (courtCode) => [
-          courtCode,
-          await getData('scope', { court: courtCode }, controller.signal),
-        ]))
-        const courtScopes = Object.fromEntries(scopeResults)
-        const periods = Object.values(courtScopes).map((scope) => scope.metadata.available_period)
-        const available = {
-          start: periods.map((period) => period.start).filter(Boolean).sort()[0],
-          end: periods.map((period) => period.end).filter(Boolean).sort().at(-1),
-        }
+        const fullScope = await getData('scope', { court }, controller.signal)
+        const courtScopes = { selection: fullScope }
+        const available = supportedPeriod()
         const filters = applied || (available.start && available.end ? { start: available.start, end: available.end } : {})
         const [statistics, instances, distribution] = await Promise.all(
           ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court }, controller.signal)),
         )
-        const filteredScopeResults = await Promise.all(courts.map(async (courtCode) => [
-          courtCode,
-          await getData('scope', { ...filters, court: courtCode }, controller.signal),
-        ]))
-        const filteredScopes = Object.fromEntries(filteredScopeResults)
+        const filteredScope = await getData('scope', { ...filters, court }, controller.signal)
+        const filteredScopes = Object.fromEntries(courts.map(code => [code, { metadata: filteredScope.by_court?.[code] || (courts.length === 1 ? filteredScope.metadata : null) }]))
         const alignmentResult = courts.includes('TJDFT')
           ? await getData('alignment', { ...filters, court: 'TJDFT' }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
-        setBounds(available)
         if (!applied) setDraft((current) => current.start ? current : { start: available.start || '', end: available.end || '', subject: '' })
         setData({ statistics, instances, distribution, courtScopes, filteredScopes })
         setAlignment(alignmentResult)
@@ -321,18 +311,19 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
-        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={exportPdf}>{exporting ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button></div>
+        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={exportPdf}>{exporting ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
         {exportError && <p role="alert">{exportError}</p>}
         <p className="filter-help">Os filtros são compartilhados entre todas as abas; aplique uma vez e navegue mantendo a seleção. Período por data de ajuizamento, não de julgamento. A comparação de precedentes usa decisões locais do TJDFT e referências do STJ no mesmo assunto e período selecionados.</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
       <nav className="dashboard-tabs" role="tablist" aria-label="Seções do painel">
+        <button id="tab-corpus" type="button" role="tab" aria-selected={activeTab === 'corpus'} aria-controls="panel-corpus" className={activeTab === 'corpus' ? 'is-active' : ''} onClick={() => setActiveTab('corpus')}>Acervo por assunto</button>
         <button id="tab-overview" type="button" role="tab" aria-selected={activeTab === 'overview'} aria-controls="panel-overview" className={activeTab === 'overview' ? 'is-active' : ''} onClick={() => setActiveTab('overview')}>Visão geral</button>
         {courts.includes('TJDFT') && <button id="tab-precedents" type="button" role="tab" aria-selected={activeTab === 'precedents'} aria-controls="panel-precedents" className={activeTab === 'precedents' ? 'is-active' : ''} onClick={() => setActiveTab('precedents')}>Precedentes e teses</button>}
         <button id="tab-sources" type="button" role="tab" aria-selected={activeTab === 'sources'} aria-controls="panel-sources" className={activeTab === 'sources' ? 'is-active' : ''} onClick={() => setActiveTab('sources')}>Fontes e cobertura</button>
       </nav>
-      <div className="data-status" role={error ? 'alert' : 'status'}>
-        {loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
+      <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
+        {activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
       </div>
       {activeTab === 'overview' && <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
       <section className="indicator-grid" aria-label="Indicadores do recorte selecionado" aria-busy={loading}>
@@ -351,6 +342,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </ChartCard>
       </section>
       </div>}
+      {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">NLP explicável</span><h2 id="alignment-title">Precedentes e teses</h2><p>Teses identificadas em decisões com seus trechos e fontes de apoio.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
         {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
@@ -439,7 +431,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </div>
           <p>Última importação de referência aprovada: {alignment.metadata.last_corpus_import ? new Date(alignment.metadata.last_corpus_import).toLocaleString('pt-BR') : 'nenhuma'}.</p>
           <p>{alignment.metadata.coverage}</p><ul className="limitations-list">{alignment.metadata.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
-          {alignment.metadata.pangea_imports?.length > 0 && <details className="chart-table"><summary>Histórico de importação Pangea (últimas 5 execuções)</summary><table><caption>Consulta pública de precedentes do STJ; totais informados pela fonte</caption><thead><tr><th scope="col">Execução</th><th scope="col">Consulta</th><th scope="col">Estado</th><th scope="col">Cobertura</th><th scope="col">Registros</th><th scope="col">Catálogo</th><th scope="col">Erro</th></tr></thead><tbody>{alignment.metadata.pangea_imports.map((run) => <tr key={run.id}><td>#{run.id}<br />{run.started_at ? new Date(run.started_at).toLocaleString('pt-BR') : '—'}</td><td>{run.scope?.query || '—'} · {run.scope?.organs?.join(', ') || '—'}</td><td>{run.status}</td><td>{formatNumber(run.pages)} páginas · {formatNumber(run.fetched)} de {run.source_total == null ? '—' : formatNumber(run.source_total)}</td><td>{formatNumber(run.created)} novos · {formatNumber(run.updated)} atualizados · {formatNumber(run.rejected)} rejeitados</td><td>{run.catalog_version || '—'}</td><td>{run.error || '—'}</td></tr>)}</tbody></table></details>}
+          {alignment.metadata.pangea_imports?.length > 0 && <details className="chart-table"><summary>Histórico de importação Pangea (últimas 5 execuções)</summary><table><caption>Consulta pública de precedentes dos tribunais selecionados; totais informados pela fonte</caption><thead><tr><th scope="col">Execução</th><th scope="col">Consulta</th><th scope="col">Estado</th><th scope="col">Cobertura</th><th scope="col">Registros</th><th scope="col">Catálogo</th><th scope="col">Erro</th></tr></thead><tbody>{alignment.metadata.pangea_imports.map((run) => <tr key={run.id}><td>#{run.id}<br />{run.started_at ? new Date(run.started_at).toLocaleString('pt-BR') : '—'}</td><td>{run.scope?.query || '—'} · {run.scope?.organs?.join(', ') || '—'}</td><td>{run.status}</td><td>{formatNumber(run.pages)} páginas · {formatNumber(run.fetched)} de {run.source_total == null ? '—' : formatNumber(run.source_total)}</td><td>{formatNumber(run.created)} novos · {formatNumber(run.updated)} atualizados · {formatNumber(run.rejected)} rejeitados</td><td>{run.catalog_version || '—'}</td><td>{run.error || '—'}</td></tr>)}</tbody></table></details>}
           <p>As teses e decisões relacionadas exibem até 300 referências para inspeção. Fontes importadas do Pangea permanecem não aprovadas até revisão humana.</p>
           {alignment.metadata.sources.length > 0 ? <ul className="source-links">{alignment.metadata.sources.map((source) => <li key={`${source.source_institution}-${source.source_name}-${source.identifier}`}><a href={source.source_url} target="_blank" rel="noreferrer">{source.source_institution} · {source.source_name}: {source.identifier} · {source.title}</a>{source.source_locator && ` — ${source.source_locator}`}{source.approval_reference && ` · aprovação ${source.approval_reference}`}</li>)}</ul> : <ChartState title="Corpus aprovado ainda não importado">Precedentes, teses e doutrina só aparecerão após a importação das fontes aprovadas pelo fluxo BDJur.</ChartState>}
         </div>}

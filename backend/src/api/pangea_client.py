@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from django.conf import settings
+from src.api.pangea_scope import canonical_court, selected_courts, source_organs
 
 
 class PangeaError(Exception):
@@ -28,10 +29,16 @@ class PangeaClient:
             )
 
     @staticmethod
-    def _read_json(request, timeout):
+    def _read_json(request, timeout, capture=None):
         try:
             with urlopen(request, timeout=timeout) as response:
-                return json.load(response)
+                raw=response.read(20_000_001)
+                if len(raw)>20_000_000:
+                    raise ValueError('Response exceeds bounded 20 MB')
+                payload=json.loads(raw)
+                if capture is not None:
+                    capture(raw)
+                return payload
         except HTTPError as exc:
             # Keycloak exposes a useful OAuth error code; never log its body,
             # which may contain provider details beyond the sanitized code.
@@ -87,12 +94,13 @@ class PangeaClient:
 
 
 class PangeaPublicSearchClient:
-    """Public Pangea frontend search API, restricted to STJ records."""
+    """Public Pangea frontend search API for the explicitly selected local courts."""
 
     def __init__(self, timeout=45):
         self.base_url = settings.PANGEA_SEARCH_BASE_URL.rstrip("/")
         self.timeout = timeout
         self._catalog = None
+        self.last_response_bytes = None
 
     def _get_json(self, url):
         request = Request(
@@ -111,18 +119,20 @@ class PangeaPublicSearchClient:
                 raise PangeaError(f"Catálogo Pangea vazio ou inválido: {field}.")
             if any(not isinstance(item, dict) or not item.get("sigla") for item in entries):
                 raise PangeaError(f"Catálogo Pangea sem sigla válida: {field}.")
-        organs = {str(item["sigla"]).upper() for item in catalog["orgaos"]}
-        if "STJ" not in organs:
-            raise PangeaError("Catálogo Pangea não disponibiliza o órgão STJ.")
         self._catalog = catalog
         return catalog
 
-    def search_page(self, query, page_index, page_size):
+    def search_page(self, query, page_index, page_size, courts=None):
         if not isinstance(query, str) or not query.strip():
             raise PangeaError("Informe o termo de pesquisa do Pangea.")
         if page_index < 0 or not 1 <= page_size <= 100:
             raise PangeaError("Pangea requer página zero-based >= 0 e tamanho entre 1 e 100.")
         catalog = self._catalog or self.get_catalog()
+        try:
+            selected = selected_courts(courts)
+            organs = source_organs(selected, catalog)
+        except ValueError as exc:
+            raise PangeaError(str(exc)) from exc
         filter_data = {
             "buscaGeral": query.strip(),
             "todasPalavras": "",
@@ -132,7 +142,7 @@ class PangeaPublicSearchClient:
             "atualizacaoDesde": "",
             "atualizacaoAte": "",
             "nr": "",
-            "orgaos": ["STJ"],
+            "orgaos": organs,
             "tipos": [str(item["sigla"]) for item in catalog["especies"]],
             "cancelados": False,
             "ordenacao": "Text",
@@ -150,7 +160,7 @@ class PangeaPublicSearchClient:
             },
             method="POST",
         )
-        result = PangeaClient._read_json(request, self.timeout)
+        result = PangeaClient._read_json(request, self.timeout, capture=lambda raw: setattr(self,'last_response_bytes',raw))
         if not isinstance(result, dict):
             raise PangeaError("Pangea retornou página em formato inesperado.")
         rows, total = result.get("resultados"), result.get("total")
@@ -163,5 +173,6 @@ class PangeaPublicSearchClient:
             or any(not isinstance(row, dict) for row in rows)
         ):
             raise PangeaError("Pangea retornou resultados ou total inválido.")
-        result["resultados"] = [row for row in rows if str(row.get("orgao", "")).upper() == "STJ"]
+        if any(canonical_court(row.get("orgao")) not in selected for row in rows):
+            raise PangeaError("Pangea retornou tribunal fora do filtro solicitado.")
         return result

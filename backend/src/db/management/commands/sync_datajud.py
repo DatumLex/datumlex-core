@@ -5,14 +5,16 @@ from django.core.management.base import BaseCommand, CommandError
 
 from src.db.models import ExtractionRun
 from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
-from src.services.period import EARLIEST_DATE, EARLIEST_DATE_ISO
+from src.services.period import HISTORY_START, today
+from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 
 class Command(BaseCommand):
     help = "Bootstrap TJDFT/STJ history, resume partial loads, then refresh both courts incrementally."
 
     def add_arguments(self, parser):
-        parser.add_argument("--start", default=EARLIEST_DATE_ISO)
+        parser.add_argument('--court', choices=COURTS, help='Optional single-court batch')
+        parser.add_argument("--start", default=HISTORY_START.isoformat())
         parser.add_argument("--subjects", default=DEFAULT_DATAJUD_SUBJECT_CODES_CSV)
         parser.add_argument("--page-size", type=int, default=100)
         parser.add_argument("--max-pages", type=int, default=2)
@@ -23,7 +25,7 @@ class Command(BaseCommand):
         try:
             start = date.fromisoformat(options["start"])
             subjects = sorted({int(code.strip()) for code in options["subjects"].split(",")})
-            if start < EARLIEST_DATE or start > date.today() or not subjects or min(subjects) < 1:
+            if start < HISTORY_START or start > today() or not subjects or min(subjects) < 1:
                 raise ValueError
         except ValueError:
             raise CommandError("Use a valid start date from 2016 to today and positive subject codes") from None
@@ -31,7 +33,8 @@ class Command(BaseCommand):
             raise CommandError("Use max-pages >= 1 and page-size 1..1000")
 
         bootstrap_complete = True
-        for court in ("TJDFT", "STJ"):
+        history_attempted = False
+        for court in ([options['court']] if options.get('court') else ("TJDFT", "STJ")):
             candidates = ExtractionRun.objects.filter(
                 scope__origin="datajud",
                 scope__court=court,
@@ -51,6 +54,7 @@ class Command(BaseCommand):
                 ))
                 bootstrap_complete = False
             elif resumable:
+                history_attempted = True
                 self.stdout.write(f"{court}: retomando carga histórica {resumable.pk}")
                 call_command("extract_datajud", resume=resumable.pk, max_pages=options["max_pages"])
                 resumable.refresh_from_db()
@@ -58,6 +62,7 @@ class Command(BaseCommand):
             elif completed:
                 self.stdout.write(f"{court}: carga histórica desde {start.isoformat()} já concluída")
             else:
+                history_attempted = True
                 self.stdout.write(f"{court}: iniciando carga histórica desde {start.isoformat()}")
                 call_command(
                     "extract_datajud",
@@ -83,9 +88,14 @@ class Command(BaseCommand):
             ))
             return
 
+        if history_attempted:
+            self.stdout.write("Histórico concluído; atualização incremental fica para a próxima execução, preservando o limite do lote.")
+            return
+
         self.stdout.write("Histórico concluído nos dois tribunais; atualizando registros recentes.")
         call_command(
             "refresh_datajud",
+            court=options.get('court'),
             subjects=options["subjects"],
             page_size=options["page_size"],
             max_pages=options["max_pages"],

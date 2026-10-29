@@ -5,14 +5,18 @@ from .contracts import SCHEMA_VERSION, fingerprint, validate_result
 from .extraction import RULES_VERSION, extract, replay_predictions
 
 
-def process(row, root, manifest, journal, model_record=None):
+def process(row, root, manifest, journal, model_record=None, computation_cache=None):
     metadata = {k: v for k, v in row.items() if k not in ("source_text", "human_annotations", "adjudication")}
     key = fingerprint({"input": metadata, "pipeline": manifest, "model_record": model_record, "extractor_rules": RULES_VERSION})
+    computation_manifest = {k:v for k,v in manifest.items() if k!='input_manifest_sha256'}
+    computation_key = fingerprint({'input':metadata,'pipeline':computation_manifest,
+                                   'model_record':model_record,'extractor_rules':RULES_VERSION})
     result = {
-        "schema_version": SCHEMA_VERSION, "job_key": key,
+        "schema_version": SCHEMA_VERSION, "job_key": key, "computation_key": computation_key,
         "document_id": row.get("document_id"), "source_version": row.get("source_version"),
         "source": metadata, "pipeline": manifest,
         "text": {"sha256": row.get("text_sha256"), "offset_unit": "unicode_code_point",
+                 "content_kind": row.get('content_kind', 'full_text'),
                  "representation": row.get("text_field") or "utf8_txt", "normalization": "identity-v1"},
         "status": "failed", "annotations": [], "relations": [], "warnings": [],
         "errors": [], "rejected_candidates": [],
@@ -27,12 +31,24 @@ def process(row, root, manifest, journal, model_record=None):
         if cached is not None:
             validate_result(cached, text)
             return cached, True
+        if computation_cache is not None:
+            reused = computation_cache.get(computation_key)
+            if reused is not None:
+                validate_result(reused, text)
+                reused['pipeline'] = manifest
+                reused['job_key'] = key
+                reused['result_sha256'] = fingerprint({k:v for k,v in reused.items() if k!='result_sha256'})
+                validate_result(reused, text)
+                journal.record(key, reused, reusable=True)
+                return reused, True
         result["text"]["characters"] = len(text)
         if len(text.strip()) < manifest["parameters"]["short_threshold"]:
             result["warnings"].append("short_text")
         if "\ufffd" in text:
             result["warnings"].append("replacement_character_requires_review")
         result["warnings"].extend(["eligibility_pending_legal_triage", "guide_approval_pending"])
+        if row.get('content_kind', 'full_text') != 'full_text':
+            result['warnings'].append('excerpt_not_full_decision_context')
         if not row.get("source_url"):
             result["warnings"].append("source_url_not_reconciled")
         annotations, skipped = extract(text, manifest["parameters"]["max_paragraph"])
@@ -65,4 +81,6 @@ def process(row, root, manifest, journal, model_record=None):
     # Deterministic partial outputs (oversize spans/rejected proposals) can be resumed.
     # Fixing rules/model/text changes the job key. Input failures are always retried.
     journal.record(key, result, reusable=result["status"] in ("completed", "partial"))
+    if computation_cache is not None:
+        computation_cache.put(computation_key, result)
     return result, False
