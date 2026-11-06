@@ -32,6 +32,27 @@ class PangeaRawImportTests(TestCase):
             call_command('import_pangea_raw',stdout=io.StringIO())
             reference.refresh_from_db();self.assertTrue(reference.approved)
             self.assertEqual(reference.title,'Titulo revisado');self.assertEqual(reference.thesis,'Tese revisada')
+    def test_catalog_failure_does_not_block_previously_archived_pages(self):
+        with tempfile.TemporaryDirectory() as temporary, override_settings(BASE_DIR=Path(temporary)):
+            root = Path(temporary) / 'data/operations/pangea-raw'
+            (root / 'pages').mkdir(parents=True)
+            page = self.archive(root, {
+                'resultados': [{'id': 'tjsp-sum-1', 'orgao': 'TJSP', 'tipo': 'SUM',
+                                'nr': 1, 'tese': 'Dano moral'}],
+                'total': 1,
+            })
+            manifest = self.manifest(root, page)
+            for key in ('catalog_version', 'catalog_path', 'catalog_sha256'):
+                page[key] = manifest.pop(key)
+            (root / 'all-pages.json').write_text(json.dumps({'pages': [page]}), encoding='utf8')
+            manifest.update(status='failed', failed_stage='catalog', pages=[])
+            (root / 'manifest.json').write_text(json.dumps(manifest), encoding='utf8')
+
+            call_command('import_pangea_raw', stdout=io.StringIO())
+            call_command('import_pangea_raw', stdout=io.StringIO())
+            self.assertEqual(LegalReference.objects.count(), 1)
+            self.assertEqual(PangeaImportRun.objects.get().catalog_version, 'test')
+
     def test_changed_artifact_is_rejected_before_loading_reference(self):
         with tempfile.TemporaryDirectory() as temporary,override_settings(BASE_DIR=Path(temporary)):
             root=Path(temporary)/'data/operations/pangea-raw';(root/'pages').mkdir(parents=True)
