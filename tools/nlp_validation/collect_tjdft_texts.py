@@ -116,6 +116,7 @@ def _collect(limit=275, page_size=25, directory=None, target_total=None):
         except (HTTPError, URLError, TimeoutError, ValueError) as exc:
             # Keep this page pending and replace any stale successful run report.
             state['next_year'] = year
+            progress['last_probe'] = {'status': 'failed', 'page': progress['page']}
             save(state_path, state)
             save(directory / 'last-run.json', {
                 'status': 'failed', 'fetched': fetched, 'new': added,
@@ -153,6 +154,9 @@ def _collect(limit=275, page_size=25, directory=None, target_total=None):
         else:
             progress['page'] += 1
         progress['exhausted'] = not truncated_by_target and len(records) < page_size
+        progress['last_probe'] = {'status': 'results' if records else 'empty',
+                                  'page': body['pagina'], 'rows_returned': len(records),
+                                  'period_end': end.isoformat()}
         if progress['exhausted']:
             visited_empty.add(year)
         save(index_path, index)

@@ -58,3 +58,19 @@ Use `scripts/run-etl.ps1 -Mode all -Once` for a complete local cycle or
 `scripts/run-etl.ps1 -Mode process -Sources 'pangea' -Once` to process archived
 Pangea input. See the [local ETL operations guide](../docs/operations/ETL-ELT-LOCAL.md)
 for setup, execution modes, and log locations.
+
+## Collection coverage
+
+After a collection round that includes TJDFT or Pangea, the ETL writes
+`backend/data/operations/collection-coverage.json`. For TJDFT, it records
+the latest page outcome and the indexed decisions with missing process
+numbers or publication dates for each judgment year. Older cursors without
+page outcomes are marked as unknown.
+
+For Pangea, the report shows the latest outcome and returned rows by
+court for each query. The broad civil liability query remains in place.
+Each round also requests one page for the least recently attempted
+focused query: `dano moral` or `negativação indevida`. Each query keeps
+its own cursor, so alternating topics preserves their progress.
+Pangea queries in this flow have no judgment-period filter. A court with
+zero rows in a sample may still have matching precedents.

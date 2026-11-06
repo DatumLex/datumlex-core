@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import time
 from etl_runtime import Runtime,atomic_json
+from collection_coverage import next_focused_query
 PROJECT=Path(__file__).resolve().parents[2];BACKEND=PROJECT/'backend';ROOT=BACKEND/'data/operations'
 sys.path.insert(0,str(BACKEND))
 
@@ -46,12 +47,18 @@ def collect(runtime,args):
     tools=Path(__file__).parent
     steps=[]
     if 'doctrine' in args.sources:steps.append(('collect_doctrine',[str(PROJECT/'tools/doctrine/collect_doctrine_raw.py'),'--limit',str(args.doctrine_limit)]))
-    if 'pangea' in args.sources:steps.append(('collect_pangea',[str(tools/'collect_pangea_raw.py')]))
+    if 'pangea' in args.sources:
+        collector = str(tools / 'collect_pangea_raw.py')
+        steps.append(('collect_pangea', [collector]))
+        steps.append(('collect_pangea_focused', [collector, '--max-pages', '1',
+                                               '--query', next_focused_query(ROOT)]))
     if 'tjdft' in args.sources and count_texts()<args.target:
         steps.append(('collect_tjdft',[str(tools/'collect_tjdft_texts.py'),'--limit',str(args.batch_size),'--target',str(args.target)]))
     if 'ementas' in args.sources:steps.append(('collect_ementas',[str(tools/'collect_ementas.py'),'--limit','400']))
     if 'djen' in args.sources:steps.append(('collect_djen',[str(tools/'collect_multicourt_publications.py'),'--limit','1000']))
     codes=[runtime.run(name,command) for name,command in steps]
+    if set(args.sources) & {'tjdft', 'pangea'}:
+        codes.append(runtime.run('collection_coverage', [str(tools / 'collection_coverage.py')]))
     runtime.publish(stored_unique_tjdft=count_texts())
     atomic_json(ROOT/'collection-target.json',{'target':args.target,'stored_unique':count_texts(),
         'count_basis':'unique_TJDFT_full_text_UUIDs','status':'target_reached' if count_texts()>=args.target else 'collecting',
