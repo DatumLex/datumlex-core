@@ -105,6 +105,14 @@ def _collect(limit=275, page_size=25, directory=None, target_total=None):
                           headers={'Content-Type': 'application/json', 'User-Agent': 'DatumLex-local-research/1.0'})
         try:
             raw = fetch_page(request)
+            downloaded += len(raw)
+            if downloaded > 200_000_000:
+                raise ValueError('Run exceeds 200 MB limit')
+            payload = json.loads(raw)
+            records = payload.get('registros') if isinstance(payload, dict) else None
+            if (not isinstance(records, list) or len(records) > page_size
+                    or any(not isinstance(row, dict) for row in records)):
+                raise ValueError('Unexpected TJDFT response schema')
         except (HTTPError, URLError, TimeoutError, ValueError) as exc:
             # Keep this page pending and replace any stale successful run report.
             state['next_year'] = year
@@ -115,13 +123,6 @@ def _collect(limit=275, page_size=25, directory=None, target_total=None):
                 'failed_year': year, 'failed_page': progress['page'],
                 'error_type': type(exc).__name__, 'review_status': 'pending'})
             raise
-        downloaded += len(raw)
-        if downloaded > 200_000_000:
-            raise ValueError('Run exceeds 200 MB limit')
-        payload = json.loads(raw)
-        records = payload.get('registros')
-        if not isinstance(records, list) or len(records) > page_size:
-            raise ValueError('Unexpected TJDFT response schema')
         digest = hashlib.sha256(raw).hexdigest()
         artifact = pages / f'{year}-{progress["page"]:06}-{digest}.json'
         from etl_runtime import archive_bytes
