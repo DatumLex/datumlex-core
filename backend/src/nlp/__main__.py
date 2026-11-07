@@ -54,7 +54,7 @@ def main():
     package = Path(__file__).parent
     code_sources = {p.name:p.read_bytes() for p in sorted(package.glob("*.py"))}
     manifest = {
-        "pipeline_version": "0.4.0", "schema_version": SCHEMA_VERSION,
+        "pipeline_version": "0.5.0", "schema_version": SCHEMA_VERSION,
         "rules_version": RULES_VERSION, "guide_version": "0.1.0", "taxonomy_version": "0.1.0",
         "guide_sha256": bytes_hash(args.guide.read_bytes()), "guide_approval": "not_verified",
         "code_hashes": {name:bytes_hash(raw) for name,raw in code_sources.items()},
@@ -64,7 +64,7 @@ def main():
         "parameters": {"short_threshold": 200, "max_paragraph": 6000},
         "model": None if replay is None else {k: v for k, v in replay.items() if k != "records"},
         "model_replay_sha256": bytes_hash(args.model_replay.read_bytes()) if replay else None,
-        "normalizer": "identity-v1", "segmenter": "blank-line-html-break-v2",
+        "normalizer": "identity-v1", "segmenter": "paragraph-sentence-limit-v3",
         "release_status": "experimental_not_evaluated",
     }
     run_dir = args.output / fingerprint(manifest)

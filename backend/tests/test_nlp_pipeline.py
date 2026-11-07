@@ -13,6 +13,24 @@ from src.nlp.pipeline import process
 
 
 class LegalNLPTests(unittest.TestCase):
+    def test_long_paragraph_keeps_eligible_sentences_and_original_offsets(self):
+        prefix = "O relatório foi apresentado. " * 300
+        sentence = "A responsabilidade civil depende do nexo causal."
+        text = prefix + sentence
+        annotations, skipped = extract(text)
+        self.assertEqual(skipped, [])
+        candidates = [item for item in annotations if "LEGAL_THESIS" in item["labels"]]
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["segments"][0]["start"], len(prefix))
+        self.assertEqual(candidates[0]["segments"][0]["text"], sentence)
+
+    def test_oversized_sentence_keeps_gap_without_hiding_next_sentence(self):
+        oversized = "Documento " + "x" * 6000 + "."
+        candidate = "A responsabilidade civil depende do nexo causal."
+        annotations, skipped = extract(oversized + " " + candidate)
+        self.assertEqual(skipped, [[0, len(oversized)]])
+        self.assertTrue(any(item["segments"][0]["text"] == candidate for item in annotations))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -102,8 +120,8 @@ class LegalNLPTests(unittest.TestCase):
         self.assertTrue(all(a["segments"][0]["text"] == text for a in items))
         self.assertTrue(all(a["label_status"] == "proposed" for a in items))
 
-    def test_long_paragraph_is_explicit_partial(self):
-        row = self.source("A responsabilidade civil depende de culpa. " * 200)
+    def test_long_sentence_is_explicit_partial(self):
+        row = self.source("A responsabilidade civil depende de " + "prova " * 1200)
         result, _ = process(row, self.root, self.manifest, self.journal)
         self.assertEqual(result["status"], "partial")
         self.assertTrue(result["coverage"]["semantic_skipped_intervals"])

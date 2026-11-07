@@ -20,7 +20,25 @@ def read_source(row, root):
     raw = path.read_bytes()
     if bytes_hash(raw) != row["artifact_sha256"]:
         raise SourceProblem("artifact_hash_mismatch")
-    if row.get('source_format') == 'djen-public-json-v1':
+    if row.get('source_format') == 'doctrine-text-v1':
+        if row.get('category') != 'doctrine' or row.get('court') != '':
+            raise SourceProblem('source_category_mismatch')
+        original = (root / row['original_pdf_path']).resolve()
+        if not original.is_relative_to(root) or bytes_hash(original.read_bytes()) != row['original_pdf_sha256']:
+            raise SourceProblem('doctrine_original_hash_mismatch')
+        text = raw.decode('utf8', errors='strict')
+    elif row.get('source_format') == 'pangea-public-json-v1':
+        from src.api.pangea_scope import canonical_court
+        if row.get('category') != 'precedent' or row.get('text_field') not in ('tese', 'questao'):
+            raise SourceProblem('source_category_mismatch')
+        records = [record for record in json.loads(raw)['resultados']
+                   if record.get('id') == row['record_id'] and canonical_court(record.get('orgao')) == row['court']]
+        if len(records) != 1:
+            raise SourceProblem('ambiguous_document')
+        if row['document_id'] != 'PANGEA:' + row['court'] + ':' + row['record_id']:
+            raise SourceProblem('document_identity_mismatch')
+        text = records[0].get(row['text_field'])
+    elif row.get('source_format') == 'djen-public-json-v1':
         if row.get('content_kind') != 'publication_excerpt' or row.get('text_field') != 'texto':
             raise SourceProblem('content_kind_mismatch')
         records = [r for r in json.loads(raw)['items'] if str(r.get('id')) == str(row.get('record_id'))]

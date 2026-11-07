@@ -24,7 +24,11 @@ def main():
     parser.add_argument('--start', type=date.fromisoformat, default=date(2016, 1, 1))
     parser.add_argument('--end', type=date.fromisoformat, default=today())
     parser.add_argument("--job-id", type=UUID)
+    parser.add_argument('--sources', default='tjdft,ementas,djen,doctrine,pangea')
     args = parser.parse_args()
+    selected = set(args.sources.split(','))
+    if not selected or selected - {'tjdft', 'ementas', 'djen', 'doctrine', 'pangea'}:
+        parser.error('Unknown source')
     if not date(2016, 1, 1) <= args.start <= args.end <= today():
         parser.error('Use 2016-01-01 through today, in chronological order')
     source = ROOT / 'stj-documents'
@@ -41,7 +45,7 @@ def main():
                 conflicts.add(key)
             records[key] = row
     queue, excluded, years = [], Counter(), Counter()
-    for path in sorted((source / 'texts').glob('*.txt')):
+    for path in sorted((source / 'texts').glob('*.txt')) if 'ementas' in selected else []:
         key = path.name.split('-')[0]
         row = records.get(key)
         if row is None or key in conflicts:
@@ -67,7 +71,7 @@ def main():
         years[str(published.year)] += 1
     # Merge verified full-text TJDFT records; do not infer a text from an ementa.
     tjdft_index = ROOT / 'tjdft-documents/documents.json'
-    if tjdft_index.exists():
+    if 'tjdft' in selected and tjdft_index.exists():
         from src.nlp.adapters import read_source
         for row in json.loads(tjdft_index.read_text(encoding='utf8')).values():
             decision = date.fromisoformat(row['decision_date'])
@@ -77,7 +81,7 @@ def main():
                 years[str(decision.year)] += 1
     queue_path = output / 'queue.json'
     extra = ROOT / 'jurisprudence-ementas/queue.json'
-    if extra.exists():
+    if 'ementas' in selected and extra.exists():
         from src.nlp.adapters import read_source
         for row in json.loads(extra.read_text(encoding='utf8')):
             decision = date.fromisoformat(row['decision_date'])
@@ -86,7 +90,7 @@ def main():
                 queue.append(row)
                 years[str(decision.year)] += 1
     publications = ROOT / 'djen-documents/queue.json'
-    if publications.exists():
+    if 'djen' in selected and publications.exists():
         from src.nlp.adapters import read_source
         for row in json.loads(publications.read_text(encoding='utf8')):
             if row['court'] not in ACTIVE_COURTS:
@@ -97,14 +101,32 @@ def main():
                 read_source(row, ROOT)
                 queue.append(row)
                 years[str(published.year)] += 1
+    from src.nlp.reference_sources import reference_queue
+    reference_rows, reference_exclusions = reference_queue(ROOT, selected)
+    excluded.update(reference_exclusions)
+    for row in reference_rows:
+        publication = row.get('publication_date')
+        if publication and not args.start <= date.fromisoformat(publication[:10]) <= args.end:
+            excluded['outside_reference_publication_period'] += 1
+            continue
+        queue.append(row)
+        if publication:
+            years[publication[:4]] += 1
+    queue = [row for row in queue if row.get('court') in ACTIVE_COURTS
+             or row.get('category') == 'doctrine' and row.get('court') == '']
     queue_path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding='utf-8')
     coverage = {'requested_start': args.start.isoformat(), 'requested_end': args.end.isoformat(),
                 'period_field': 'Per record: decision_date when supplied; otherwise publication_date', 'local_texts_selected': len(queue),
                 'period_fields_by_content': {'STJ_full_text': 'publication_date', 'TJDFT_full_text': 'decision_date',
                     'STJ_ementa': 'decision_date', 'TST_ementa': 'decision_date', 'DJEN_publication_excerpt': 'publication_date'},
-                'texts_by_court': dict(Counter(row['court'] for row in queue)),
+                'texts_by_court': dict(Counter(row['court'] for row in queue if row['court'])),
+                'texts_by_publisher': dict(Counter(row['source_name'] for row in queue if row.get('category') == 'doctrine')),
                 'content_kinds': dict(Counter(row.get('content_kind', 'full_text') for row in queue)),
-                'texts_by_court_year': dict(Counter(row['court'] + ':' + (row.get('decision_date') or row['publication_date'])[:4] for row in queue)),
+                'texts_by_court_year': dict(Counter(row['court'] + ':' + (row.get('decision_date') or row.get('publication_date'))[:4]
+                                                  for row in queue if row['court'] and (row.get('decision_date') or row.get('publication_date')))),
+                'undated_references': sum(not row.get('decision_date') and not row.get('publication_date') for row in queue
+                                         if row.get('category') in ('precedent', 'doctrine')),
+                'categories': dict(Counter(row.get('category', 'jurisprudence') for row in queue)),
                 'texts_by_year': dict(years), 'exclusions': dict(excluded),
                 'years_without_local_texts': [year for year in range(args.start.year, args.end.year + 1)
                                              if not years.get(str(year))],
@@ -113,6 +135,11 @@ def main():
     (output / 'coverage.json').write_text(json.dumps(coverage, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(coverage, ensure_ascii=False, indent=2), flush=True)
     if not queue:
+        if selected <= {'doctrine', 'pangea'}:
+            (output / 'current-run.json').write_text(json.dumps({
+                'status': 'no_eligible_text', 'directory': None,
+            }), encoding='utf8')
+            return 0
         return 1
     result = subprocess.run([sys.executable, '-m', 'src.nlp', '--root', str(ROOT),
                             '--queue', str(queue_path), '--output', str(output / 'runs'),

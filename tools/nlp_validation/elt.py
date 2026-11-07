@@ -67,16 +67,22 @@ def process(runtime,args):
         if source in args.sources and (ROOT/relative).exists():codes.append(runtime.run(name,command))
     has_jurisprudence=bool(set(args.sources)&{'tjdft','ementas','djen'})
     if has_jurisprudence:codes.append(runtime.run('index_acquired',['manage.py','index_jurisprudence_queues']))
-    juris_signature=inputs_signature(('tjdft','ementas','djen')) if has_jurisprudence else None
-    if has_jurisprudence and runtime.state.get('nlp_completed_signature')!=juris_signature and any((ROOT/path).exists() for path in ('tjdft-documents/documents.json','jurisprudence-ementas/queue.json','djen-documents/queue.json')):
+    signature = inputs_signature(args.sources)
+    input_paths = {'tjdft': 'tjdft-documents/documents.json', 'ementas': 'jurisprudence-ementas/queue.json',
+                   'djen': 'djen-documents/queue.json', 'doctrine': 'doctrine/manifest.json',
+                   'pangea': 'pangea-raw/manifest.json'}
+    if runtime.state.get('nlp_completed_signature') != signature and any(
+            (ROOT / input_paths[source]).exists() for source in args.sources):
         # Every processing cycle has an immutable, separate queue and output pointer.
         import uuid
         job=str(uuid.uuid4());runtime.publish(nlp_job_id=job)
-        code=runtime.run('nlp',[str(tools/'run_nlp_local.py'),'--job-id',job]);codes.append(code)
+        code=runtime.run('nlp',[str(tools/'run_nlp_local.py'),'--job-id',job,
+                              '--sources', ','.join(args.sources)]);codes.append(code)
         if code==0:
             codes.append(runtime.run('import_nlp',[str(tools/'import_local_results.py'),'--job-id',job]))
-            codes.append(runtime.run('coverage',[str(tools/'report_coverage.py')]))
-            if not any(codes[-3:]):runtime.publish(nlp_completed_signature=juris_signature)
+            if has_jurisprudence:
+                codes.append(runtime.run('coverage',[str(tools/'report_coverage.py')]))
+            if not any(codes):runtime.publish(nlp_completed_signature=signature)
     return codes
 
 def main(argv=None):

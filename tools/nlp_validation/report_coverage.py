@@ -15,7 +15,8 @@ def main():
     queue = json.loads((ROOT / 'nlp-local/queue.json').read_text(encoding='utf8'))
     latest = ROOT / 'djen-documents/last-run.json'
     probes = json.loads(latest.read_text(encoding='utf8')).get('source_status', {}) if latest.exists() else {}
-    unique = {row['document_id']: row for row in queue if row['court'] in COURTS}
+    unique = {row['document_id']: row for row in queue
+              if row['court'] in COURTS and row.get('category', 'jurisprudence') == 'jurisprudence'}
     total = Counter(row.get('content_kind', 'full_text') for row in unique.values())
     courts = {}
     for court in COURTS:

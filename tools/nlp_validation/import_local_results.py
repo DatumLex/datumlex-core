@@ -43,6 +43,9 @@ def main():
     count = unchanged = 0
     # The runner records its exact run directory; older experimental runs are not reimported.
     current = json.loads((output / 'current-run.json').read_text(encoding='utf8'))
+    if not queue and current.get('status') == 'no_eligible_text':
+        print(json.dumps({'imported_or_verified': 0, 'status': 'no_eligible_text'}))
+        return 0
     directory = Path(current['directory']).resolve()
     if not directory.is_relative_to((output / 'runs').resolve()):
         raise ValueError('Output directory outside local corpus')
@@ -66,7 +69,7 @@ def main():
         count += 1
     import io
     from django.core.management import call_command
-    call_command('refresh_legal_corpus', category='jurisprudence', stdout=io.StringIO())
+    call_command('refresh_legal_corpus', category='all', stdout=io.StringIO())
     print(json.dumps({'imported_or_verified': count, 'unchanged_skipped': unchanged, 'review_status': 'pending'}))
     return 0
 

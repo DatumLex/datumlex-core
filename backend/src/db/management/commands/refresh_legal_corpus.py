@@ -5,9 +5,9 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Q
 from src.db.court_catalog import ACTIVE_COURTS
-from src.db.models import NlpTextVersion, LegalReference, LegalCorpusItem, LegalCorpusTopicMatch
+from src.db.models import NlpExtraction, NlpTextVersion, LegalReference, LegalCorpusItem, LegalCorpusTopicMatch
 from src.services.corpus_catalog import VERSION, classify, fingerprint, parse_date, safe_url
 
 
@@ -53,6 +53,8 @@ class Command(BaseCommand):
             versions=NlpTextVersion.objects.filter(pk=Subquery(latest),document__court__in=ACTIVE_COURTS).select_related('document')
             for version in versions.iterator(chunk_size=100):
                 source=version.source
+                if source.get('category', 'jurisprudence') != 'jurisprudence':
+                    continue
                 key='nlp:'+version.document.source_key
                 digest=fingerprint({'version':VERSION,'sha256':version.sha256,'source':source})
                 if known.get(key)==digest:
@@ -71,6 +73,12 @@ class Command(BaseCommand):
                 batch.append((item,matches));changed+=1
                 if len(batch)>=200:persist(batch);batch=[]
         if category in ('all','precedent','doctrine'):
+            reference_runs = {}
+            runs = NlpExtraction.objects.filter(
+                Q(document__source_key__startswith='PANGEA:') | Q(document__source_key__startswith='DOCTRINE:')
+            ).select_related('document', 'text_version').order_by('created_at', 'pk')
+            for run in runs.iterator(chunk_size=200):
+                reference_runs[run.document.source_key] = run
             refs=LegalReference.objects.all()
             if category!='all':refs=refs.filter(reference_type=category)
             for reference in refs.iterator(chunk_size=200):
@@ -78,10 +86,21 @@ class Command(BaseCommand):
                 if kind=='precedent' and reference.source_institution not in ACTIVE_COURTS:continue
                 if kind not in ('precedent','doctrine'):continue
                 metadata=reference.source_metadata if isinstance(reference.source_metadata,dict) else {}
+                nlp_key = ('DOCTRINE:' + reference.identifier if kind == 'doctrine'
+                           else 'PANGEA:' + reference.source_institution + ':' + reference.identifier)
+                run = reference_runs.get(nlp_key)
+                if run and (not run.text_version or
+                            run.text_version.source.get('reference_payload_hash') != reference.source_payload_hash):
+                    run = None
+                nlp_provenance = {
+                    'nlp_extraction_id': str(run.pk) if run else None,
+                    'nlp_status': run.status if run else 'pending',
+                }
                 key='reference:'+str(reference.pk)
                 digest=fingerprint({'version':VERSION,'payload':reference.source_payload_hash,
                     'title':reference.title,'thesis':reference.thesis,'metadata':metadata,
-                    'published_at':reference.published_at,'approved':reference.approved})
+                    'published_at':reference.published_at,'approved':reference.approved,
+                    'nlp': nlp_provenance})
                 if known.get(key)==digest:
                     unchanged+=1;continue
                 body=reference.thesis;basis='source_reference_text'
@@ -99,7 +118,8 @@ class Command(BaseCommand):
                     date=reference.published_at,date_kind='publication_date' if reference.published_at else '',
                     excerpt=body.strip()[:600],authors=authors,
                     review_status='approved' if reference.approved else 'pending',fingerprint=digest,
-                    provenance={'reference_id':reference.pk,'classifier':VERSION,'classification_basis':basis})
+                    provenance={'reference_id':reference.pk,'classifier':VERSION,
+                                'classification_basis':basis, **nlp_provenance})
                 batch.append((item,matches));changed+=1
                 if len(batch)>=200:persist(batch);batch=[]
         persist(batch)

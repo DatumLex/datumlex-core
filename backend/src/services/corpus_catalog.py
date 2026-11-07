@@ -1,40 +1,16 @@
 """Discovery by lexical topic, explicitly separate from validated legal analysis."""
 import hashlib
 import json
-import re
-import unicodedata
 from datetime import date
 from urllib.parse import urlparse
 from django.db.models import Count, F, Max, Q
 from src.db.models import LegalCorpusItem, LegalCorpusTopicMatch
 from src.services.statistics_service import InvalidQuery, filtered_processes
+from src.nlp.topics import TOPICS, classify, folded
 
 VERSION = 'lexical_candidate_v1'
 CATEGORIES = ('jurisprudence','precedent','doctrine')
-TOPICS = (
-    ('dano-moral','Dano moral', ('dano moral','danos morais','dano extrapatrimonial','danos extrapatrimoniais')),
-    ('dano-material','Dano material e reparação integral', ('dano material','danos materiais','lucros cessantes','reparacao integral','dano reparavel','dano patrimonial','danos patrimoniais')),
-    ('saude','Responsabilidade em serviços de saúde', ('erro medico','responsabilidade medica','falha medica','servicos de saude','servico de saude')),
-    ('transito','Acidentes de trânsito', ('acidente de transito','acidentes de transito','acidente automobilistico','atropelamento')),
-    ('negativacao','Negativação indevida', ('negativacao indevida','inscricao indevida','cadastro de inadimplentes','cadastros de inadimplentes')),
-    ('transporte-aereo','Transporte aéreo', ('transporte aereo','atraso de voo','cancelamento de voo','extravio de bagagem')),
-    ('imovel','Atraso na entrega de imóvel', ('atraso na entrega','atraso de entrega','entrega do imovel','entrega de imovel')),
-    ('imagem','Imagem, honra e privacidade', ('direito de imagem','direito a imagem','direito de privacidade','violacao da honra','uso indevido da imagem')),
-    ('perda-chance','Perda de uma chance', ('perda de uma chance','perda da chance')),
-    ('internet','Responsabilidade na internet', ('provedores de aplicacoes','provedor de aplicacoes','provedor de internet','provedores de internet','marco civil da internet','plataformas digitais')),
-)
 
-_DIACRITICS = re.compile(r'[\u0300-\u036f]')
-_TERM_PATTERN = re.compile(r'(?<!\w)(?:' + '|'.join(re.escape(term) for term in
-    sorted({term for _,_,terms in TOPICS for term in terms}, key=len, reverse=True)) + r')(?!\w)')
-
-def folded(value):
-    return ' '.join(_DIACRITICS.sub('', unicodedata.normalize('NFD', value.casefold())).split())
-
-def classify(text):
-    found={match.group() for match in _TERM_PATTERN.finditer(folded(text))}
-    return {key:[term for term in terms if term in found]
-            for key,_,terms in TOPICS if any(term in found for term in terms)}
 
 def safe_url(value):
     if not isinstance(value,str):return ''
@@ -95,13 +71,16 @@ def inventory(params):
     undated=base.filter(date__isnull=True).count()
     items=base.filter(category=category).order_by(F('date').desc(nulls_last=True),'title','pk')
     total=counts[category]
-    fields=('id','title','category','court','source_name','source_url','content_kind','date','date_kind','excerpt','authors','review_status','provenance__pending_nlp')
+    fields=('id','title','category','court','source_name','source_url','content_kind','date','date_kind','excerpt','authors','review_status',
+            'provenance__pending_nlp', 'provenance__nlp_extraction_id', 'provenance__nlp_status')
     page_rows=list(items.values(*fields)[(page-1)*size:page*size])
     matches={}
     for match in LegalCorpusTopicMatch.objects.filter(item_id__in=[row['id'] for row in page_rows]).values('item_id','topic','matched_terms'):
         matches.setdefault(match['item_id'],[]).append({'id':match['topic'],'terms':match['matched_terms']})
     for row in page_rows:
         row['processing_status']='awaiting_nlp' if row.pop('provenance__pending_nlp',False) else 'source_indexed'
+        row['nlp_extraction_id'] = row.pop('provenance__nlp_extraction_id')
+        row['nlp_status'] = row.pop('provenance__nlp_status')
         row['source_url']=safe_url(row['source_url'])
         row['topics']=matches.get(row['id'],[])
         row['period_confirmed']=row['date'] is not None

@@ -3,6 +3,7 @@
 from .adapters import read_source
 from .contracts import SCHEMA_VERSION, fingerprint, validate_result
 from .extraction import RULES_VERSION, extract, replay_predictions
+from .topics import classify
 
 
 def process(row, root, manifest, journal, model_record=None, computation_cache=None):
@@ -42,6 +43,16 @@ def process(row, root, manifest, journal, model_record=None, computation_cache=N
                 journal.record(key, reused, reusable=True)
                 return reused, True
         result["text"]["characters"] = len(text)
+        result['topics'] = {'method': 'lexical_candidate_v1', 'review_status': 'pending',
+                            'matches': classify(text)}
+        category = row.get('category', 'jurisprudence')
+        result['coverage']['category'] = category
+        if category in ('precedent', 'doctrine'):
+            result['warnings'].append(category + '_candidate_requires_source_context_review')
+            result['coverage']['source_role'] = (
+                'doctrine_author' if category == 'doctrine'
+                else 'precedent_thesis' if row.get('text_field') == 'tese' else 'legal_question'
+            )
         if len(text.strip()) < manifest["parameters"]["short_threshold"]:
             result["warnings"].append("short_text")
         if "\ufffd" in text:
