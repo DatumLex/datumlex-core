@@ -54,6 +54,25 @@ class CollectionRecoveryTests(unittest.TestCase):
             self.assertEqual(report['status'], 'failed')
             self.assertEqual(report['failed_page'], 0)
 
+    def test_invalid_responses_keep_the_page_pending(self):
+        for response in (b'<html>error</html>', b'[]', b'{"registros":[null]}'):
+            with self.subTest(response=response), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                (directory / 'last-run.json').write_text('{"status":"completed"}')
+                with patch.object(collector, 'fetch_page', return_value=response), \
+                        patch.object(collector.shutil, 'disk_usage') as disk:
+                    disk.return_value.free = 2_000_000_000
+                    with self.assertRaises(ValueError):
+                        collector.collect(limit=25, directory=directory)
+
+                state = json.loads((directory / 'cursor.json').read_text())
+                report = json.loads((directory / 'last-run.json').read_text())
+                self.assertEqual(state['next_year'], 2016)
+                self.assertEqual(state['years']['2016']['page'], 0)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['failed_page'], 0)
+                self.assertFalse((directory / 'documents.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

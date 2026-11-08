@@ -43,10 +43,12 @@ class Command(BaseCommand):
         signature=hashlib.sha256(json.dumps(stable,sort_keys=True).encode()+Path(__file__).read_bytes()+Path(__file__).with_name('sync_pangea.py').read_bytes()).hexdigest()
         if PangeaImportRun.objects.filter(scope__raw_signature=signature,scope__archive_consumed=True).exists():
             self.stdout.write('Pangea archive already imported.');return
-        courts=selected_courts(manifest['courts']);read_artifact(root,manifest['catalog_path'],manifest['catalog_sha256'])
+        courts=selected_courts(manifest['courts'])
+        catalog = manifest if 'catalog_path' in manifest else manifest['pages'][0]
+        read_artifact(root, catalog['catalog_path'], catalog['catalog_sha256'])
         run=PangeaImportRun.objects.create(scope={'query':manifest['query'],'organs':list(courts),'origin':'archived_pangea',
             'raw_signature':signature,'normalizer_sha':normalizer_sha,'raw_pages':[page.get('receipt_key',page['sha256']) for page in manifest['pages']],
-            'counting_unit':'archived_response_rows_may_repeat','next_page':manifest['pages'][0]['page'] if manifest['pages'] else 0},catalog_version=manifest.get('catalog_version','')[:64])
+            'counting_unit':'archived_response_rows_may_repeat','next_page':manifest['pages'][0]['page'] if manifest['pages'] else 0},catalog_version=catalog.get('catalog_version','')[:64])
         try:
             for page in manifest['pages']:
                 if page.get('catalog_path'):read_artifact(root,page['catalog_path'],page['catalog_sha256'])
