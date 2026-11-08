@@ -1,4 +1,4 @@
-"""Run the public Pangea STJ import independently of the web server."""
+"""Run the public Pangea multi-court import independently of the web server."""
 
 from run import main
 

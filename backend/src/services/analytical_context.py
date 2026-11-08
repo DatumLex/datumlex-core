@@ -1,18 +1,15 @@
 """Canonical #165 context, shared by NLP readers and downstream export consumers."""
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 
 from src.nlp.contracts import fingerprint
+from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES
+from src.services.period import HISTORY_START, today
+from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
-COURTS = ('STJ', 'TJDFT')
 SOURCES = ('datajud', 'tjdft_jurisprudence', 'stj_jurisprudence', 'stj_precedent', 'bdjur_doctrine')
 OUTCOMES = ('granted', 'denied', 'partial', 'not_admitted', 'partial_knowledge',
             'ambiguous', 'unknown', 'outside_appellate_degree')
-SUBJECTS = (10431, 10433, 10439)
-
-
-def today():
-    return datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+SUBJECTS = DEFAULT_DATAJUD_SUBJECT_CODES
 
 
 def permitted(actor):
@@ -31,7 +28,7 @@ def resolve(actor, supplied):
         raise ValueError('context_object_required')
     defaults = {'contract_version': 'analytical-context-v1', 'courts': sorted(permitted(actor)),
                 'outcomes': sorted(OUTCOMES), 'sources': sorted(SOURCES),
-                'subject_codes': list(SUBJECTS), 'start': '2016-01-01', 'end': today().isoformat()}
+                'subject_codes': list(SUBJECTS), 'start': HISTORY_START.isoformat(), 'end': today().isoformat()}
     if set(supplied) - set(defaults):
         raise ValueError('unknown_context_field')
     result = defaults | supplied
@@ -48,7 +45,7 @@ def resolve(actor, supplied):
         value = result[field]
         if not isinstance(value, str) or len(value) != 10 or date.fromisoformat(value).isoformat() != value:
             raise ValueError(f'invalid_{field}')
-    if not '2016-01-01' <= result['start'] <= result['end'] <= today().isoformat():
+    if not HISTORY_START.isoformat() <= result['start'] <= result['end'] <= today().isoformat():
         raise ValueError('invalid_period')
     authorize(actor, result)
     return result

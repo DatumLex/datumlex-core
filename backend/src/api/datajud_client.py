@@ -5,10 +5,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-ENDPOINTS = {
-    "TJDFT": "https://api-publica.datajud.cnj.jus.br/api_publica_tjdft/_search",
-    "STJ": "https://api-publica.datajud.cnj.jus.br/api_publica_stj/_search",
-}
+from src.db.court_catalog import ENDPOINTS
 SOURCE_FIELDS = [
     "id",
     "numeroProcesso",

@@ -16,6 +16,7 @@ from src.db.models import (
     NlpTextVersion,
 )
 from src.nlp.contracts import bytes_hash, fingerprint, validate_annotation, validate_result
+from src.db.court_catalog import COURTS
 
 
 class Conflict(ValueError):
@@ -38,7 +39,8 @@ def annotation_check(value, text):
 def authorize(actor, document, write=False):
     if not actor.is_authenticated or not actor.is_active or not actor.approved or actor.must_change_password:
         raise PermissionError('inactive_account')
-    if not actor.support and not actor.courts.filter(pk=document.court).exists():
+    shared_doctrine = document.court == '' and document.source_key.startswith('DOCTRINE:')
+    if not actor.support and not shared_doctrine and not actor.courts.filter(pk=document.court).exists():
         raise PermissionError('court_forbidden')
     if write and actor.role not in ('Master', 'Admin'):
         raise PermissionError('reviewer_role_required')
@@ -57,7 +59,10 @@ def persist_result(result, text, *, request_key, previous_id=None, reason=''):
         source = result['source']
         if not result['document_id'] or source['document_id'] != result['document_id']:
             raise ValueError('document_identity_mismatch')
-        if source['court'] not in ('STJ', 'TJDFT'):
+        shared_doctrine = (source.get('category') == 'doctrine' and source['court'] == ''
+                           and source.get('source_format') == 'doctrine-text-v1'
+                           and result['document_id'].startswith('DOCTRINE:'))
+        if source['court'] not in COURTS and not shared_doctrine:
             raise ValueError('unsupported_court')
         if result['text']['offset_unit'] != 'unicode_code_point':
             raise ValueError('unsupported_offsets')

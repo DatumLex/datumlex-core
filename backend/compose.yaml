@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: datumlex_v2
       POSTGRES_USER: datumlex
-      POSTGRES_PASSWORD: datumlex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Preencha POSTGRES_PASSWORD no arquivo backend/.env}
     ports:
       - "127.0.0.1:5433:5432"
     volumes:

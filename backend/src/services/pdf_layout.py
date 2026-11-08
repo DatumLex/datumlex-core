@@ -198,7 +198,7 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
             ["Assunto", subject],
             ["Período solicitado", period],
             ["Campo temporal", "Ajuizamento (DataJud); decisão nas avaliações revisadas"],
-            ["Fonte jurídica", "DataJud" + (" e referências Pangea/STJ" if pangea is not None else "")],
+            ["Fonte jurídica", "DataJud" + (" e referências Pangea" if pangea is not None else "")],
         ],
         y,
     )
@@ -386,7 +386,7 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
             y = r.source_link(item["source_url"], y)
     else:
         y = r.text(
-            "Nenhuma referência Pangea nesta exportação. Inclua STJ para consultar o inventário disponível.",
+            "Nenhuma referência Pangea disponível para os tribunais e filtros desta exportação.",
             y,
         )
     r.text(
@@ -454,7 +454,7 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
                 f"{number(totals['process_records'])} documentos e {number(totals['distinct_process_numbers'])} números CNJ distintos no recorte.",
             ],
             [
-                "Pangea / STJ",
+                "Pangea / tribunais selecionados",
                 f"{number(pangea['inventory_count'])} referências no inventário complementar; {number(pangea['undated_count'])} sem publicação informada."
                 if pangea
                 else "Não incluído nesta seleção.",

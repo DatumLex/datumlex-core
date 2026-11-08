@@ -27,7 +27,12 @@ completion evidence remain separate.
 
 See the [step-by-step installation guide](INSTALLATION-GUIDE.md) to install prerequisites, run the backend and frontend, and load the database data.
 
+Para executar a coleta em uma nova cópia do projeto, consulte [Automação local a partir de um clone](docs/operations/AUTOMACAO-LOCAL.md). A [validação NLP](tools/nlp_validation/README.md) mantém amostras, revisões e métricas separadas dos dados de produção.
+
 ## Project structure
 
 - `frontend/` — React dashboard application.
 - `backend/` — API and data integration services.
+
+
+Fluxo local de coleta e processamento desacoplados: [ETL/ELT local](docs/operations/ETL-ELT-LOCAL.md). Use `scripts/run-etl.ps1`; os originais sao preservados antes da importacao.

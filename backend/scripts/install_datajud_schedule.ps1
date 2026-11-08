@@ -1,9 +1,22 @@
+param(
+    [string]$At = '19:40',
+    [string]$TaskName,
+    [switch]$RunNow,
+    [int]$Target = 20000
+)
 $ErrorActionPreference = 'Stop'
 
 $backendRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $backendRoot '.venv\Scripts\python.exe'
-$runner = Join-Path $backendRoot 'scripts\scheduled_datajud_sync.py'
-$taskName = 'DatumLex DataJud TJDFT-STJ'
+$runner = Join-Path (Split-Path -Parent $backendRoot) 'tools\nlp_validation\collect_until_target.py'
+if (-not $TaskName) {
+    $pathBytes = [Text.Encoding]::UTF8.GetBytes($backendRoot.ToLowerInvariant())
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { $suffix = ([BitConverter]::ToString($hasher.ComputeHash($pathBytes))).Replace('-', '').Substring(0, 8) }
+    finally { $hasher.Dispose() }
+    $TaskName = "DatumLex-Local-$suffix"
+}
+$scheduledTime = [DateTime]::ParseExact($At, 'HH:mm', [Globalization.CultureInfo]::InvariantCulture)
 
 if (-not (Test-Path -LiteralPath $python)) {
     throw "Python do ambiente virtual não encontrado: $python"
@@ -18,17 +31,19 @@ $principal = New-ScheduledTaskPrincipal `
     -RunLevel Limited
 $action = New-ScheduledTaskAction `
     -Execute $python `
-    -Argument "`"$runner`"" `
+    -Argument "`"$runner`" --target $Target" `
     -WorkingDirectory $backendRoot
-$trigger = New-ScheduledTaskTrigger -Daily -At '2:00 AM'
+$trigger = New-ScheduledTaskTrigger -Daily -At $scheduledTime
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
     -MultipleInstances IgnoreNew `
     -ExecutionTimeLimit (New-TimeSpan -Hours 6)
 
 Register-ScheduledTask `
     -TaskName $taskName `
-    -Description 'Sincroniza diariamente DataJud TJDFT/STJ e precedentes STJ do BNP/Pangea para o DatumLex.' `
+    -Description "Retoma jurisprudência local até $Target textos únicos; encerra ao atingir a meta." `
     -Action $action `
     -Trigger $trigger `
     -Principal $principal `
@@ -40,6 +55,6 @@ if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) 
     throw "A tarefa '$taskName' não foi encontrada após o registro."
 }
 
-Start-ScheduledTask -TaskName $taskName -ErrorAction Stop
-Write-Host "Tarefa '$taskName' instalada e iniciada. A rotina continuará diariamente às 2h."
+if ($RunNow) { Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop }
+Write-Host "Tarefa '$TaskName' instalada para $At, no horário configurado no Windows."
 Write-Host "Log: $(Join-Path $backendRoot 'data\datajud-scheduler.log')"

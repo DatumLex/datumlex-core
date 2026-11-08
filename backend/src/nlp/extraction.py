@@ -3,8 +3,9 @@
 import re
 
 from .contracts import fingerprint, unknown, validate_annotation
+from .topics import classify
 
-RULES_VERSION = "0.2.0"
+RULES_VERSION = "0.3.0"
 NUMBER_PREFIX = r"(?:n(?:[.º°o]|\s)*\s*)?"
 AUTHORITY_RULES = {
     "sumula": rf"\bS[úu]mula\s+{NUMBER_PREFIX}\d+\s*,?\s*(?:do\s+|/\s*)(?:STJ|STF)\b",
@@ -44,7 +45,8 @@ def annotation(text, labels, segments, method, rule_id=None):
 def paragraphs(text):
     # Keep original intervals; trimming affects selection only, never source text.
     start = 0
-    for boundary in re.finditer(r"(?:\r?\n)[ \t\r]*(?:\n)", text):
+    # Preserve original offsets while recognizing HTML breaks in archived STJ TXT.
+    for boundary in re.finditer(r"(?:\r?\n)[ \t\r]*(?:\n)|<br\s*/?>|</p\s*>", text, re.I):
         if boundary.start() > start:
             yield start, boundary.start()
         start = boundary.end()
@@ -65,9 +67,6 @@ def extract(text, max_paragraph=6000):
             annotations.append(item)
     for start, end in paragraphs(text):
         fragment = text[start:end]
-        if len(fragment) > max_paragraph:
-            skipped.append([start, end])
-            continue
         # A keyword elsewhere in the paragraph must not classify an unrelated sentence.
         # Do not rewrite text or remove negation; all spans reference the original bytes' text.
         sentence_start = start
@@ -76,7 +75,11 @@ def extract(text, max_paragraph=6000):
         sentence_ends.append((end, end))
         for sentence_end, next_start in sentence_ends:
             sentence = text[sentence_start:sentence_end]
-            if TOPIC.search(sentence):
+            if len(sentence) > max_paragraph:
+                skipped.append([sentence_start, sentence_end])
+                sentence_start = next_start
+                continue
+            if TOPIC.search(sentence) or classify(sentence):
                 for label, trigger in (("LEGAL_THESIS", THESIS), ("LEGAL_GROUND", GROUND)):
                     if trigger.search(sentence):
                         item = annotation(text, [label], [(sentence_start, sentence_end, sentence)], "weak_rule", label)

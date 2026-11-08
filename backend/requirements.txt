@@ -7,3 +7,4 @@ typing-extensions==4.16.0
 python-dotenv==1.2.3
 gunicorn==26.2.0
 reportlab==5.1.0
+pypdf==6.12.0

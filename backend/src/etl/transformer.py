@@ -5,6 +5,8 @@ import json
 import re
 from datetime import datetime, timezone
 
+from src.db.court_catalog import COURTS, matches_source
+
 
 class InvalidRecord(ValueError):
     pass
@@ -58,12 +60,12 @@ def normalize(hit, scope):
     if not isinstance(source, dict):
         raise InvalidRecord("Missing source payload")
     court = scope.get("court", "TJDFT")
-    if court not in {"TJDFT", "STJ"} or source.get("tribunal") != court or source.get("nivelSigilo") != 0:
+    if court not in COURTS or not matches_source(court, source.get("tribunal")) or source.get("nivelSigilo") != 0:
         raise InvalidRecord(f"Outside public {court} scope")
     identity = hit.get("_id") or source.get("id")
     number = source.get("numeroProcesso")
     # Keep existing TJDFT IDs stable; STJ gets a court prefix to avoid collisions.
-    identity = f"STJ:{identity}" if court == "STJ" and identity else identity
+    identity = f"{court}:{identity}" if court != "TJDFT" and identity else identity
     if not identity or len(str(identity)) > 255:
         raise InvalidRecord("Missing or oversized source identifier")
     if not isinstance(number, str) or not re.fullmatch(r"\d{20}", number):

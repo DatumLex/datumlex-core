@@ -64,7 +64,8 @@ def collect(actor, context):
     max_documents = getattr(settings, 'NLP_DASHBOARD_MAX_DOCUMENTS', 10000)
     runs = NlpExtraction.objects.filter(document__court__in=context['courts']).select_related('document', 'text_version')
     if not context['sources'] or not context['subject_codes']:
-        return [], [], {'unmapped_documents': 0, 'quality_blocked': 0, 'missing_text': 0}
+        return [], [], {'unmapped_documents': 0, 'quality_blocked': 0, 'missing_text': 0,
+                        'evidence_not_approved': 0}
     if runs.values('document_id').distinct().count() > max_documents:
         raise nlp_evidence.Conflict('snapshot_capacity_exceeded')
     documents, evidence, exclusions = [], [], {'unmapped_documents': 0, 'quality_blocked': 0, 'missing_text': 0,
@@ -87,6 +88,10 @@ def collect(actor, context):
         document = {'id': key, 'court': run.document.court, 'kind': kind, 'metadata': deepcopy(metadata),
                     'has_text': run.text_version_id is not None, 'processed': run.status == 'completed', 'released': False}
         documents.append(document)
+        if run.original_result.get('source', {}).get('content_kind', 'full_text') != 'full_text':
+            # Excerpts may be reviewed as candidates, never silently enter a full-decision denominator.
+            exclusions['quality_blocked'] += 1
+            continue
         if run.text_version is None or run.status != 'completed':
             exclusions['missing_text'] += 1
             continue

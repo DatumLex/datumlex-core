@@ -21,6 +21,7 @@ from src.services.statistics_service import (
     filtered_processes,
     instance_series,
     metadata,
+    metadata_by_court,
     metrics,
 )
 
@@ -64,6 +65,7 @@ def scope(request):
     query, selected = filtered_processes(request.GET)
     return {
         "metadata": metadata(query, selected),
+        "by_court": metadata_by_court(query, selected),
         "subjects": list(
             DimSubject.objects.filter(factprocess__court__in=selected["court"].split(","))
             .annotate(record_count=Count("factprocess", distinct=True))

@@ -21,6 +21,7 @@ from django.views.decorators.http import require_http_methods
 
 from .middleware import denied
 from .models import AuditEvent, Court, RequestLimit, User
+from src.db.court_catalog import ACTIVE_COURTS
 
 
 def csrf_failure(request, reason=""):
@@ -83,7 +84,7 @@ def identity(data):
 
 
 def serialize(user):
-    courts = Court.objects.all() if user.support else user.courts.all()
+    courts = Court.objects.filter(code__in=ACTIVE_COURTS) if user.support else user.courts.filter(code__in=ACTIVE_COURTS)
     return {
         "id": user.pk,
         "name": user.name,
@@ -193,7 +194,7 @@ def logout(request):
 def me(request):
     return {
         "user": serialize(request.user),
-        "courts": list(Court.objects.order_by("code").values("code", "name")),
+        "courts": list(Court.objects.filter(code__in=ACTIVE_COURTS).order_by("code").values("code", "name")),
     }
 
 
@@ -243,7 +244,7 @@ def apply_permissions(request, user):
     if (
         not isinstance(selected, list)
         or any(not isinstance(c, str) for c in selected)
-        or set(selected) - set(Court.objects.values_list("code", flat=True))
+        or set(selected) - set(Court.objects.filter(code__in=ACTIVE_COURTS).values_list("code", flat=True))
     ):
         raise ValueError("Selecione tribunais válidos.")
     user.role, user.approved, user.is_active = role, status != "Pendente", status != "Inativo"
