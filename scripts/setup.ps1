@@ -1,4 +1,4 @@
-param([switch]$Migrate, [switch]$SkipDependencies)
+param([switch]$Migrate, [switch]$SkipDependencies, [switch]$BackendOnly)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $backendRoot = Join-Path $projectRoot 'backend'
@@ -14,30 +14,41 @@ if (-not (Test-Path -LiteralPath $envFile)) {
     $envText = $envText.Replace('DJANGO_SECRET_KEY=local-development-only-datumlex', ('DJANGO_SECRET_KEY=' + [Convert]::ToBase64String($secretBytes)))
     $envText = $envText.Replace('DATUMLEX_SUPPORT_PASSWORD=', ('DATUMLEX_SUPPORT_PASSWORD=' + [Convert]::ToBase64String($supportBytes)))
     [System.IO.File]::WriteAllText($envFile, $envText)
-    Write-Host 'Arquivo backend/.env criado a partir do exemplo. Preencha as configurações locais antes da coleta.'
+    Write-Host 'Created backend/.env from the example. Review the local configuration before collecting.'
 }
 if (-not (Test-Path -LiteralPath $pythonExe)) {
-    & python -m venv (Join-Path $backendRoot '.venv')
-    if ($LASTEXITCODE -ne 0) { throw 'Não foi possível criar o ambiente Python. Instale Python compatível.' }
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3 -c "import sys; assert sys.version_info >= (3, 12), 'Python 3.12 or later is required'"
+        if ($LASTEXITCODE -ne 0) { throw 'Install Python 3.12 or later.' }
+        & py -3 -m venv (Join-Path $backendRoot '.venv')
+    } else {
+        & python -c "import sys; assert sys.version_info >= (3, 12), 'Python 3.12 or later is required'"
+        if ($LASTEXITCODE -ne 0) { throw 'Install Python 3.12 or later.' }
+        & python -m venv (Join-Path $backendRoot '.venv')
+    }
+    if ($LASTEXITCODE -ne 0) { throw 'Could not create the Python environment. Install a compatible Python version.' }
 }
 if (-not $SkipDependencies) {
     & $pythonExe -m pip install -r (Join-Path $backendRoot 'requirements.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Falha na instalação das dependências Python.' }
-    Push-Location (Join-Path $projectRoot 'frontend')
-    try {
-        & npm.cmd ci
-        if ($LASTEXITCODE -ne 0) { throw 'Falha no npm ci. Confira Node.js, npm e conectividade.' }
-    } finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed.' }
+    if (-not $BackendOnly) {
+        Push-Location (Join-Path $projectRoot 'frontend')
+        try {
+            & npm.cmd ci
+            if ($LASTEXITCODE -ne 0) { throw 'npm ci failed. Check Node.js, npm, and connectivity.' }
+        } finally { Pop-Location }
+    }
 }
 if ($Migrate) {
     Push-Location $backendRoot
     try {
         & $pythonExe -c "import os; os.environ['DJANGO_SETTINGS_MODULE']='config.settings'; from django.conf import settings; c=settings.DATABASES['default']; assert c['ENGINE']=='django.db.backends.sqlite3' or c.get('HOST') in ('localhost','127.0.0.1','::1'), 'Setup only supports a local database'"
-        if ($LASTEXITCODE -ne 0) { throw 'A configuração não aponta para banco local.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Setup requires a local database configuration.' }
         & $pythonExe manage.py migrate --noinput
-        if ($LASTEXITCODE -ne 0) { throw 'Falha nas migrações. Confira banco e configurações de suporte.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Migrations failed. Check the database and support configuration.' }
         & $pythonExe manage.py register_courts
-        if ($LASTEXITCODE -ne 0) { throw 'Falha no cadastro dos tribunais oficiais.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Could not register the court catalog.' }
     } finally { Pop-Location }
 }
-Write-Host 'Instalação preparada. Configure backend/.env; para PostgreSQL, inicie o Compose e execute setup.ps1 -Migrate -SkipDependencies.'
+Write-Host 'Setup finished. Review backend/.env and run setup.ps1 -Migrate -SkipDependencies if migrations were not selected.'
+Write-Host 'Run one collection with scripts/run-etl.ps1 -Once. Use scripts/install-schedule.ps1 to enable daily runs.'
