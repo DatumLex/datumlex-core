@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:17-alpine
+    container_name: postgres-datumlex
     environment:
       POSTGRES_DB: datumlex_v2
       POSTGRES_USER: datumlex
@@ -14,5 +15,53 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - qtsw-network
+
+  sonar-db:
+    image: postgres:17-alpine
+    container_name: postgres-sonarqube
+    environment:
+      POSTGRES_DB: sonarqube
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+    volumes:
+      - sonar_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - qtsw-network
+
+  sonarqube:
+    image: sonarqube:community
+    hostname: sonarqube-datumlex
+    container_name: sonarqube-datumlex
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    ports:
+      - "9000:9000"
+    networks:
+      - qtsw-network
+
 volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
   datumlex_pg_v2:
+  sonar_pg_data:
+
+networks:
+  qtsw-network:
+    driver: bridge
