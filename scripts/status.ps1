@@ -1,7 +1,43 @@
+param(
+    [switch]$Watch,
+    [switch]$Detailed,
+    [ValidateRange(2,300)][int]$IntervalSeconds = 15
+)
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $backendRoot=Join-Path $projectRoot 'backend'
 $operations=Join-Path $backendRoot 'data\operations'
+if (-not $Detailed) {
+    $python = Join-Path $backendRoot '.venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $python)) { throw 'Execute scripts/setup.ps1 antes de consultar o painel.' }
+    do {
+        if ($Watch) { Clear-Host }
+        & $python -X utf8 (Join-Path $backendRoot 'scripts\etl_status.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Falha ao ler o painel da coleta.' }
+        Write-Host ''
+        Write-Host 'AGENDAMENTO DO WINDOWS'
+        try {
+            $associated = @(Get-ScheduledTask -ErrorAction Stop | Where-Object {
+                @($_.Actions | Where-Object {
+                    $_.WorkingDirectory -and
+                    [IO.Path]::GetFullPath($_.WorkingDirectory).TrimEnd('\','/') -eq $backendRoot.TrimEnd('\','/')
+                }).Count -gt 0
+            })
+            foreach ($task in $associated) {
+                $info = $task | Get-ScheduledTaskInfo -ErrorAction Stop
+                $scheduleState = if (-not $task.Settings.Enabled) { 'Pausado' } elseif ($task.State -eq 'Running') { 'Executando' } else { 'Ativo, aguardando o horario' }
+                Write-Host "$scheduleState | $($task.TaskName)"
+                if ($task.Settings.Enabled) { Write-Host "Proxima execucao: $($info.NextRunTime.ToString('dd/MM/yyyy HH:mm'))" }
+            }
+            if (-not $associated) { Write-Host 'Nenhum agendamento associado a esta pasta.' }
+        } catch { Write-Host 'Consulta do Agendador indisponivel nesta sessao.' }
+        if ($Watch) {
+            Write-Host "`nAtualizacao a cada $IntervalSeconds segundos. Ctrl+C encerra este acompanhamento."
+            Start-Sleep -Seconds $IntervalSeconds
+        }
+    } while ($Watch)
+    return
+}
 $preflightLog = Get-ChildItem -LiteralPath (Join-Path $operations 'preflight-logs') -Filter '*.json' -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if ($preflightLog) {

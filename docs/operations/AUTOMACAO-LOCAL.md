@@ -150,8 +150,20 @@ existing role and source locks also guard the same clone's files.
 
 ## Step 7: monitor, change, or stop the automation
 
-Run `.\scripts\status.ps1` after the first scheduled time and inspect the
-task's last result, next run, ETL state, and log paths. You can also open
+After setup, Windows users can double-click `Acompanhar coleta.cmd` in the
+project folder to open the live monitor. Close its window to stop monitoring.
+See the [Portuguese monitoring manual](../../documentation/DatumLex-Manual-de-Acompanhamento-da-Coleta.pdf)
+for the steps to share with the team.
+
+From the VS Code PowerShell terminal at the repository root, run
+`.\scripts\status.ps1 -Watch` to refresh the Portuguese status panel every
+15 seconds. It shows the current stage, elapsed time, archived volumes by
+source and the next Windows trigger. Use `-IntervalSeconds 5` for a faster
+refresh, or omit `-Watch` for a single snapshot. Ctrl+C closes the monitor.
+The previous technical status view is available with `-Detailed`.
+
+Run `.\scripts\status.ps1 -Detailed` to inspect the task's last result,
+next run, ETL state, and log paths. You can also open
 Windows Task Scheduler with `taskschd.msc` and locate the printed task name.
 To change the time, sources, or batch size, repeat step 6 with the new values.
 
