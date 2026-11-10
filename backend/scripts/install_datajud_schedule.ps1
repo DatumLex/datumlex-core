@@ -1,14 +1,20 @@
+[CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string]$At = '19:40',
     [string]$TaskName,
     [switch]$RunNow,
-    [int]$Target = 20000
+    [ValidateRange(1,2147483647)][int]$Target = 20000,
+    [ValidateRange(25,1000)][ValidateScript({ $_ % 25 -eq 0 })][int]$BatchSize = 1000,
+    [ValidateRange(1,100)][int]$DoctrineLimit = 50,
+    [ValidatePattern('^(doctrine|pangea|tjdft|ementas|djen)(,(doctrine|pangea|tjdft|ementas|djen))*$')]
+    [string]$Sources = 'doctrine,pangea,tjdft,ementas,djen'
 )
 $ErrorActionPreference = 'Stop'
 
 $backendRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $backendRoot '.venv\Scripts\python.exe'
-$runner = Join-Path (Split-Path -Parent $backendRoot) 'tools\nlp_validation\collect_until_target.py'
+$runner = Join-Path (Split-Path -Parent $backendRoot) 'scripts\run-etl.ps1'
+$powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if (-not $TaskName) {
     $pathBytes = [Text.Encoding]::UTF8.GetBytes($backendRoot.ToLowerInvariant())
     $hasher = [Security.Cryptography.SHA256]::Create()
@@ -18,20 +24,47 @@ if (-not $TaskName) {
 }
 $scheduledTime = [DateTime]::ParseExact($At, 'HH:mm', [Globalization.CultureInfo]::InvariantCulture)
 
+if (-not (Test-Path -LiteralPath $powershell)) {
+    throw 'Windows PowerShell is required for the scheduled ETL entry point.'
+}
+
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existing) {
+    $ownedActions = @($existing.Actions | Where-Object {
+        $_.WorkingDirectory -and
+        [IO.Path]::GetFullPath($_.WorkingDirectory).TrimEnd('\','/') -eq $backendRoot.TrimEnd('\','/')
+    })
+    if ($ownedActions.Count -ne @($existing.Actions).Count -or $ownedActions.Count -eq 0) {
+        throw 'The task name belongs to another installation. Choose another TaskName.'
+    }
+}
+
+$arguments = "-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File `"$runner`" -Mode all -Once -Target $Target -BatchSize $BatchSize -DoctrineLimit $DoctrineLimit -Sources $Sources"
+[pscustomobject]@{
+    TaskName = $TaskName
+    Execute = $powershell
+    Arguments = $arguments
+    WorkingDirectory = $backendRoot
+    DailyAt = $At
+}
+if (-not $PSCmdlet.ShouldProcess($TaskName, 'Install or update the daily ETL/NLP schedule')) { return }
+
 if (-not (Test-Path -LiteralPath $python)) {
-    throw "Python do ambiente virtual não encontrado: $python"
+    throw "Virtual environment Python was not found at $python. Run scripts/setup.ps1 first."
 }
 if (-not (Test-Path -LiteralPath $runner)) {
-    throw "Agendador do DatumLex não encontrado: $runner"
+    throw "The ETL runner was not found at $runner."
 }
+& $python (Join-Path $backendRoot 'scripts\check_etl_setup.py')
+if ($LASTEXITCODE -ne 0) { throw 'Prepare the ETL installation before enabling its schedule.' }
 
 $principal = New-ScheduledTaskPrincipal `
     -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) `
     -LogonType Interactive `
     -RunLevel Limited
 $action = New-ScheduledTaskAction `
-    -Execute $python `
-    -Argument "`"$runner`" --target $Target" `
+    -Execute $powershell `
+    -Argument $arguments `
     -WorkingDirectory $backendRoot
 $trigger = New-ScheduledTaskTrigger -Daily -At $scheduledTime
 $settings = New-ScheduledTaskSettingsSet `
@@ -43,7 +76,7 @@ $settings = New-ScheduledTaskSettingsSet `
 
 Register-ScheduledTask `
     -TaskName $taskName `
-    -Description "Retoma jurisprudência local até $Target textos únicos; encerra ao atingir a meta." `
+    -Description "DatumLex ETL/NLP daily cycle for this clone; TJDFT target $Target." `
     -Action $action `
     -Trigger $trigger `
     -Principal $principal `
@@ -56,5 +89,6 @@ if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) 
 }
 
 if ($RunNow) { Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop }
-Write-Host "Tarefa '$TaskName' instalada para $At, no horário configurado no Windows."
-Write-Host "Log: $(Join-Path $backendRoot 'data\datajud-scheduler.log')"
+Write-Host "Task '$TaskName' installed for $At in the Windows time zone."
+Write-Host "Status: $(Join-Path $backendRoot 'data\operations\etl-all.json')"
+Write-Host "Logs: $(Join-Path $backendRoot 'data\operations\etl-logs')"

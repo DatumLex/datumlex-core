@@ -1,50 +1,199 @@
-# Automação local a partir de um clone
+# Extraction automation after cloning
 
-Todos os comandos abaixo partem da raiz do projeto. Os scripts resolvem a pasta do clone, sem depender de C:/API ou D:/Api. Credenciais e dados não acompanham o código.
+Run these commands in PowerShell from the project root on Windows. Each clone
+keeps its configuration, Python environment, data, cursors, and logs locally.
+Install Git and Python 3.12 or later first. Node.js is required when installing
+the frontend. PostgreSQL is optional for the first local run.
 
-## Instalação
+If PowerShell blocks local scripts, open a shell for this installation with
+`powershell -NoProfile -ExecutionPolicy RemoteSigned`. Organization policies
+can require a different execution procedure.
 
-Instale Python compatível com as dependências, Node.js/npm e, para PostgreSQL, Docker Desktop. O setup instala dependências pela rede quando executado; nenhuma instalação nem coleta externa foi executada durante a preparação destas correções.
+## Step 1: check the prerequisites
+
+Open Windows PowerShell and verify the installed tools:
 
 ```powershell
-.\scripts\setup.ps1
+git --version
+py -3 --version
 ```
 
-Preencha `backend/.env`, criado a partir de `.env.example`, com a chave DataJud e as configurações da sua máquina. Para usar PostgreSQL, escolha POSTGRES_PASSWORD e use a mesma senha, codificada para URL quando necessário, em DATABASE_URL apontando para 127.0.0.1:5433. Configure também a senha de suporte exigida para o primeiro provisionamento. Não copie credenciais de outra pessoa.
+Python must be 3.12 or later. If the Python launcher is unavailable, use
+`python --version`; setup also supports that executable. Internet access is
+needed to install dependencies and collect public source material.
+
+## Step 2: clone and prepare a new installation
+
+```powershell
+git clone https://github.com/DatumLex/datumlex-core.git
+cd datumlex-core
+
+# Prepare the extraction backend and its persistent SQLite database.
+.\scripts\setup.ps1 -BackendOnly -Migrate
+```
+
+Setup creates an ignored `backend/.env` with generated local secrets, installs
+the backend requirements, applies migrations, and registers the court catalog.
+It preserves an existing configuration. To install frontend dependencies as
+well, omit `-BackendOnly`.
+
+The default ETL sources use public interfaces and need no DataJud key.
+`DATAJUD_API_KEY` is required for the separate DataJud commands. Credentials,
+downloaded documents, and database contents are excluded from Git.
+
+## Step 3: review the database and credentials
+
+Open the configuration created by setup:
+
+```powershell
+notepad .\backend\.env
+```
+
+For the simplest local installation, leave `DATABASE_URL=` empty. Setup uses
+the persistent SQLite file at `backend/data/datumlex_v2.sqlite3`; Docker is
+not required. Keep the generated `DJANGO_SECRET_KEY` and
+`DATUMLEX_SUPPORT_PASSWORD` private. Do not commit this file.
+
+The scheduled source list below uses public interfaces. Leave DataJud and
+BNP integration credentials empty unless enabling their separate integrations.
+The public Pangea search source does not require those BNP credentials.
+
+For PostgreSQL instead, edit `backend/.env` before migrating that database. Set `POSTGRES_PASSWORD`
+and a matching `DATABASE_URL` using a URL-encoded password and loopback host.
+Then start Docker Desktop and run:
 
 ```powershell
 docker compose --project-directory backend -f backend/compose.yaml up -d
-.\scripts\setup.ps1 -Migrate -SkipDependencies
+.\scripts\setup.ps1 -BackendOnly -Migrate -SkipDependencies
 ```
 
-Se preferir SQLite, deixe DATABASE_URL vazio e dispense o Compose. O Compose agora exige POSTGRES_PASSWORD; mudar essa variável não altera a senha de um volume PostgreSQL já existente. Preserve volumes existentes e confira suas credenciais antes de reutilizá-los. A migração é uma etapa explícita de instalação; a coleta diária não recria bancos.
+An existing PostgreSQL volume keeps its previous password. The automation
+connects to the configured database and preserves its existing records.
+Choosing PostgreSQL after the SQLite quick start creates a separate database;
+it does not copy existing SQLite records. Use the matching database settings
+for subsequent manual and scheduled runs.
 
-## Execução e agendamento
+## Step 4: run and inspect a first bounded cycle
 
 ```powershell
-# Um lote DataJud/Pangea e reconciliação técnica de citações.
-.\scripts\run-local.ps1
+# Start small and include collection, NLP, import, and coverage.
+.\scripts\run-etl.ps1 -Once -BatchSize 25 -DoctrineLimit 1
 
-# Instalar rotina diária, sem começar uma coleta imediatamente.
-.\scripts\install-schedule.ps1 -At '19:40'
-
-# Opcional: instalar e também começar agora.
-.\scripts\install-schedule.ps1 -At '19:40' -RunNow
-
-# Ver estado da tarefa desta cópia e últimas linhas do log.
+# View the outcome and the log locations.
 .\scripts\status.ps1
 ```
 
-A tarefa recebe um nome derivado da pasta do clone, evitando sobrescrever a tarefa de outra cópia. Usa o horário configurado no Windows, requer sessão de usuário e computador disponível, evita sobreposição da mesma tarefa e grava logs em backend/data/datajud-scheduler.log. Não foi criada ou alterada uma tarefa Windows nesta entrega.
+The runner checks the configuration, database connection, migration state,
+and storage before starting. A nonzero exit means the cycle needs attention.
+The stage logs identify which source or processing step failed.
+Confirm that status reports setup as `ready` and the complete-cycle state as
+`completed` before enabling the schedule. A completed cycle can contain no new
+eligible records; inspect coverage and source logs to understand its results.
 
-A coleta é limitada por execução e retoma os cursores dos recortes correspondentes. O histórico solicitado começa em 2016, mas isso não comprova cobertura integral da fonte. Cursores antigos mantêm seu escopo original. Uma cópia separada apontando para o mesmo banco pode disputar o trabalho: a configuração IgnoreNew protege a mesma tarefa, não todos os processos possíveis.
+The default sources are `doctrine,pangea,tjdft,ementas,djen`. For example:
 
-O lote padrão DataJud consulta até cinco páginas de 100 registros por tribunal, até 1.000 registros na soma TJDFT/STJ. Registros atualizados, repetidos ou rejeitados podem fazer o total de documentos novos ficar abaixo de 1.000. Pangea e evidências NLP são contados separadamente. Esse limite pressupõe os cursores criados por esta configuração de 100 registros por página; cursores antigos com outro page_size preservam o tamanho original. Ao concluir o histórico, a atualização incremental começa na execução seguinte, evitando somar um segundo lote na mesma rodada.
+```powershell
+.\scripts\run-etl.ps1 -Once -Sources 'tjdft,pangea' -BatchSize 100
+.\scripts\run-etl.ps1 -Mode process -Once -Sources 'doctrine,pangea'
+```
 
-O agendador exige banco local ou SQLite. Não use esse comando para publicar diretamente na Render. A rotina agenda metadados DataJud/Pangea e reconciliação. Quando há textos STJ em backend/data/operations/stj-documents/texts, também processa o NLP, importa resultados idempotentes como pendentes de revisão e prepara a amostra de avaliação. Sem textos, registra a pendência, sem fabricar resultados. Obtenção de inteiro teor, revisão humana e publicação são etapas distintas. Confira [as ferramentas de validação NLP](../../tools/nlp_validation/README.md).
+The second command processes archived reference material. Source failures are
+recorded independently, and valid archived inputs remain available to the
+processor. Each cycle preserves source artifacts, hashes, pending-page cursors,
+and versioned NLP evidence.
 
-## Publicação e limites
+`BatchSize` applies to TJDFT and must be a multiple of 25 between 25 and 1,000.
+`Target` defaults to 20,000 unique TJDFT full-text documents. Other source
+limits are described in [the ETL guide](ETL-ELT-LOCAL.md). Actual additions
+depend on duplicates, source availability, and eligibility.
 
-Não foi incorporado um publicador remoto completo nesta alteração. Uma publicação futura precisa transferir dados e textos com validação, backup e preservação de contas. Clonar o projeto não dá acesso à Render nem ao banco de outra pessoa.
+## Step 5: choose and preview the daily configuration
 
-Não há corpus real embutido na entrega. Os comandos de preparação NLP precisam da fila e dos textos locais verificáveis. Nenhuma métrica jurídica é aprovada sem a referência humana necessária.
+After a successful manual cycle, preview the scheduled action:
+
+```powershell
+.\scripts\install-schedule.ps1 -At '19:40' -BatchSize 100 -DoctrineLimit 1 -Sources 'doctrine,pangea,tjdft,ementas,djen' -WhatIf
+```
+
+`At` is the daily Windows local time. `Sources` chooses collectors, `BatchSize`
+sets the TJDFT batch, and `DoctrineLimit` limits the doctrine collector. These
+values are stored in the scheduled action; editing the command later requires
+running the installer again. Preview does not register or execute a task.
+
+## Step 6: activate the schedule
+
+Install it using the same parameters, removing `-WhatIf`:
+
+```powershell
+.\scripts\install-schedule.ps1 -At '19:40' -BatchSize 100 -DoctrineLimit 1 -Sources 'doctrine,pangea,tjdft,ementas,djen'
+.\scripts\status.ps1
+```
+
+Use `-RunNow` to also start the installed task immediately. The installer
+accepts `Sources`, `Target`, and `DoctrineLimit`, matching the manual runner.
+Without `-RunNow`, installation enables future runs without starting a cycle.
+
+The task name is derived from the clone path. Reinstalling updates that
+clone's task. A custom `TaskName` is accepted only when it is free or already
+belongs to the same installation.
+
+Every scheduled execution runs the clone's `scripts/run-etl.ps1 -Mode all -Once`
+through Windows PowerShell. The saved action uses absolute paths and an explicit
+working directory, with a process-local RemoteSigned execution policy.
+The task runs under the current user's interactive session,
+uses the Windows time zone, and resumes a missed time when available. Keep the
+computer powered, the user signed in, and the required network and database
+services available. Its execution limit is six hours.
+
+Task Scheduler prevents overlapping instances of the same task. The ETL's
+existing role and source locks also guard the same clone's files.
+
+## Step 7: monitor, change, or stop the automation
+
+After setup, Windows users can double-click `Acompanhar coleta.cmd` in the
+project folder to open the live monitor. Close its window to stop monitoring.
+See the [Portuguese monitoring manual](../../documentation/DatumLex-Manual-de-Acompanhamento-da-Coleta.pdf)
+for the steps to share with the team.
+
+From the VS Code PowerShell terminal at the repository root, run
+`.\scripts\status.ps1 -Watch` to refresh the Portuguese status panel every
+15 seconds. It shows the current stage, elapsed time, archived volumes by
+source and the next Windows trigger. Use `-IntervalSeconds 5` for a faster
+refresh, or omit `-Watch` for a single snapshot. Ctrl+C closes the monitor.
+The previous technical status view is available with `-Detailed`.
+
+Run `.\scripts\status.ps1 -Detailed` to inspect the task's last result,
+next run, ETL state, and log paths. You can also open
+Windows Task Scheduler with `taskschd.msc` and locate the printed task name.
+To change the time, sources, or batch size, repeat step 6 with the new values.
+
+To pause or remove a schedule, replace the example placeholder below with
+the exact task name printed by status:
+
+```powershell
+Disable-ScheduledTask -TaskName 'DatumLex-Local-<clone-hash>'
+# Re-enable later.
+Enable-ScheduledTask -TaskName 'DatumLex-Local-<clone-hash>'
+# Remove the schedule when retiring this installation.
+Unregister-ScheduledTask -TaskName 'DatumLex-Local-<clone-hash>' -Confirm:$false
+```
+
+After moving a clone, disable its old task and reinstall from the new path.
+
+## Step 8: diagnose a failed cycle
+
+- `backend/data/operations/etl-all.json` records the last complete-cycle state.
+- `etl-collect.json` and `etl-process.json` record separate worker modes.
+- `etl-logs/<job>/` stores each stage's output and error log.
+- `preflight-logs/` records setup and database checks, including failures before collection.
+- `collection-coverage.json` reports the observed TJDFT and Pangea collection.
+- `nlp-local/jobs/<job>/` preserves the queue and NLP processing results.
+
+For a missing database or pending migrations, rerun
+`scripts/setup.ps1 -Migrate -SkipDependencies`. For PostgreSQL connection
+errors, start the database service and verify the local configuration. After
+fixing a source or network problem, repeat the bounded cycle to resume work.
+
+The schedule prepares candidate evidence with its source and review state.
+Legal review and release evaluation are separate project tasks.
+Use a single scheduled installation for each database.

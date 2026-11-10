@@ -27,7 +27,28 @@ completion evidence remain separate.
 
 See the [step-by-step installation guide](INSTALLATION-GUIDE.md) to install prerequisites, run the backend and frontend, and load the database data.
 
-Para executar a coleta em uma nova cópia do projeto, consulte [Automação local a partir de um clone](docs/operations/AUTOMACAO-LOCAL.md). A [validação NLP](tools/nlp_validation/README.md) mantém amostras, revisões e métricas separadas dos dados de produção.
+## Extraction automation on Windows
+
+After cloning, run these commands from the project root with Python 3.12 or later:
+
+```powershell
+.\scripts\setup.ps1 -BackendOnly -Migrate
+.\scripts\run-etl.ps1 -Once -BatchSize 25 -DoctrineLimit 1
+.\scripts\status.ps1
+```
+
+After a successful manual run, enable a daily cycle with
+`scripts/install-schedule.ps1 -At '19:40'`.
+See [the clone automation guide](docs/operations/AUTOMACAO-LOCAL.md) for
+PostgreSQL configuration, source selection, schedule previews, and recovery.
+The [NLP validation tools](tools/nlp_validation/README.md) keep review samples
+and quality evaluation separate from the collected corpus.
+
+For a shareable Portuguese walkthrough covering installation, application access,
+database configuration, and scheduling, see the
+[team setup PDF](documentation/DatumLex-Guia-de-Configuracao-e-Automacao.pdf).
+The PDF records the implementation's pre-publication status at its issue date;
+use the merged code and this README to confirm current availability.
 
 ## Project structure
 
