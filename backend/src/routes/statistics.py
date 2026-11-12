@@ -16,6 +16,7 @@ from src.db.models import (
     ProcessMovement,
 )
 from src.services.outcomes import CODES, classify, summarize
+from src.services.precedent_usage import summarize as summarize_usage
 from src.services.statistics_service import (
     InvalidQuery,
     filtered_processes,
@@ -82,6 +83,7 @@ def statistics(request):
     return {
         "status": "partial" if query.exists() else "empty",
         "metrics": metrics(query),
+        "precedent_usage": summarize_usage(selected),
         "metadata": metadata(query, selected),
     }
 
@@ -432,3 +434,15 @@ def alignment(request):
             ),
         },
     }
+
+
+@endpoint
+def precedent_usage(request):
+    _, selected = filtered_processes(request.GET)
+    try:
+        page, size = int(request.GET.get('page', 1)), int(request.GET.get('page_size', 20))
+        if page < 1 or not 1 <= size <= 100:
+            raise ValueError
+    except ValueError:
+        raise InvalidQuery('page must be positive; page_size must be 1..100') from None
+    return summarize_usage(selected, page=page, page_size=size)

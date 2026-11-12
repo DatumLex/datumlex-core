@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from .contracts import SCHEMA_VERSION, bytes_hash, canonical, fingerprint
+from .contracts import SCHEMA_VERSION, bytes_hash, canonical, fingerprint, windows_path
 from .extraction import RULES_VERSION
 from .journal import Journal
 from .cache import ComputationCache
@@ -67,7 +67,7 @@ def main():
         "normalizer": "identity-v1", "segmenter": "paragraph-sentence-limit-v3",
         "release_status": "experimental_not_evaluated",
     }
-    run_dir = args.output / fingerprint(manifest)
+    run_dir = windows_path(args.output) / fingerprint(manifest)
     run_dir.mkdir(parents=True, exist_ok=True)
     write_immutable(run_dir / "manifest.json", manifest)
     code_dir=run_dir/'code';code_dir.mkdir(exist_ok=True)

@@ -52,7 +52,7 @@ class SchedulePlanTests(SimpleTestCase):
     def run_powershell(self, script):
         command = "$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); " + script
         encoded = base64.b64encode(command.encode('utf-16le')).decode()
-        return subprocess.run([str(POWERSHELL), '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+        return subprocess.run([str(POWERSHELL), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-EncodedCommand', encoded],
                               capture_output=True, text=True, encoding='utf8', errors='replace', timeout=30)
 
     def copy_scripts(self, directory):

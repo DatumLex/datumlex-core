@@ -1,9 +1,11 @@
 from django.db.models import Count, Q
 
 from src.db.models import DecisionAssessment, DimSubject
+from src.services.precedent_usage import summarize as precedent_usage
+from src.services.report_nlp import report_nlp
 
 
-def report_context(query, scope):
+def report_context(query, scope, actor=None):
     annual = list(
         query.order_by()
         .values("time__year")
@@ -37,4 +39,4 @@ def report_context(query, scope):
         if scope["subject"]
         else None
     )
-    return {"annual": annual, "assessments": counts, "subject_name": subject}
+    return {"annual": annual, "assessments": counts, "subject_name": subject, "nlp": report_nlp(scope, actor), "precedent_usage": precedent_usage(scope)}

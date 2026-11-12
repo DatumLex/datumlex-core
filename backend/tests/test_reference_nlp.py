@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from django.core.management import call_command
 from django.contrib.auth import get_user_model
+from src.nlp.contracts import windows_path
+
 from django.test import TestCase, override_settings
 
 from src.db.court_catalog import ACTIVE_COURTS
@@ -34,7 +36,7 @@ class ReferenceNlpTests(TestCase):
     def test_bibliography_only_reference_cycle_completes_without_fabricated_text(self):
         runner = load_script('empty_reference_runner', PROJECT / 'tools/nlp_validation/run_nlp_local.py')
         importer = load_script('empty_reference_importer', PROJECT / 'tools/nlp_validation/import_local_results.py')
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(dir=windows_path(tempfile.gettempdir())) as temporary:
             root = Path(temporary)
             path = root / 'doctrine'
             path.mkdir()
@@ -77,7 +79,7 @@ class ReferenceNlpTests(TestCase):
     def test_cli_import_keeps_all_courts_topics_and_reference_categories(self):
         runner = load_script('reference_runner', PROJECT / 'tools/nlp_validation/run_nlp_local.py')
         importer = load_script('reference_importer', PROJECT / 'tools/nlp_validation/import_local_results.py')
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(dir=windows_path(tempfile.gettempdir())) as temporary:
             root = Path(temporary) / 'data/operations'
             root.mkdir(parents=True)
             self.sources(root)
@@ -130,7 +132,7 @@ class ReferenceNlpTests(TestCase):
             self.assertEqual(LegalCorpusItem.objects.filter(provenance__nlp_status='completed').count(), 11)
 
     def test_reference_reader_rejects_changed_sources_and_bibliography_only(self):
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(dir=windows_path(tempfile.gettempdir())) as temporary:
             root = Path(temporary)
             self.sources(root)
             rows, excluded = reference_queue(root, {'pangea', 'doctrine'})
