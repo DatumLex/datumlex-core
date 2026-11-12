@@ -32,7 +32,7 @@ def main():
     django.setup()
     from django.conf import settings
     from src.nlp.adapters import read_source
-    from src.nlp.contracts import fingerprint
+    from src.nlp.contracts import fingerprint, windows_path
     from src.services.nlp_evidence import persist_result
     from src.db.models import NlpExtraction
     config = settings.DATABASES['default']
@@ -46,8 +46,8 @@ def main():
     if not queue and current.get('status') == 'no_eligible_text':
         print(json.dumps({'imported_or_verified': 0, 'status': 'no_eligible_text'}))
         return 0
-    directory = Path(current['directory']).resolve()
-    if not directory.is_relative_to((output / 'runs').resolve()):
+    directory = windows_path(current['directory']).resolve()
+    if not directory.is_relative_to(windows_path(output / 'runs').resolve()):
         raise ValueError('Output directory outside local corpus')
     manifest = json.loads((directory / 'manifest.json').read_text(encoding='utf8'))
     if fingerprint(manifest) != directory.name:

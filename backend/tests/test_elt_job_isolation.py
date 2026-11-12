@@ -8,6 +8,8 @@ import tempfile
 import uuid
 from pathlib import Path
 from unittest.mock import patch
+from src.nlp.contracts import windows_path
+
 from django.test import TestCase
 from src.db.models import NlpDocument,NlpExtraction
 
@@ -20,7 +22,7 @@ class JobIsolationTests(TestCase):
     def test_isolated_queue_and_result_pointer_are_used_by_importer(self):
         run=load('isolated_nlp_runner',PROJECT/'tools/nlp_validation/run_nlp_local.py')
         importer=load('isolated_nlp_importer',PROJECT/'tools/nlp_validation/import_local_results.py')
-        with tempfile.TemporaryDirectory(prefix='datumlex-job-test-') as temporary:
+        with tempfile.TemporaryDirectory(prefix='datumlex-job-test-', dir=windows_path(tempfile.gettempdir())) as temporary:
             root=Path(temporary);texts=root/'stj-documents/texts';texts.mkdir(parents=True)
             raw=('Documento sintetico. O dano moral depende de prova. '+('Contexto de teste. '*20)).encode()
             (texts/'1-synthetic.txt').write_bytes(raw)

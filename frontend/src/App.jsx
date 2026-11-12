@@ -6,6 +6,7 @@ import SourceDecisions from './SourceDecisions'
 import ThesisGroups from './ThesisGroups'
 import SourceReferences from './SourceReferences'
 import { thesisTitle } from './thesisPresentation'
+import PrecedentUsage from './PrecedentUsage'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -345,6 +346,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
       {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
+        <PrecedentUsage usage={data?.statistics.precedent_usage} />
         {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
           {(() => {
             const groups = alignment.thesis_groups || []
