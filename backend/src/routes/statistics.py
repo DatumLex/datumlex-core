@@ -1,5 +1,7 @@
 from functools import wraps
 
+from src.nlp.thesis_display import describe_thesis
+
 from django.db import DatabaseError, connection
 from django.db.models import Count, Max, Prefetch, Q
 from django.db.models.functions import TruncQuarter
@@ -282,15 +284,13 @@ def alignment(request):
         group["matched_local_decisions"] += thesis["matched_local_decisions"]
         group["unresolved_citations"] += thesis["unresolved_citations"]
         group["approved"] = group["approved"] and thesis["approved"]
-        if len(group["source_references"]) < 3:
-            group["source_references"].append({
+        group["source_references"].append({
                 "identifier": thesis["identifier"],
                 "title": thesis["title"],
                 "source_url": thesis["source_url"],
                 "source_name": thesis["source_name"],
             })
-        if len(source_theses) < 300:
-            source_theses.append(thesis)
+        source_theses.append(thesis)
         for decision in thesis["related_decisions"]:
             key = str(decision.get("identifier", ""))
             if key and all(item["identifier"] != key for item in group["related_decisions"]):
@@ -356,9 +356,9 @@ def alignment(request):
         "theses": theses,
         "source_theses": source_theses,
         "thesis_groups": sorted(
-            thesis_groups.values(),
+            ({**group, **describe_thesis(group["title"])} for group in thesis_groups.values()),
             key=lambda item: (-item["case_count"], -item["matched_local_decisions"], item["title"].casefold()),
-        )[:8],
+        ),
         "candidate_links": [
             {
                 "local_source_id": row.local_decision.source_id,

@@ -367,3 +367,25 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .corpus-message { padding: 14px; background: #f7f4e9; line-height: 1.6; }
 @media (max-width: 900px) { .corpus-topics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) { .corpus-panel { padding: 16px; } .corpus-counts,.corpus-results,.corpus-topics { grid-template-columns: 1fr; } .corpus-search { align-items: stretch; flex-direction: column; } }
+
+
+.precedent-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.compact-theses .thesis-distribution { margin: 12px 0; }
+.compact-theses .thesis-row-main strong { font-size: 14px; line-height: 1.4; }
+.compact-theses .thesis-row:nth-child(3n+2) .thesis-track-fill { background: #c9a227; }
+.compact-theses .thesis-row:nth-child(3n) .thesis-track-fill { background: #3f7452; }
+.compact-theses .thesis-full-text { margin-top: 12px; }
+.compact-theses .thesis-statement { text-align: left; }
+.thesis-related-sources { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; overflow-wrap: anywhere; }
+.thesis-related-sources ul { list-style: none; padding: 0; }
+.thesis-related-sources li { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.thesis-related-sources a { color: var(--navy); font-weight: 650; }
+.thesis-related-sources summary { cursor: pointer; color: var(--muted); }
+@media (max-width: 900px) { .precedent-grid { grid-template-columns: 1fr; } }
+
+.thesis-search { display: grid; gap: 6px; margin-top: 18px; font-size: 13px; color: var(--navy); }
+.thesis-search input { min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); background: white; }
+.thesis-pagination { display: flex; gap: 10px; margin-top: 14px; }
+
+.thesis-card > .compact-theses { max-height: 640px; overflow-y: auto; padding-right: 8px; scrollbar-color: #c9a227 #f6f5f0; }
+.related-card .source-citations { margin-top: 18px; }
