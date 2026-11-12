@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { nlpRequest, reportUrl, safeOfficialUrl } from './nlpApi'
 import './nlp.css'
+import { thesisTitle, thesisSummary } from './thesisPresentation'
 
 const sourceLabels = { datajud: 'DataJud (metadados)', tjdft_jurisprudence: 'Jurisprudência TJDFT', stj_jurisprudence: 'Jurisprudência STJ', stj_precedent: 'Precedentes STJ', bdjur_doctrine: 'Doutrina BDJur' }
 const outcomeLabels = { granted: 'Provido', denied: 'Desprovido', partial: 'Parcial', not_admitted: 'Não admitido', partial_knowledge: 'Conhecido em parte', ambiguous: 'Ambíguo', unknown: 'Desconhecido', outside_appellate_degree: 'Fora do grau recursal' }
@@ -76,28 +77,35 @@ function Sources({ snapshotId, resource, groupId, population }) {
   </div>
 }
 
-function Thesis({ item, snapshotId, resource, population }) {
-  const [open, setOpen] = useState(false)
-  const id = useId()
-  return <li className="nlp-thesis"><h3>{item.label}</h3>
-    <p>{item.document_count} documentos distintos · {item.evidence_count} trechos. A frequência não comprova adoção pelo julgador.</p>
-    <button className="secondary-button" type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>Ver fontes<span className="nlp-visually-hidden"> — {item.label}</span></button>
-    <div id={id} hidden={!open}>{open && <Sources snapshotId={snapshotId} resource={resource} groupId={item.id} population={population} />}</div>
-  </li>
-}
 
 function Rankings({ snapshot, population, resource, order }) {
   const [cursor, setCursor] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
+  const evidenceId = useId()
   const statusRef = useRef(null)
   const moveFocus = useRef(false)
   const path = `analysis-snapshots/${snapshot.snapshot_id}/${resource}/?population=${population}&order=${order}&limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
   const [state, retry] = useRemote(path, signal => nlpRequest(path, { signal }))
   useEffect(() => { if (state.data && moveFocus.current) { statusRef.current?.focus(); moveFocus.current = false } }, [state.data])
-  function navigate(value) { moveFocus.current = true; setCursor(value) }
+  function navigate(value) { moveFocus.current = true; setSelectedId(null); setCursor(value) }
+  const selected = state.data?.items.find(item => item.id === selectedId)
+  const maximum = Math.max(1, ...(state.data?.items || []).map(item => item.document_count || 0))
   return <div aria-busy={state.status === 'loading'}><Feedback state={state} retry={retry} />
     {state.data && <><p role="status" tabIndex={-1} ref={statusRef}>{state.data.total_items} grupos por texto literal. Não há inferência de equivalência jurídica.</p>
       {!state.data.items.length && <p>Nenhuma ocorrência liberada nesta população. A ausência de extração não comprova ausência de tese no documento.</p>}
-      <ol className="nlp-ranking">{state.data.items.map(item => <Thesis key={item.id} item={item} snapshotId={snapshot.snapshot_id} population={population} resource={resource} />)}</ol>
+      <div className="nlp-evidence-grid">
+        <article className="thesis-card"><span className="section-kicker">Frequência · NLP + revisão</span><h3>{resource === 'theses' ? 'Principais teses no recorte' : 'Principais fundamentos no recorte'}</h3><p>{population === 'decision_text' ? 'Decisões com evidência revisada; contagem por documento distinto, não por processo.' : 'Documentos distintos nesta população; não representam casos julgados.'}</p>
+          <ol className="nlp-ranking compact-theses">{state.data.items.map(item => <li className={`thesis-row${selectedId === item.id ? ' is-selected' : ''}`} key={item.id}>
+            <h4 className="nlp-compact-title">{thesisTitle(item)}</h4>
+            <div className="thesis-distribution"><div className="thesis-track"><div className="thesis-track-fill" style={{ width: `${(item.document_count || 0) / maximum * 100}%` }} /></div><span className="thesis-count">{item.document_count} {item.document_count === 1 ? 'documento' : 'documentos'}</span></div>
+            <details className="thesis-full-text"><summary>Resumo da tese</summary><p>{thesisSummary({ title: item.label })}</p><details><summary>Texto identificado pelo NLP</summary><p>{item.label}</p></details></details>
+            <button className="text-button nlp-select-evidence" type="button" aria-expanded={selectedId === item.id} aria-controls={evidenceId} onClick={() => setSelectedId(current => current === item.id ? null : item.id)}>Ver fontes<span className="nlp-visually-hidden"> — {thesisTitle(item)}</span> →</button>
+          </li>)}</ol>
+        </article>
+        <article className="related-card" id={evidenceId}><span className="section-kicker">Evidências · fonte rastreável</span><h3>Decisões relacionadas</h3>
+          {selected ? <><h4>{thesisTitle(selected)}</h4><p>{selected.document_count} documentos distintos · {selected.evidence_count} trechos. A frequência não comprova adoção pelo julgador.</p><Sources key={selected.id} snapshotId={snapshot.snapshot_id} resource={resource} groupId={selected.id} population={population} /></> : <p role="status">Selecione “Ver fontes” em uma tese para consultar os trechos e documentos que sustentam a contagem.</p>}
+        </article>
+      </div>
       {cursor && <button className="secondary-button" type="button" onClick={() => navigate('')}>Primeira página</button>}
       {state.data.next_cursor && <button className="secondary-button" type="button" onClick={() => navigate(state.data.next_cursor)}>Próxima página</button>}
     </>}
@@ -153,7 +161,7 @@ export default function NlpPanel({ contextKey }) {
     setChoices({ ...selected, [field]: checked ? [...selected[field], value] : selected[field].filter(item => item !== value) })
   }
   return <section className="nlp-panel" aria-labelledby="nlp-title">
-    <h2 id="nlp-title">Teses e fundamentos com evidências</h2>
+    <h2 id="nlp-title">Teses identificadas nas decisões</h2>
     <p>Tribunais, assunto e período seguem o recorte aplicado acima. Fontes e desfechos abaixo filtram somente este painel de NLP; as taxas DataJud mantêm sua própria população.</p>
     <Feedback state={options} retry={retryOptions} />
     {options.data && <><form onSubmit={event => { event.preventDefault(); setApplied({ sources: selected.sources, outcomes: selected.outcomes }); setVersion(value => value + 1) }}>

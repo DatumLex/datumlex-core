@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { downloadReport, getData } from './api'
-import NlpPanel from './NlpPanel'
 import CorpusPanel from './CorpusPanel'
 import SourceDecisions from './SourceDecisions'
+import ThesisGroups from './ThesisGroups'
+import SourceReferences from './SourceReferences'
+import { thesisTitle } from './thesisPresentation'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
 const formatRate = (value) => value == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 }).format(value)
 const formatDate = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : '—'
 const supportedPeriod = () => ({ start: '2016-01-01', end: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()) })
-const shortThesisLabel = (thesis) => {
-  const label = thesis.label || thesis.titulo || thesis.title || 'Tese sem título'
-  return label.trim().split(/\s+/).slice(0, 4).join(' ')
-}
+const shortThesisLabel = thesisTitle
+
 const degrees = { G1: '1ª instância', G2: '2ª instância', JE: 'Juizados especiais', TR: 'Turmas recursais', SUP: 'Tribunal superior' }
 const relationLabels = { aligned: 'Adesão identificada', divergent: 'Divergência sinalizada', distinguished: 'Distinção registrada', uncertain: 'Inconclusivo' }
 
@@ -362,7 +362,6 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
             const candidateLinks = (alignment.candidate_links || []).map((item) => ({ ...item, kind: 'candidate' }))
             const unresolvedCandidates = (alignment.unresolved_candidates || []).map((item) => ({ ...item, kind: 'candidate', candidate_type: 'unresolved' }))
             const visibleCandidates = [...candidateLinks, ...unresolvedCandidates].filter((item) => belongsToSelectedGroup(item.reference_identifier))
-            const maxCount = Math.max(1, ...groups.map((group) => group.case_count || 0))
             const pendingReviews = alignment.metadata?.review_queue?.pending_or_unreviewed ?? 0
             const candidateLimit = alignment.metadata?.candidate_link_coverage?.display_limit
             const candidateTotals = alignment.metadata?.candidate_link_coverage
@@ -372,27 +371,16 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
 
             return <>
           <div className="precedent-grid">
-            <article className="thesis-card"><header className="precedent-card-heading"><div><span className="section-kicker">TESES E ENUNCIADOS</span><h3>Principais teses no recorte</h3><p>Grupos ordenados por quantidade de referências. Abra “Enunciado e fontes” para ler o texto integral e consultar as referências de origem.</p></div><span className="design-badge">Fonte rastreável</span></header>
-              {groups.length ? <ol className="thesis-list">{groups.map((group) => {
-                const fullTitle = group.title || group.label || group.titulo || 'Tese sem título'
-                const sourceReferences = group.source_references || []
-                const selected = selectedThesisId === group.id
-                return <li key={group.id} className={`thesis-row${selected ? ' is-selected' : ''}`}>
-                  <button type="button" className="thesis-row-main" aria-pressed={selected} title={fullTitle} onClick={() => setSelectedThesisId((current) => current === group.id ? null : group.id)}>
-                    <strong>{shortThesisLabel(group)}</strong>
-                  </button>
-                  <div className="thesis-distribution"><div className="thesis-track" role="progressbar" aria-label={`Quantidade de referências: ${formatNumber(group.case_count)}`} aria-valuemin="0" aria-valuemax={maxCount} aria-valuenow={group.case_count || 0}><div className="thesis-track-fill" style={{ width: `${Math.max(0, ((group.case_count || 0) / maxCount) * 100)}%` }} /></div><span className="thesis-count">{formatNumber(group.case_count)} {group.case_count === 1 ? 'referência' : 'referências'}</span></div>
-                  <div className="thesis-row-meta"><small>Fontes: {sourceReferences.map((reference) => <a key={reference.identifier} href={reference.source_url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{reference.identifier}</a>).reduce((previous, current) => previous ? <>{previous} · {current}</> : current, null)}</small>{!group.approved && <span className="review-pending-badge">Revisão pendente</span>}</div>
-                  <details className="thesis-full-text"><summary>Enunciado e fontes</summary><p className="thesis-statement">{fullTitle}</p><p>Referências de origem: {sourceReferences.map((reference) => reference.identifier).join(' · ') || 'não informadas'}.</p><p>O agrupamento indica recorrência nas referências carregadas; não representa, por si só, força vinculante nem conclusão sobre o caso em análise.</p></details>
-                </li>
-              })}</ol> : <ChartState title="Nenhuma tese disponível">As teses aparecem após a importação das fontes do STJ.</ChartState>}
+            <article className="thesis-card"><header className="precedent-card-heading"><div><span className="section-kicker">TESES E ENUNCIADOS</span><h3>Teses disponíveis</h3><p>Selecione uma tese para filtrar as decisões e fontes ao lado. Expanda “Resumo da tese” para ler mais.</p></div><span className="design-badge">Fonte rastreável</span></header>
+              <ThesisGroups groups={groups} references={alignment.source_theses || []} selectedId={selectedThesisId} onSelect={(id) => setSelectedThesisId(current => current === id ? null : id)} />
             </article>
             <article className="related-card"><header className="precedent-card-heading"><div><span className="section-kicker">DECISÕES E RASTREABILIDADE</span><h3>Decisões relacionadas</h3><p>Consulte em separado avaliações e vínculos do DataJud e processos citados nas referências do Pangea. Uma citação não confirma aderência jurídica.</p></div><span className="design-badge">{evidenceBadge}</span></header>
+              {!selectedGroup ? <p role="status">Clique em uma tese à esquerda para consultar suas decisões e fontes.</p> : <>
               {visibleAssessments.length ? <div className="related-list">{visibleAssessments.slice(0, 5).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference.identifier}`}>
                 <span className={`evidence-status-icon evidence-status-icon--${item.relation}`} aria-hidden="true">{item.relation === 'aligned' ? '✓' : item.relation === 'divergent' ? '!' : 'i'}</span>
                 <div className="evidence-item-content"><h4>{relationLabels[item.relation]} · {item.local_process_number}</h4><p>{item.reference.title}</p><small>{item.reference.identifier}</small></div>
                 <button type="button" className="source-drawer-button" onClick={() => setEvidenceDrawerItem({ ...item, kind: 'assessment' })}>Ver fontes →</button>
-              </article>)}</div> : <details className="candidate-empty-state local-review-details"><summary>Avaliações locais TJDFT × STJ{pendingReviews ? ` · ${formatNumber(pendingReviews)} pendentes` : ' · ainda não cadastradas'}</summary>
+              </article>)}</div> : <details open={visibleCandidates.length > 0} className="candidate-empty-state local-review-details"><summary>Avaliações locais TJDFT × STJ{pendingReviews ? ` · ${formatNumber(pendingReviews)} pendentes` : ' · ainda não cadastradas'}</summary>
                 <div className="pending-summary"><strong>{pendingReviews ? `${formatNumber(pendingReviews)} avaliações aguardando revisão` : 'Nenhuma avaliação jurídica cadastrada'}</strong><p>As avaliações jurídicas dependem de revisão. As citações disponíveis na fonte aparecem abaixo, mesmo sem vínculo com um processo local.</p><p>{formatNumber(candidateTotal)} relações candidatas{selectedGroup ? ` retornadas para “${shortThesisLabel(selectedGroup)}”` : ' no recorte'}{candidateLimit ? ` · a lista exibe até ${formatNumber(candidateLimit)}` : ''}.</p></div>
                 {visibleCandidates.length ? <div className="related-list">{visibleCandidates.slice(0, 8).map((item) => <article className="related-item evidence-item" key={`${item.local_source_id}-${item.reference_identifier}-${item.cited_identifier}`}>
                   <span className="evidence-status-icon evidence-status-icon--pending" aria-hidden="true">!</span>
@@ -401,6 +389,8 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
                 </article>)}</div> : <p className="candidate-no-links">{selectedGroup ? 'Nenhuma relação candidata retornada para esta tese. Limpe a seleção para ver o recorte completo.' : 'Nenhuma relação candidata retornada pela API neste recorte.'}</p>}
               </details>}
               <SourceDecisions references={alignment.source_theses || []} selectedIdentifiers={selectedReferenceIds} />
+              <SourceReferences groups={groups} references={alignment.source_theses || []} selectedIdentifiers={selectedReferenceIds} />
+              </>}
             </article>
           </div>
           {selectedGroup && <p className="thesis-selection-note">Filtrando evidências por: <strong>{shortThesisLabel(selectedGroup)}</strong> <button type="button" className="text-button" onClick={() => setSelectedThesisId(null)}>Limpar seleção</button></p>}
@@ -432,12 +422,12 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
           <p>Última importação de referência aprovada: {alignment.metadata.last_corpus_import ? new Date(alignment.metadata.last_corpus_import).toLocaleString('pt-BR') : 'nenhuma'}.</p>
           <p>{alignment.metadata.coverage}</p><ul className="limitations-list">{alignment.metadata.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
           {alignment.metadata.pangea_imports?.length > 0 && <details className="chart-table"><summary>Histórico de importação Pangea (últimas 5 execuções)</summary><table><caption>Consulta pública de precedentes dos tribunais selecionados; totais informados pela fonte</caption><thead><tr><th scope="col">Execução</th><th scope="col">Consulta</th><th scope="col">Estado</th><th scope="col">Cobertura</th><th scope="col">Registros</th><th scope="col">Catálogo</th><th scope="col">Erro</th></tr></thead><tbody>{alignment.metadata.pangea_imports.map((run) => <tr key={run.id}><td>#{run.id}<br />{run.started_at ? new Date(run.started_at).toLocaleString('pt-BR') : '—'}</td><td>{run.scope?.query || '—'} · {run.scope?.organs?.join(', ') || '—'}</td><td>{run.status}</td><td>{formatNumber(run.pages)} páginas · {formatNumber(run.fetched)} de {run.source_total == null ? '—' : formatNumber(run.source_total)}</td><td>{formatNumber(run.created)} novos · {formatNumber(run.updated)} atualizados · {formatNumber(run.rejected)} rejeitados</td><td>{run.catalog_version || '—'}</td><td>{run.error || '—'}</td></tr>)}</tbody></table></details>}
-          <p>As teses e decisões relacionadas exibem até 300 referências para inspeção. Fontes importadas do Pangea permanecem não aprovadas até revisão humana.</p>
+          <p>As teses disponíveis e suas referências estão acessíveis na aba Precedentes e teses. Fontes importadas do Pangea permanecem não aprovadas até revisão humana.</p>
           {alignment.metadata.sources.length > 0 ? <ul className="source-links">{alignment.metadata.sources.map((source) => <li key={`${source.source_institution}-${source.source_name}-${source.identifier}`}><a href={source.source_url} target="_blank" rel="noreferrer">{source.source_institution} · {source.source_name}: {source.identifier} · {source.title}</a>{source.source_locator && ` — ${source.source_locator}`}{source.approval_reference && ` · aprovação ${source.approval_reference}`}</li>)}</ul> : <ChartState title="Corpus aprovado ainda não importado">Precedentes, teses e doutrina só aparecerão após a importação das fontes aprovadas pelo fluxo BDJur.</ChartState>}
         </div>}
       </section>}
       <footer className="dashboard-footer"><p>Fonte: <a href={metadata?.source_url || 'https://api-publica.datajud.cnj.jus.br/'} target="_blank" rel="noreferrer">{metadata?.source || 'DataJud · Conselho Nacional de Justiça'}</a>. {metadata?.coverage || 'Cobertura parcial dos registros locais.'}</p><p>Última atualização dos registros: {refreshed ? new Date(refreshed).toLocaleString('pt-BR') : '—'} · Painel atualizado a cada 5 minutos enquanto aberto.</p></footer>
-      {!loading && data ? <NlpPanel contextKey={JSON.stringify({ courts, ...(metadata?.scope?.start ? { start: metadata.scope.start, end: metadata.scope.end } : {}), ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })} /> : <section className="nlp-panel"><h2>Teses e fundamentos com evidências</h2><p role="status">{loading ? 'Aguardando o recorte aplicado do dashboard…' : 'Recorte indisponível. Atualize a consulta para carregar as evidências.'}</p></section>}
+
     </main>
   </div>
 }

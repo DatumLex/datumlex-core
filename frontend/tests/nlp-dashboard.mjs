@@ -70,6 +70,11 @@ try {
   await page.keyboard.press('Enter')
   assert.equal(await page.getByRole('button', { name: /^Ver fontes/ }).getAttribute('aria-expanded'), 'true')
   assert.equal(await page.locator('blockquote').innerText(), quote)
+  assert.equal(await page.locator('.nlp-evidence-grid .thesis-count').innerText(), '1 documento')
+  assert.equal(await page.locator('.nlp-evidence-grid .thesis-full-text').first().getAttribute('open'), null)
+  assert.match(await page.locator('.nlp-evidence-grid .related-card').innerText(), /Documento sintético/)
+  await page.locator('.nlp-evidence-grid').screenshot({ path: 'tests/nlp-ranking-preview.png' })
+
   assert.match(await page.locator('.nlp-source').innerText(), /Fonte alterada/)
   assert.match(await page.locator('.nlp-source').innerText(), /Baixa confiança/)
   assert.match(await page.locator('.nlp-source').innerText(), /Pontuação da extração não disponível/)

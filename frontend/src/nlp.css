@@ -18,3 +18,23 @@
 .nlp-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (max-width: 1000px) { .nlp-controls { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .nlp-panel { padding: 16px; }.nlp-panel button { max-width: 100%; white-space: normal; } }
+
+.nlp-thesis { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; border-left: 3px solid #1f4e5f; padding: 20px; background: #faf9f5; }
+.nlp-thesis:nth-child(3n+2) { border-left-color: #c9a227; }
+.nlp-thesis:nth-child(3n) { border-left-color: #3f7452; }
+.nlp-thesis-description, .nlp-thesis-evidence { min-width: 0; }
+.nlp-thesis-evidence { padding-left: 20px; border-left: 1px solid var(--border); }
+@media (max-width: 760px) { .nlp-thesis { grid-template-columns: 1fr; } .nlp-thesis-evidence { padding-left: 0; border-left: 0; } }
+
+.nlp-evidence-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 20px; }
+.nlp-evidence-grid > article { min-width: 0; }
+.nlp-evidence-grid .nlp-ranking { list-style: none; padding: 0; margin: 16px 0 0; }
+.nlp-evidence-grid .thesis-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.nlp-compact-title { margin: 0; color: var(--deep-navy); font-size: 14px; line-height: 1.4; }
+.nlp-evidence-grid .thesis-track { display: block; height: 9px; background: #edeae0; overflow: hidden; }
+.nlp-evidence-grid .is-selected { background: #fffaf0; }
+.nlp-evidence-grid .nlp-select-evidence { font-size: 12px; }
+.nlp-evidence-grid .nlp-source { margin-top: 12px; padding: 12px; }
+.reference-catalog { margin-top: 22px; }
+.reference-catalog > summary { cursor: pointer; padding: 14px; background: #f6f5f0; color: var(--navy); font-weight: 650; }
+@media (max-width: 900px) { .nlp-evidence-grid { grid-template-columns: 1fr; } }
