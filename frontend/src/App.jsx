@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { BarChart3, Info, X, ListChecks, ChevronDown } from 'lucide-react'
 import { downloadReport, getData } from './api'
-import NlpPanel from './NlpPanel'
 import CorpusPanel from './CorpusPanel'
 import SourceDecisions from './SourceDecisions'
+import PrecedentUsage from './PrecedentUsage'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -345,6 +345,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
       {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
+        <PrecedentUsage usage={data?.statistics.precedent_usage} />
         {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
           {(() => {
             const groups = alignment.thesis_groups || []
@@ -437,7 +438,6 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </div>}
       </section>}
       <footer className="dashboard-footer"><p>Fonte: <a href={metadata?.source_url || 'https://api-publica.datajud.cnj.jus.br/'} target="_blank" rel="noreferrer">{metadata?.source || 'DataJud · Conselho Nacional de Justiça'}</a>. {metadata?.coverage || 'Cobertura parcial dos registros locais.'}</p><p>Última atualização dos registros: {refreshed ? new Date(refreshed).toLocaleString('pt-BR') : '—'} · Painel atualizado a cada 5 minutos enquanto aberto.</p></footer>
-      {!loading && data ? <NlpPanel contextKey={JSON.stringify({ courts, ...(metadata?.scope?.start ? { start: metadata.scope.start, end: metadata.scope.end } : {}), ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })} /> : <section className="nlp-panel"><h2>Teses e fundamentos com evidências</h2><p role="status">{loading ? 'Aguardando o recorte aplicado do dashboard…' : 'Recorte indisponível. Atualize a consulta para carregar as evidências.'}</p></section>}
     </main>
   </div>
 }

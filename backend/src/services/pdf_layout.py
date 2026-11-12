@@ -15,6 +15,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph, Table, TableStyle
 
+from src.services.report_nlp import coverage_note
+
 NAVY = colors.HexColor("#102c3d")
 TEAL = colors.HexColor("#205669")
 GOLD = colors.HexColor("#c7a218")
@@ -177,10 +179,13 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
         f"Assunto TPU {scope['subject']}" if scope["subject"] else "Pesquisa jurídica integrada"
     )
     period = f"{datetime.fromisoformat(scope['start']):%d/%m/%Y} a {datetime.fromisoformat(scope['end']):%d/%m/%Y}"
-    review = context.get("assessments", {})
-    comparable = review.get("aligned", 0) + review.get("divergent", 0)
-    adherence = review.get("aligned", 0) / comparable if comparable else None
+    usage = context.get("precedent_usage", {})
+    use_counts = usage.get("counts", {})
+    use_base = usage.get("denominator", 0)
+    use_rate = usage.get("application_rate")
     denominator = totals["binary_denominator"]
+    nlp = context.get("nlp", {})
+    nlp_note = coverage_note(nlp) if nlp else "Inventário NLP não consultado nesta exportação."
 
     y = r.page(
         1, "Visão geral", subject[:45], f"Pesquisa integrada | {courts} | Recorte aplicado na consulta"
@@ -197,7 +202,7 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
             ["Tribunais", courts],
             ["Assunto", subject],
             ["Período solicitado", period],
-            ["Campo temporal", "Ajuizamento (DataJud); decisão nas avaliações revisadas"],
+            ["Campo temporal", "Ajuizamento (DataJud); julgamento nas ementas analisadas"],
             ["Fonte jurídica", "DataJud" + (" e referências Pangea" if pangea is not None else "")],
         ],
         y,
@@ -218,15 +223,15 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
                 GREEN,
             ),
             (
-                percentage(adherence),
-                "Aderência revisada",
-                f"Base: {number(comparable)} vínculos alinhados ou divergentes",
+                percentage(use_rate) if use_base else number(sum(use_counts.values())),
+                "Aplicação de precedentes" if use_base else "Referências a precedentes",
+                f"{number(use_counts.get("applied", 0))} aplicações / {number(use_base)} vínculos explícitos",
                 GOLD,
             ),
             (
-                "Indisponível",
-                "Cobertura NLP nesta exportação",
-                "Requer snapshot de evidências revisadas e liberadas",
+                number(nlp.get("processed", 0)),
+                "Documentos processados por NLP",
+                f"Inventário dos tribunais; {number(nlp.get("released", 0))} liberados no recorte",
                 TEAL,
             ),
         ],
@@ -331,44 +336,44 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
         3,
         "Precedentes e teses",
         "Relação com o STJ",
-        "Avaliações humanas validadas e referências de consulta, em populações separadas",
+        "Aplicação textual identificada automaticamente nas ementas públicas",
     )
-    y = r.heading("Comparação dos vínculos revisados", y)
-    if comparable or sum(review.values()):
-        y = r.table(
-            [["CLASSIFICAÇÃO", "VÍNCULOS"]]
-            + [
-                [label, number(review.get(key, 0))]
-                for key, label in [
-                    ("aligned", "Aderência identificada"),
-                    ("divergent", "Possível divergência"),
-                    ("distinguished", "Distinção registrada"),
-                    ("uncertain", "Inconclusivo"),
-                ]
-            ],
-            y,
-        )
-        y = r.text(
-            f"Taxa de aderência: {percentage(adherence)}. Base: {comparable} vínculos alinhados ou divergentes; demais categorias ficam fora da taxa. Período por data de decisão revisada, não ajuizamento.",
-            y,
-            size=8,
-            leading=11,
-        )
+    y = r.heading("Uso de precedentes nas ementas", y)
+    y = r.table(
+        [["SINAL TEXTUAL IDENTIFICADO", "VÍNCULOS DOCUMENTO / PRECEDENTE"]]
+        + [[label, number(use_counts.get(key, 0))] for key, label in [
+            ("applied", "Aplicação explícita"), ("not_applied", "Afastamento explícito"),
+            ("mentioned", "Somente citação"), ("ambiguous", "Contexto ambíguo")]],
+        y, size=8, padding=5,
+    )
+    rate_description = f"Percentual: {percentage(use_rate)}" if use_base else "Percentual não calculado: nenhum vínculo com uso explícito"
+    y = r.text(
+        f"{number(usage.get('coverage', {}).get('documents_analyzed', 0))} ementas analisadas no período de julgamento. "
+        f"{rate_description}; base de {number(use_base)} vínculos explícitos. "
+        "Citações e contextos ambíguos ficam fora da taxa. Afastamento não significa divergência jurídica.",
+        y, size=8, leading=11,
+    )
+    examples = usage.get("items", [])
+    if examples:
+        example = examples[0]
+        use_labels = {"applied": "Aplicação", "not_applied": "Afastamento", "mentioned": "Somente citação", "ambiguous": "Contexto ambíguo"}
+        y = r.text(f"{use_labels[example["status"]]}: {example['authority_literal']} | {example['court']} | {example['decision_date']}", y, bold=True, size=8)
+        y = r.text(example["excerpt"], y, size=8, leading=11)
+        y = r.text(f"Localização: ementa, linha {example['line']}; caracteres {example['start']} a {example['end']}. Método: {usage['method']}.", y, size=7, leading=10)
+        y = r.text(f"Texto SHA-256: {example["text_sha256"]}", y, size=7, leading=10)
+        y = r.source_link(example["source_url"], y)
     else:
-        y = r.notice(
-            "Comparação jurídica indisponível",
-            "Não há avaliações validadas elegíveis. Citações do Pangea não são convertidas automaticamente em aderência ou divergência.",
-            y,
-        )
+        y = r.text("Nenhuma referência STJ identificável nas ementas elegíveis deste recorte. Ausência de sinal não é divergência.", y, size=8, leading=11)
+    y = r.text("Resultado automático auditável pelo trecho e pela fonte; não equivale a avaliação jurídica revisada.", y, size=8, leading=11, color=MUTED)
     y = r.heading("Teses e precedentes para consulta", y)
     if pangea and pangea["items"]:
         y = r.text(
-            f"Amostra de até três das {number(pangea['sample_count'])} referências no inventário complementar. Não é ranking NLP de relevância ou frequência. Itens sem data ou assunto classificados não têm correspondência confirmada ao recorte.",
+            f"Amostra de uma das {number(pangea['sample_count'])} referências no inventário complementar. Não é ranking NLP de relevância ou frequência. Itens sem data ou assunto classificados não têm correspondência confirmada ao recorte.",
             y,
             size=8,
             leading=11,
         )
-        for item in pangea["items"][:3]:
+        for item in pangea["items"][:1]:
             y = r.text(item["title"][:100], y, bold=True)
             y = r.text(
                 item["thesis"][:330] + (" [Trecho; consulte a fonte.]" if len(item["thesis"]) > 330 else ""),
@@ -390,7 +395,7 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
             y,
         )
     r.text(
-        "Frequência de teses NLP: indisponível neste resumo sem snapshot de evidências revisadas e liberadas. Nenhuma série demonstrativa foi usada.",
+        f"Evidências NLP aprovadas no recorte: {number(nlp.get("reviewed_evidence", 0))}. Camada de revisão separada da identificação textual automática.",
         y - 5,
         size=8,
         leading=11,
@@ -461,7 +466,7 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
             ],
             [
                 "Textos e NLP",
-                "Sem cobertura quantificada neste resumo. Metadados não equivalem a decisões com inteiro teor processado.",
+                nlp_note,
             ],
             ["BDJur", "Doutrina não incluída nos indicadores desta exportação."],
         ],
@@ -494,12 +499,12 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
         leading=12,
     )
     y = r.text(
-        "Cobertura e NLP. Citação ou similaridade não comprovam aderência jurídica. Teses Pangea não são automaticamente evidências NLP revisadas. Atualização da fonte não substitui data de publicação ou julgamento; assunto não classificado não comprova correspondência temática.",
+        "Cobertura e NLP. Aplicação textual = aplicações / (aplicações + afastamentos explícitos) em pares documento/precedente, sem exigir aprovação manual. A regra analisa somente a ementa própria, exclui citações e ambiguidades do denominador. Citação ou similaridade não comprovam aderência jurídica. Teses Pangea não são automaticamente evidências NLP revisadas. Atualização da fonte não substitui data de publicação ou julgamento; assunto não classificado não comprova correspondência temática.",
         y,
     )
     y = r.heading("Identificação da exportação", y)
     now = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S - Brasília")
-    y = r.text(f"Pesquisa: {report_id} | Emissão: {now} | Layout: sprint2-real-v1", y, size=8.5)
+    y = r.text(f"Pesquisa: {report_id} | Emissão: {now} | Layout: sprint2-textual-v3", y, size=8.5)
     y = r.text(
         f"Última coleta DataJud no recorte: {provenance['last_record_refresh'] or 'não disponível'}. Regra: {totals['rule_version']}.",
         y,

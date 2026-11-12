@@ -35,4 +35,5 @@ urlpatterns = [
     path("api/instances/", statistics.instances),
     path("api/processes/", statistics.processes),
     path("api/alignment/", statistics.alignment),
+    path("api/precedent-usage/", statistics.precedent_usage),
 ]

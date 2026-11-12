@@ -30,7 +30,7 @@ def report(request):
                 instance_series(query),
                 report_references(selected),
                 case_summaries(query),
-                report_context(query, selected),
+                report_context(query, selected, request.user),
             )
         response = HttpResponse(content, content_type="application/pdf")
         response["Content-Disposition"] = (

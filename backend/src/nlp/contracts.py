@@ -61,3 +61,19 @@ def validate_result(result, text):
         raise ValueError("duplicate_annotation_id")
     if result["relations"]:
         raise ValueError("relations_not_supported_in_v0")
+
+
+def windows_path(path):
+    """Use the extended Windows namespace for hash-addressed NLP paths."""
+    import os
+    from pathlib import Path
+
+    if os.name != "nt":
+        return Path(path)
+    absolute = str(Path(path).resolve())
+    separator = chr(92)
+    prefix = separator * 2 + "?" + separator
+    if not absolute.startswith(prefix):
+        absolute = (prefix + "UNC" + separator + absolute[2:]
+                    if absolute.startswith(separator * 2) else prefix + absolute)
+    return Path(absolute)
