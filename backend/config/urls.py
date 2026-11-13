@@ -1,11 +1,12 @@
 from django.urls import path
 
 from src.accounts import views as accounts
-from src.routes import corpus, nlp_dashboard, nlp_evidence, pdf_report, statistics
+from src.routes import corpus, excel_report, nlp_dashboard, nlp_evidence, pdf_report, statistics
 
 urlpatterns = [
     path("api/corpus/", corpus.catalog),
     path("api/report.pdf/", pdf_report.report),
+    path("api/report.xlsx/", excel_report.report),
     path('api/v2/filter-options/', nlp_dashboard.options),
     path('api/v2/analysis-snapshots/', nlp_dashboard.snapshots),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/', nlp_dashboard.detail),
