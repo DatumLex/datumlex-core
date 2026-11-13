@@ -185,6 +185,8 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('corpus')
+  const [topic, setTopic] = useState('')
+  const [topicOptions, setTopicOptions] = useState([])
   const [draft, setDraft] = useState({ start: '', end: '', subject: '' })
   const [applied, setApplied] = useState(null)
   const bounds = supportedPeriod()
@@ -228,15 +230,16 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         const [statistics, instances, distribution] = await Promise.all(
           ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court }, controller.signal)),
         )
+        const usage = topic ? await getData('precedent-usage', { ...filters, court, topic }, controller.signal) : statistics.precedent_usage
         const filteredScope = await getData('scope', { ...filters, court }, controller.signal)
         const filteredScopes = Object.fromEntries(courts.map(code => [code, { metadata: filteredScope.by_court?.[code] || (courts.length === 1 ? filteredScope.metadata : null) }]))
         const alignmentResult = courts.includes('TJDFT')
-          ? await getData('alignment', { ...filters, court: 'TJDFT' }, controller.signal)
+          ? await getData('alignment', { ...filters, court: 'TJDFT', ...(topic ? { topic } : {}) }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
         if (!applied) setDraft((current) => current.start ? current : { start: available.start || '', end: available.end || '', subject: '' })
-        setData({ statistics, instances, distribution, courtScopes, filteredScopes })
+        setData({ statistics, instances, distribution, courtScopes, filteredScopes, usage })
         setAlignment(alignmentResult)
         setError('')
       } catch (failure) {
@@ -251,7 +254,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     }
     load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [applied, retry, court, courts, authorizedCourts])
+  }, [applied, retry, court, courts, authorizedCourts, topic])
 
   function apply(event) {
     event.preventDefault()
@@ -264,6 +267,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
 
   function reset() {
     setDraft({ start: '', end: '', subject: '' })
+    setTopic('')
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
   }
 
@@ -285,6 +289,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const rateNote = metrics?.binary_denominator ? `Base: ${formatNumber(metrics.binary_denominator)} documentos com resultado mais recente identificado. Indicador por documento, não por recurso individual.` : unavailableNote
   const refreshed = metadata?.last_record_refresh
   const subjectOptions = [...Object.values(data?.courtScopes || {}).flatMap((scope) => scope.subjects || []).reduce((subjects, subject) => {
+    subject = { ...subject, name: subject.name?.trim() || `Assunto CNJ ${subject.code} (nome não informado)` }
     const current = subjects.get(subject.code)
     subjects.set(subject.code, current
       ? { ...current, record_count: current.record_count + subject.record_count }
@@ -297,24 +302,25 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     <header className="site-header"><a className="brand" href="#main-content" aria-label="DatumLex, ir ao conteúdo"><span className="brand-mark"><img src="/assets/datumlex-logo.jpeg" alt="" /></span><span>DatumLex</span></a><span className="header-context">Análise de Recursos</span></header>
     <main id="main-content" className="dashboard">
       <section className="hero" aria-labelledby="page-title"><span className="eyebrow">Inteligência jurídica · {selectedSubjectName || 'Todos os assuntos'}</span>
-        <div className="hero-title-row"><h1 id="page-title">{selectedSubjectName ? `${selectedSubjectName} — ` : ''}{courts.includes('TJDFT') && courts.includes('STJ') ? 'TJDFT × STJ' : court}</h1>
+        <div className="hero-title-row"><h1 id="page-title">{selectedSubjectName ? `${selectedSubjectName} — ` : ''}{courts.length > 2 ? `${courts.length} tribunais selecionados` : courts.join(' × ')}</h1>
           <div className="methodology-trigger"><button className="info-button" type="button" aria-label="Ver metodologia de cálculo" aria-expanded={isMethodologyOpen} aria-controls="methodology-popover" onClick={() => setIsMethodologyOpen(!isMethodologyOpen)}><Info aria-hidden="true" size={21} /></button>
             {isMethodologyOpen && <aside id="methodology-popover" className="methodology-popover" onKeyDown={(event) => { if (event.key === 'Escape') setIsMethodologyOpen(false) }}><div className="popover-heading"><strong>Como interpretar os dados</strong><button type="button" aria-label="Fechar metodologia" onClick={() => setIsMethodologyOpen(false)}><X aria-hidden="true" size={18} /></button></div>
               <p>Os valores contam documentos do DataJud por data de ajuizamento. Um processo pode aparecer em mais de uma instância. Ter vários assuntos não multiplica a contagem.</p><p>Provimento = providos ÷ (providos + desprovidos). Desprovimento usa a mesma base. No TJDFT, são usados resultados TPU mapeados em G2/TR; no STJ, em SUP, incluindo movimentos específicos de recurso especial com resultado expresso. Resultados parciais, de admissibilidade, não conhecidos e sem evidência datada ficam fora da base binária. Em empate de data e horário, usamos o maior ID do movimento no banco (desempate técnico). Cada documento conta uma vez. Não representa recursos individuais nem a taxa geral do tribunal.</p>
             </aside>}
           </div>
-        </div><p>{court === 'TJDFT' ? 'Visão integrada de resultados locais, precedentes e teses do STJ, com evidências, cobertura e limitações da base.' : 'Metadados processuais do STJ em Responsabilidade Civil; a análise de aderência usa teses e precedentes revisados, não apenas processos relacionados.'}</p>
+        </div><p>{'Pesquise jurisprudência, precedentes e doutrina nos tribunais selecionados, com evidências, cobertura e limitações da base.'}</p>
       </section>
       <form className="filter-panel" aria-label="Filtros do dashboard" onSubmit={apply}>
         <div className="filter-grid">
-          <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{courts.length === authorizedCourts.length ? 'Todos os tribunais' : courts.join(', ')}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} aria-disabled={courts.length === 1 && courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
-          <label className="filter-field"><span>Assunto</span><select value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label>
+          <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{courts.length === authorizedCourts.length ? `Todos os tribunais autorizados (${authorizedCourts.length})` : `${courts.length} selecionado(s): ${courts.join(', ')}`}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} aria-disabled={courts.length === 1 && courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
+          {activeTab === 'precedents' && <label className="filter-field"><span>Tema de Responsabilidade Civil</span><select aria-label="Tema de Responsabilidade Civil" value={topic} onChange={(event) => setTopic(event.target.value)}><option value="">Todos os temas</option>{topicOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
+          {activeTab !== 'corpus' && <label className="filter-field"><span>Assunto CNJ (visão geral)</span><select aria-label="Assunto CNJ (visão geral)" value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label>}
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
         <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={exportPdf}>{exporting ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
         {exportError && <p role="alert">{exportError}</p>}
-        <p className="filter-help">Os filtros são compartilhados entre todas as abas; aplique uma vez e navegue mantendo a seleção. Período por data de ajuizamento, não de julgamento. A comparação de precedentes usa decisões locais do TJDFT e referências do STJ no mesmo assunto e período selecionados.</p>
+        <p className="filter-help">{activeTab === 'corpus' ? 'Selecione abaixo um dos dez temas de Responsabilidade Civil. O acervo usa a data de julgamento ou publicação, quando informada, e permite pesquisar desde 2016. A disponibilidade depende dos documentos carregados e dos tribunais autorizados.' : 'O assunto CNJ filtra os metadados da visão geral por data de ajuizamento. Os dez temas de Responsabilidade Civil são selecionados na aba Acervo por assunto.'}</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
       <nav className="dashboard-tabs" role="tablist" aria-label="Seções do painel">
@@ -343,10 +349,15 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </ChartCard>
       </section>
       </div>}
-      {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} /></div>}
+      {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
-        <PrecedentUsage usage={data?.statistics.precedent_usage} />
+        <PrecedentUsage usage={data?.usage} onClearSubject={applied?.subject ? () => {
+          setDraft(current => ({ ...current, subject: '' }))
+          setApplied(current => ({ ...current, subject: '' }))
+          setLoading(true)
+        } : undefined} />
+        {alignment?.metadata?.source_thesis_coverage?.undated > 0 && <p className="chart-note">Há {formatNumber(alignment.metadata.source_thesis_coverage.undated)} referências sem data confirmada nesta seleção. Elas acompanham o filtro de assunto, mas não comprovam cobertura do período.</p>}
         {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
           {(() => {
             const groups = alignment.thesis_groups || []
@@ -374,7 +385,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
             return <>
           <div className="precedent-grid">
             <article className="thesis-card"><header className="precedent-card-heading"><div><span className="section-kicker">TESES E ENUNCIADOS</span><h3>Teses disponíveis</h3><p>Selecione uma tese para filtrar as decisões e fontes ao lado. Expanda “Resumo da tese” para ler mais.</p></div><span className="design-badge">Fonte rastreável</span></header>
-              <ThesisGroups groups={groups} references={alignment.source_theses || []} selectedId={selectedThesisId} onSelect={(id) => setSelectedThesisId(current => current === id ? null : id)} />
+              <ThesisGroups key={`${court}:${applied?.start}:${applied?.end}:${applied?.subject}:${topic}`} groups={groups} references={alignment.source_theses || []} selectedId={selectedThesisId} onSelect={(id) => setSelectedThesisId(current => current === id ? null : id)} />
             </article>
             <article className="related-card"><header className="precedent-card-heading"><div><span className="section-kicker">DECISÕES E RASTREABILIDADE</span><h3>Decisões relacionadas</h3><p>Consulte em separado avaliações e vínculos do DataJud e processos citados nas referências do Pangea. Uma citação não confirma aderência jurídica.</p></div><span className="design-badge">{evidenceBadge}</span></header>
               {!selectedGroup ? <p role="status">Clique em uma tese à esquerda para consultar suas decisões e fontes.</p> : <>

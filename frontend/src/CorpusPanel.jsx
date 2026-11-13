@@ -6,8 +6,10 @@ const formats = { full_text: 'Inteiro teor', ementa: 'Ementa', publication_excer
 const count = (value) => new Intl.NumberFormat('pt-BR').format(value || 0)
 const dateLabel = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada'
 
-export default function CorpusPanel({ court, start, end }) {
-  const [topic, setTopic] = useState('')
+export default function CorpusPanel({ court, start, end, topic: selectedTopic, onTopicChange, onTopicsChange }) {
+  const [localTopic, setLocalTopic] = useState('')
+  const topic = selectedTopic ?? localTopic
+  function setTopic(value) { if (onTopicChange) onTopicChange(value); else setLocalTopic(value) }
   const [category, setCategory] = useState('jurisprudence')
   const [completeOnly, setCompleteOnly] = useState(false)
   const [includeUndated, setIncludeUndated] = useState(true)
@@ -36,6 +38,9 @@ export default function CorpusPanel({ court, start, end }) {
     return () => { active = false; clearTimeout(timer); controller.abort() }
   }, [court, start, end, topic, category, completeOnly, includeUndated, query, page, retry])
   const data = state.data
+  useEffect(() => {
+    if (data?.topics && onTopicsChange) onTopicsChange(data.topics)
+  }, [data, onTopicsChange])
   const topicLabel = data?.topics.find((item) => item.id === topic)?.label
   const completeTopics = data?.topics.filter((item) => item.has_all_three) || []
   function chooseTopic(value) { setTopic(value); setPage(1) }
@@ -52,6 +57,7 @@ export default function CorpusPanel({ court, start, end }) {
     {state.loading && <p role="status">Consultando o acervo local…</p>}
     {data && <>
       <p className="chart-note">{completeTopics.length ? `${completeTopics.length} assuntos têm material nos três grupos.` : 'Ainda não há assunto com material nos três grupos neste recorte.'} Os dez temas são uma seleção inicial, não um ranking nacional. Um documento pode aparecer em mais de um assunto.</p>
+      <label className="filter-field corpus-topic-filter"><span id="corpus-topic-label">Assunto de Responsabilidade Civil ({data.topics.length} temas)</span><select aria-labelledby="corpus-topic-label" value={topic} onChange={(event) => chooseTopic(event.target.value)}><option value="">Todos os temas</option>{data.topics.map((item) => <option key={item.id} value={item.id}>{item.label} - J: {count(item.counts.jurisprudence)} · P: {count(item.counts.precedent)} · D: {count(item.counts.doctrine)}</option>)}</select></label>
       <div className="corpus-topics" role="group" aria-label="Assuntos de Responsabilidade Civil"><button type="button" aria-pressed={!topic} onClick={() => chooseTopic('')}>Todos os assuntos</button>{data.topics.filter((item) => !completeOnly || item.has_all_three).map((item) => <button key={item.id} type="button" aria-pressed={topic === item.id} onClick={() => chooseTopic(item.id)}><strong>{item.label}</strong><span>{item.has_all_three ? 'Três tipos disponíveis · ' : ''}J: {count(item.counts.jurisprudence)} · P: {count(item.counts.precedent)} · D: {count(item.counts.doctrine)}</span></button>)}</div>
       <div className="corpus-categories" role="group" aria-label="Tipo de conteúdo">{Object.entries(kinds).map(([key, label]) => <button className="secondary-button" type="button" key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setPage(1) }}>{label} ({count(data.counts[key])})</button>)}</div>
       <h3>{kinds[category]}{topicLabel ? ` · ${topicLabel}` : ''}</h3>

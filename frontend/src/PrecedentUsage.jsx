@@ -1,8 +1,15 @@
 const number = value => new Intl.NumberFormat('pt-BR').format(value || 0)
 const labels = { applied: 'Aplicação explícita', not_applied: 'Afastamento explícito', mentioned: 'Somente citação', ambiguous: 'Contexto ambíguo' }
 
-export default function PrecedentUsage({ usage }) {
+export default function PrecedentUsage({ usage, onClearSubject }) {
   if (!usage) return null
+  if (!usage.coverage.documents_analyzed) return <article className="source-card">
+    <h3>Aplicação de precedentes: sem base elegível neste recorte</h3>
+    <p>O percentual não pode ser calculado. Isso não significa ausência de documentos nem taxa de aplicação igual a zero.</p>
+    {usage.coverage.unconfirmed_subject > 0 && <><p>{number(usage.coverage.unconfirmed_subject)} textos não têm o assunto CNJ selecionado confirmado na fonte. Os temas sugeridos pelo NLP não substituem essa confirmação.</p>{onClearSubject && <button type="button" className="secondary-button" onClick={onClearSubject}>Consultar todos os assuntos CNJ</button>}</>}
+    <p className="chart-note">Sem data de julgamento: {number(usage.coverage.undated)}. Sem ementa delimitada: {number(usage.coverage.missing_ementa)}. Confira também o período, o tema e os tribunais selecionados.</p>
+    <p className="chart-note">{usage.disclaimer}</p>
+  </article>
   return <article className="source-card">
     <h3>Aplicação de precedentes identificada nos textos públicos</h3>
     <p>{usage.application_rate == null ? 'Sem sinal explícito para calcular o percentual.' : `${(usage.application_rate * 100).toFixed(1).replace('.', ',')}% de aplicações entre os vínculos explícitos.`} Base: {number(usage.denominator)} pares de documento e precedente.</p>
