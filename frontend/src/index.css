@@ -170,7 +170,7 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .alignment-sources li { margin: 5px 0; }
 @media (max-width: 900px) { .alignment-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .alignment-section { padding: 20px 14px; } .alignment-metrics { grid-template-columns: 1fr; } }
-.dashboard-tabs { display: flex; gap: 8px; margin-top: 30px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.dashboard-tabs { max-width: 100%; min-width: 0; display: flex; gap: 8px; margin-top: 30px; border-bottom: 1px solid var(--border); overflow-x: auto; }
 .dashboard-tabs button { flex: 0 0 auto; padding: 14px 18px 12px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #56616b; font-weight: 700; cursor: pointer; }
 .dashboard-tabs button:hover { color: var(--deep-navy); }
 .dashboard-tabs button.is-active { border-bottom-color: var(--gold); color: var(--deep-navy); }
@@ -364,6 +364,8 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .corpus-result a { display: inline-block; margin-top: 16px; color: #1f4e5f; }
 .corpus-result summary { cursor: pointer; }
 .corpus-excerpt { white-space: pre-wrap; max-height: 230px; overflow: auto; }
+.corpus-topic-filter { width: 100%; max-width: 640px; margin: 18px 0; }
+.corpus-topic-filter select { width: 100%; min-width: 0; }
 .corpus-message { padding: 14px; background: #f7f4e9; line-height: 1.6; }
 @media (max-width: 900px) { .corpus-topics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) { .corpus-panel { padding: 16px; } .corpus-counts,.corpus-results,.corpus-topics { grid-template-columns: 1fr; } .corpus-search { align-items: stretch; flex-direction: column; } }

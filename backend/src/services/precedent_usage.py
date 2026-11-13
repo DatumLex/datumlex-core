@@ -9,6 +9,7 @@ from django.db.models import OuterRef, Subquery
 
 from src.db.models import NlpTextVersion
 from src.nlp.contracts import bytes_hash, fingerprint
+from src.nlp.topics import classify
 
 VERSION = 'ementa-explicit-stj-v1'
 DISCLAIMER = ('Identificação automática de linguagem na ementa, sem aprovação dos desenvolvedores. '
@@ -114,6 +115,9 @@ def summarize(scope, *, page=1, page_size=20):
                 or source.get('data_mode') == 'fixture'):
             continue
         coverage['source_documents'] += 1
+        if scope.get('topic') and scope['topic'] not in classify(version.text):
+            coverage['outside_topic'] += 1
+            continue
         if (source.get('court') != version.document.court
                 or source.get('document_id') != version.document.source_key
                 or not official_source(source.get('source_url', ''))):

@@ -1,6 +1,7 @@
 from functools import wraps
 
 from src.nlp.thesis_display import describe_thesis
+from src.nlp.topics import TOPICS
 
 from django.db import DatabaseError, connection
 from django.db.models import Count, Max, Prefetch, Q
@@ -14,6 +15,7 @@ from src.db.models import (
     DimSubject,
     FactProcess,
     LegalReference,
+    LegalCorpusTopicMatch,
     PangeaImportRun,
     ProcessMovement,
 )
@@ -66,16 +68,21 @@ def health(request):
 @endpoint
 def scope(request):
     query, selected = filtered_processes(request.GET)
+    subjects = list(
+        DimSubject.objects.filter(factprocess__court__in=selected["court"].split(","))
+        .annotate(record_count=Count("factprocess", distinct=True))
+        .filter(record_count__gt=0)
+        .order_by("code")
+        .values("code", "name", "record_count")
+    )
+    for subject in subjects:
+        subject["name"] = (subject["name"] or "").strip() or (
+            f"Assunto CNJ {subject['code']} (nome não informado)"
+        )
     return {
         "metadata": metadata(query, selected),
         "by_court": metadata_by_court(query, selected),
-        "subjects": list(
-            DimSubject.objects.filter(factprocess__court__in=selected["court"].split(","))
-            .annotate(record_count=Count("factprocess", distinct=True))
-            .filter(record_count__gt=0)
-            .order_by("code")
-            .values("code", "name", "record_count")
-        ),
+        "subjects": subjects,
     }
 
 
@@ -174,7 +181,20 @@ def processes(request):
 
 @endpoint
 def alignment(request):
-    _, selected = filtered_processes(request.GET)
+    params = request.GET.copy()
+    if len(params.getlist("topic")) > 1:
+        raise InvalidQuery("Repeated topic filter")
+    topic = params.get("topic", "")
+    if topic and topic not in {key for key, _, _ in TOPICS}:
+        raise InvalidQuery("Unknown responsibility-civil topic")
+    params.pop("topic", None)
+    _, selected = filtered_processes(params)
+    topic_reference_ids = None
+    if topic:
+        topic_reference_ids = list(LegalCorpusTopicMatch.objects.filter(
+            topic=topic, item__category="precedent",
+        ).values_list("item__provenance__reference_id", flat=True))
+        topic_reference_ids = [int(value) for value in topic_reference_ids if str(value).isdigit()]
     if selected["court"] != "TJDFT":
         raise InvalidQuery("Jurisprudential alignment is scoped to local TJDFT decisions")
     assessments = DecisionAssessment.objects.filter(
@@ -187,6 +207,8 @@ def alignment(request):
     ).select_related("local_decision__process_dimension", "reference")
     if selected["subject"]:
         assessments = assessments.filter(local_decision__subjects__code=selected["subject"])
+    if topic_reference_ids is not None:
+        assessments = assessments.filter(reference_id__in=topic_reference_ids)
     assessments = assessments.order_by()
     period_assessments = DecisionAssessment.objects.filter(
         local_decision__court="TJDFT", decision_date__range=[selected["start"], selected["end"]],
@@ -194,6 +216,8 @@ def alignment(request):
     )
     if selected["subject"]:
         period_assessments = period_assessments.filter(local_decision__subjects__code=selected["subject"])
+    if topic_reference_ids is not None:
+        period_assessments = period_assessments.filter(reference_id__in=topic_reference_ids)
     counts = assessments.aggregate(
         validated_links=Count("pk", distinct=True),
         local_decisions=Count("local_decision_id", distinct=True),
@@ -233,10 +257,19 @@ def alignment(request):
     source_theses_query = LegalReference.objects.filter(
         reference_type=LegalReference.PRECEDENT,
         source_institution="STJ",
-    ).order_by("-imported_at", "-id").values(
+    ).filter(Q(published_at__isnull=True) | Q(published_at__range=[selected["start"], selected["end"]]))
+    if selected["subject"]:
+        matching_assessments = period_assessments.values("reference_id")
+        source_theses_query = source_theses_query.filter(
+            Q(subject_code=selected["subject"]) | Q(id__in=matching_assessments)
+        )
+    if topic_reference_ids is not None:
+        source_theses_query = source_theses_query.filter(id__in=topic_reference_ids)
+    selected_reference_ids = list(source_theses_query.values_list("id", flat=True))
+    source_theses_query = source_theses_query.order_by("-imported_at", "-id").values(
         "id", "identifier", "title", "thesis", "source_name", "source_url",
         "source_locator", "approved", "approval_reference", "related_decisions",
-        "source_updated_at",
+        "source_updated_at", "published_at",
     )
     source_theses = []
     reviewed_thesis_counts = {
@@ -247,6 +280,7 @@ def alignment(request):
         reference__reference_type=LegalReference.PRECEDENT,
         reference__source_institution="STJ",
     )
+    candidate_scope = candidate_scope.filter(reference_id__in=selected_reference_ids)
     if selected["subject"]:
         candidate_scope = candidate_scope.filter(local_decision__subjects__code=selected["subject"])
     matched_by_reference = {
@@ -392,7 +426,13 @@ def alignment(request):
             for row in unresolved_rows
         ],
         "metadata": {
-            "scope": {**selected, "date_field": "decision_date", "court": "TJDFT"},
+            "scope": {**selected, "topic": topic, "date_field": "decision_date", "court": "TJDFT"},
+            "source_thesis_coverage": {
+                "period_field": "published_at",
+                "undated": sum(row["published_at"] is None for row in source_theses),
+                "date_filter_applied": True,
+                "undated_included": True,
+            },
             "source": "Corpus aprovado e avaliações revisadas; fontes citadas por registro.",
             "coverage": "Avaliações jurídicas validadas usam data de decisão informada na revisão. Sugestões por identificador abrangem as citações cadastradas nas fontes STJ e os registros TJDFT locais; não têm data de julgamento confiável e não recebem o filtro de período.",
             "limitations": [
@@ -438,7 +478,16 @@ def alignment(request):
 
 @endpoint
 def precedent_usage(request):
-    _, selected = filtered_processes(request.GET)
+    params = request.GET.copy()
+    if len(params.getlist("topic")) > 1:
+        raise InvalidQuery("Repeated topic filter")
+    topic = params.get("topic", "")
+    if topic and topic not in {key for key, _, _ in TOPICS}:
+        raise InvalidQuery("Unknown responsibility-civil topic")
+    params.pop("topic", None)
+    _, selected = filtered_processes(params)
+    if topic:
+        selected["topic"] = topic
     try:
         page, size = int(request.GET.get('page', 1)), int(request.GET.get('page_size', 20))
         if page < 1 or not 1 <= size <= 100:
