@@ -1,16 +1,16 @@
 const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
-export async function downloadReport(filters) {
-  const response = await fetch(`${base}/report.pdf/?${new URLSearchParams(filters)}`, { credentials: 'include' })
+export async function downloadReport(filters, format = 'pdf') {
+  const response = await fetch(`${base}/report.${format}/?${new URLSearchParams(filters)}`, { credentials: 'include' })
   if (response.status === 401) window.dispatchEvent(new Event('datumlex:session-ended'))
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
-    throw new Error(data.error?.message || 'Não foi possível gerar o PDF. Tente novamente.')
+    throw new Error(data.error?.message || 'Não foi possível gerar o arquivo. Tente novamente.')
   }
   const url = URL.createObjectURL(await response.blob())
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `datumlex-${filters.start}-${filters.end}.pdf`
+  anchor.download = `datumlex-${filters.start}-${filters.end}.${format}`
   document.body.append(anchor)
   anchor.click()
   anchor.remove()

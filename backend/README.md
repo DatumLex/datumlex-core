@@ -267,3 +267,24 @@ approval and citation metadata. The application does not label cases as aligned
 or misaligned from process metadata alone. See [the approved-corpus import and
 review workflow](docs/precedent-alignment.md) for cited, human-validated
 TJDFT-to-STJ/BDJur assessments.
+
+
+## Exportação para Excel
+
+No painel, aplique os filtros e clique em **Exportar Excel**. O endpoint autenticado
+`GET /api/report.xlsx/?court=TJDFT&start=2023-01-01&end=2023-12-31`
+aceita os mesmos filtros de tribunal, período de ajuizamento e assunto do painel.
+A permissão é verificada para todos os tribunais selecionados.
+
+O arquivo `.xlsx` contém as abas Documentos (todos os registros filtrados, sem
+paginação), Indicadores, Trimestres e Contexto. Identificadores processuais são
+texto para preservar zeros iniciais; contagens e taxas são células numéricas.
+Textos da fonte são armazenados como texto literal, sem fórmulas executáveis.
+A primeira linha fica congelada e as abas possuem autofiltro. A exportação usa
+somente a base local parcial, uma linha por documento DataJud, e não representa
+uma contagem de recursos individuais. As taxas estão entre 0 e 1. O arquivo
+registra o momento de exportação e os filtros; não é um snapshot NLP persistido.
+
+Consultas acima de 1.048.575 documentos devem ser reduzidas por período ou assunto
+para respeitar o limite de linhas do Excel. Textos são limitados a 32.767 caracteres
+por célula. Não é necessário instalar novas dependências.

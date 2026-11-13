@@ -267,12 +267,12 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
   }
 
-  async function exportPdf() {
+  async function exportFile(format = 'pdf') {
     if (!data || loading || exporting) return
     const scope = data.statistics.metadata.scope
-    setExporting(true); setExportError('')
+    setExporting(format); setExportError('')
     try {
-      await downloadReport({ court: scope.court, start: scope.start, end: scope.end, ...(scope.subject ? { subject: scope.subject } : {}) })
+      await downloadReport({ court: scope.court, start: scope.start, end: scope.end, ...(scope.subject ? { subject: scope.subject } : {}) }, format)
     } catch (failure) { setExportError(failure.message) }
     finally { setExporting(false) }
   }
@@ -312,7 +312,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
-        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={exportPdf}>{exporting ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
+        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || !!exporting} onClick={() => exportFile('xlsx')}>{exporting === 'xlsx' ? 'Gerando Excel…' : 'Exportar Excel'}</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={() => exportFile('pdf')}>{exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
         {exportError && <p role="alert">{exportError}</p>}
         <p className="filter-help">Os filtros são compartilhados entre todas as abas; aplique uma vez e navegue mantendo a seleção. Período por data de ajuizamento, não de julgamento. A comparação de precedentes usa decisões locais do TJDFT e referências do STJ no mesmo assunto e período selecionados.</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
