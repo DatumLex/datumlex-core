@@ -192,6 +192,9 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const bounds = supportedPeriod()
   const [data, setData] = useState(null)
   const [alignment, setAlignment] = useState(null)
+  const [usage, setUsage] = useState(null)
+  const [usageLoading, setUsageLoading] = useState(false)
+  const [usageError, setUsageError] = useState('')
   const [selectedThesisId, setSelectedThesisId] = useState(null)
   const [evidenceDrawerItem, setEvidenceDrawerItem] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -228,18 +231,17 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         const available = supportedPeriod()
         const filters = applied || (available.start && available.end ? { start: available.start, end: available.end } : {})
         const [statistics, instances, distribution] = await Promise.all(
-          ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court }, controller.signal)),
+          ['statistics', 'instances', 'distribution'].map((resource) => getData(resource, { ...filters, court, ...(resource === 'statistics' ? { include_precedent_usage: 'false' } : {}) }, controller.signal)),
         )
-        const usage = topic ? await getData('precedent-usage', { ...filters, court, topic }, controller.signal) : statistics.precedent_usage
         const filteredScope = await getData('scope', { ...filters, court }, controller.signal)
         const filteredScopes = Object.fromEntries(courts.map(code => [code, { metadata: filteredScope.by_court?.[code] || (courts.length === 1 ? filteredScope.metadata : null) }]))
-        const alignmentResult = courts.includes('TJDFT')
+        const alignmentResult = activeTab === 'precedents' && courts.includes('TJDFT')
           ? await getData('alignment', { ...filters, court: 'TJDFT', ...(topic ? { topic } : {}) }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
         if (!applied) setDraft((current) => current.start ? current : { start: available.start || '', end: available.end || '', subject: '' })
-        setData({ statistics, instances, distribution, courtScopes, filteredScopes, usage })
+        setData({ statistics, instances, distribution, courtScopes, filteredScopes })
         setAlignment(alignmentResult)
         setError('')
       } catch (failure) {
@@ -254,7 +256,21 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     }
     load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [applied, retry, court, courts, authorizedCourts, topic])
+  }, [applied, retry, court, courts, authorizedCourts, topic, activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'precedents') return
+    const controller = new AbortController()
+    let active = true
+    const timeout = setTimeout(() => controller.abort(), 120000)
+    setUsage(null); setUsageLoading(true); setUsageError('')
+    const filters = applied || { start: bounds.start, end: bounds.end }
+    getData('precedent-usage', { ...filters, court, ...(topic ? { topic } : {}) }, controller.signal)
+      .then(result => { if (active) setUsage(result) })
+      .catch(error => { if (active) setUsageError(error.name === 'AbortError' ? 'A análise textual ainda não respondeu. Tente novamente; os demais dados continuam disponíveis.' : error.message) })
+      .finally(() => { clearTimeout(timeout); if (active) setUsageLoading(false) })
+    return () => { active = false; clearTimeout(timeout); controller.abort() }
+  }, [activeTab, applied, court, topic, retry, bounds.start, bounds.end])
 
   function apply(event) {
     event.preventDefault()
@@ -352,7 +368,9 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
       {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
-        <PrecedentUsage usage={data?.usage} onClearSubject={applied?.subject ? () => {
+        {usageLoading && <p role="status" className="chart-note">Analisando os textos para identificar a aplicação de precedentes. As teses e os demais indicadores carregam separadamente.</p>}
+        {usageError && <p role="alert">{usageError} <button className="secondary-button" type="button" onClick={() => setRetry(value => value + 1)}>Tentar análise novamente</button></p>}
+        <PrecedentUsage usage={usage} onClearSubject={applied?.subject ? () => {
           setDraft(current => ({ ...current, subject: '' }))
           setApplied(current => ({ ...current, subject: '' }))
           setLoading(true)
