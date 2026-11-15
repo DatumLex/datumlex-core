@@ -1,0 +1,70 @@
+name: Reference and NLP integrity
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reference-nlp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrity:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: Test 1 - Reference idempotency
+            tests: tests.test_reference_nlp tests.test_nlp_computation_cache
+          - check: Test 3 - NLP evidence integrity
+            tests: tests.test_nlp_evidence tests.test_ci_evidence_integrity
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: datumlex_ci
+          POSTGRES_USER: datumlex_ci
+          POSTGRES_PASSWORD: disposable-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U datumlex_ci -d datumlex_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://datumlex_ci:disposable-ci-only@127.0.0.1:5432/datumlex_ci
+      DJANGO_SECRET_KEY: disposable-ci-key-not-for-deployment
+      DJANGO_DEBUG: 'false'
+      DATAJUD_API_KEY: ''
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check Django configuration
+        run: python manage.py check
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run
+      - name: Apply migrations on disposable PostgreSQL
+        run: python manage.py migrate --noinput
+      - name: Run integrity tests
+        run: python manage.py test ${{ matrix.tests }} --noinput --verbosity 2

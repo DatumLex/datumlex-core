@@ -58,6 +58,8 @@ try {
     select.selectOption('perda-chance'),
   ])
   assert.ok(requests.some(url => url.searchParams.get('start') === '2016-01-01'))
+  assert.ok(requests.filter(url => url.pathname.endsWith('/statistics/')).every(url => url.searchParams.get('include_precedent_usage') === 'false'))
+  assert.equal(requests.filter(url => url.pathname.endsWith('/precedent-usage/')).length, 0)
   await page.getByRole('button', { name: /Todos os tribunais autorizados \(10\)/ }).click()
   assert.equal(await page.locator('#tribunal-options input[type=checkbox]').count(), 10)
   await page.locator('.tribunal-trigger').click()

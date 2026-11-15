@@ -33,3 +33,10 @@ after access changes. A downloaded ZIP alone does not change the running databas
 Regression coverage: `test_dashboard_filter_options.py`,
 `test_thesis_filter_scope.py`, and `frontend/tests/dashboard-filters.mjs`.
 No migrations or data rewrite are required for this correction.
+
+## Overview latency
+
+The frontend requests statistics with include_precedent_usage=false and loads
+the full-text precedent-use analysis independently only on the thesis tab.
+A slow text scan must not block overview indicators or source-thesis browsing.
+Existing API clients retain the default statistics payload.

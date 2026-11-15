@@ -88,11 +88,18 @@ def scope(request):
 
 @endpoint
 def statistics(request):
-    query, selected = filtered_processes(request.GET)
+    params = request.GET.copy()
+    if len(params.getlist("include_precedent_usage")) > 1:
+        raise InvalidQuery("Repeated include_precedent_usage parameter")
+    include_usage = params.get("include_precedent_usage", "true")
+    if include_usage not in ("true", "false"):
+        raise InvalidQuery("include_precedent_usage must be true or false")
+    params.pop("include_precedent_usage", None)
+    query, selected = filtered_processes(params)
     return {
         "status": "partial" if query.exists() else "empty",
         "metrics": metrics(query),
-        "precedent_usage": summarize_usage(selected),
+        "precedent_usage": summarize_usage(selected) if include_usage == "true" else None,
         "metadata": metadata(query, selected),
     }
 
