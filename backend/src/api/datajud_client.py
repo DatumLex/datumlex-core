@@ -1,6 +1,7 @@
 """Bounded retries and strict search_after pagination for DataJud court APIs."""
 
 import json
+import os
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -26,14 +27,24 @@ class DataJudError(Exception):
     pass
 
 
+class _RetryableSearchError(Exception):
+    """A successful HTTP response can still contain an incomplete search."""
+
+
 class DataJudClient:
-    def __init__(self, api_key, court="TJDFT", timeout=45, attempts=4, pause=0.5):
+    def __init__(self, api_key, court="TJDFT", timeout=None, attempts=4, pause=0.5):
         if court not in ENDPOINTS:
             raise DataJudError("Unsupported DataJud court.")
         if not api_key.strip():
             raise DataJudError("Configure DATAJUD_API_KEY using the current CNJ public key.")
         self.api_key = api_key.strip().removeprefix("APIKey ")
-        self.timeout, self.attempts, self.pause = timeout, attempts, pause
+        try:
+            self.timeout = float(timeout if timeout is not None else os.environ.get("DATAJUD_HTTP_TIMEOUT", "120"))
+        except (ValueError, TypeError):
+            raise DataJudError("DATAJUD_HTTP_TIMEOUT must be a positive number of seconds, at most 300.") from None
+        if not 0 < self.timeout <= 300:
+            raise DataJudError("DATAJUD_HTTP_TIMEOUT must be a positive number of seconds, at most 300.")
+        self.attempts, self.pause = attempts, pause
         self.endpoint = ENDPOINTS[court]
 
     def search(self, scope, cursor=None):
@@ -80,13 +91,24 @@ class DataJudClient:
                 "User-Agent": "DatumLex-local-research/0.1",
             },
         )
+        last_problem = ""
         for attempt in range(self.attempts):
             retry_after = None
             try:
                 with urlopen(request, timeout=self.timeout) as response:
                     result = json.load(response)
-                if result.get("timed_out") or result.get("_shards", {}).get("failed", 0):
-                    raise DataJudError("DataJud returned an incomplete search; page was not loaded.")
+                shards = result.get("_shards", {})
+                if result.get("timed_out") or shards.get("failed", 0):
+                    failures = shards.get("failures", [])
+                    overloaded = bool(failures) and all(
+                        failure.get("reason", {}).get("type") == "es_rejected_execution_exception"
+                        for failure in failures
+                    )
+                    if not result.get("timed_out") and not overloaded:
+                        raise DataJudError("DataJud returned an incomplete search; page was not loaded.")
+                    last_problem = "source overloaded or search timed out; incomplete page was not loaded"
+                    retry_after = str(min(30, 10 * (attempt + 1)))
+                    raise _RetryableSearchError
                 if not isinstance(result.get("hits", {}).get("hits"), list):
                     raise DataJudError("Unexpected DataJud response schema.")
                 hits = result["hits"]["hits"]
@@ -107,9 +129,14 @@ class DataJudClient:
                 retry_after = exc.headers.get("Retry-After")
             except (URLError, TimeoutError, OSError):
                 pass
+            except _RetryableSearchError:
+                pass
             except (ValueError, TypeError):
                 raise DataJudError("DataJud returned invalid JSON.") from None
             if attempt + 1 < self.attempts:
                 delay = float(retry_after) if retry_after and retry_after.isdigit() else 2**attempt
                 time.sleep(min(delay, 30))
-        raise DataJudError("DataJud unavailable after bounded retries; resume the saved run later.")
+        raise DataJudError(
+            f"DataJud unavailable after bounded retries (timeout {self.timeout:g}s per attempt); "
+            f"resume the saved run later.{(' Last response: ' + last_problem + '.') if last_problem else ''}"
+        )
