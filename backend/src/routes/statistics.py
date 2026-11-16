@@ -21,6 +21,7 @@ from src.db.models import (
 )
 from src.services.outcomes import CODES, classify, summarize
 from src.services.precedent_usage import summarize as summarize_usage
+from src.services.subject_groups import grouped_options, matching_codes
 from src.services.statistics_service import (
     InvalidQuery,
     filtered_processes,
@@ -83,6 +84,7 @@ def scope(request):
         "metadata": metadata(query, selected),
         "by_court": metadata_by_court(query, selected),
         "subjects": subjects,
+        "subject_groups": grouped_options(subjects, selected['court'].split(',')),
     }
 
 
@@ -213,7 +215,7 @@ def alignment(request):
         reference__source_institution="STJ",
     ).select_related("local_decision__process_dimension", "reference")
     if selected["subject"]:
-        assessments = assessments.filter(local_decision__subjects__code=selected["subject"])
+        assessments = assessments.filter(local_decision__subjects__code__in=matching_codes(selected["subject"])).distinct()
     if topic_reference_ids is not None:
         assessments = assessments.filter(reference_id__in=topic_reference_ids)
     assessments = assessments.order_by()
@@ -222,7 +224,7 @@ def alignment(request):
         reference__reference_type=LegalReference.PRECEDENT, reference__source_institution="STJ",
     )
     if selected["subject"]:
-        period_assessments = period_assessments.filter(local_decision__subjects__code=selected["subject"])
+        period_assessments = period_assessments.filter(local_decision__subjects__code__in=matching_codes(selected["subject"])).distinct()
     if topic_reference_ids is not None:
         period_assessments = period_assessments.filter(reference_id__in=topic_reference_ids)
     counts = assessments.aggregate(
@@ -268,7 +270,7 @@ def alignment(request):
     if selected["subject"]:
         matching_assessments = period_assessments.values("reference_id")
         source_theses_query = source_theses_query.filter(
-            Q(subject_code=selected["subject"]) | Q(id__in=matching_assessments)
+            Q(subject_code__in=matching_codes(selected["subject"])) | Q(id__in=matching_assessments)
         )
     if topic_reference_ids is not None:
         source_theses_query = source_theses_query.filter(id__in=topic_reference_ids)
@@ -289,7 +291,7 @@ def alignment(request):
     )
     candidate_scope = candidate_scope.filter(reference_id__in=selected_reference_ids)
     if selected["subject"]:
-        candidate_scope = candidate_scope.filter(local_decision__subjects__code=selected["subject"])
+        candidate_scope = candidate_scope.filter(local_decision__subjects__code__in=matching_codes(selected["subject"])).distinct()
     matched_by_reference = {
         row["reference_id"]: row["matched"]
         for row in candidate_scope.filter(

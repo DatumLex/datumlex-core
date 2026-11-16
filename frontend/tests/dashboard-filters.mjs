@@ -29,6 +29,11 @@ await page.route('**/api/**', route => {
   } : resource === 'scope' ? {
     metadata, by_court: {}, subjects: [
       { code: 101, name: '', record_count: 4 }, { code: 102, name: '  ', record_count: 10 },
+      { code: 301, name: 'Acidente de Trânsito', record_count: 4 },
+      { code: 302, name: 'Acidente de Trânsito', record_count: 3 },
+    ], subject_groups: [
+      { code: 101, name: '', record_count: 4 }, { code: 102, name: '  ', record_count: 10 },
+      { code: 301, codes: [301, 302], name: 'Acidente de Trânsito', record_count: 6 },
     ],
   } : resource === 'statistics' ? {
     status: 'empty', metadata, metrics: { process_records: 0, binary_denominator: 0 },
@@ -58,10 +63,27 @@ try {
     select.selectOption('perda-chance'),
   ])
   assert.ok(requests.some(url => url.searchParams.get('start') === '2016-01-01'))
+  await Promise.all([
+    page.waitForResponse(response => response.url().includes('/corpus/') && !new URL(response.url()).searchParams.get('topic')),
+    page.getByRole('button', { name: 'Limpar seleção de assunto', exact: true }).click(),
+  ])
+  assert.equal(await select.inputValue(), '')
   assert.ok(requests.filter(url => url.pathname.endsWith('/statistics/')).every(url => url.searchParams.get('include_precedent_usage') === 'false'))
   assert.equal(requests.filter(url => url.pathname.endsWith('/precedent-usage/')).length, 0)
   await page.getByRole('button', { name: /Todos os tribunais autorizados \(10\)/ }).click()
   assert.equal(await page.locator('#tribunal-options input[type=checkbox]').count(), 10)
+  await page.getByRole('button', { name: 'Desmarcar todos', exact: true }).click()
+  assert.equal(await page.locator('#tribunal-options input:checked').count(), 0)
+  await page.getByText('Selecione pelo menos um tribunal para pesquisar.', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Aplicar filtros', exact: true }).isDisabled(), true)
+  if (!await page.locator('#tribunal-options').isVisible()) await page.locator('.tribunal-trigger').click()
+  await page.locator('#tribunal-options input').first().check()
+  await page.locator('#tribunal-options input').first().uncheck()
+  assert.equal(await page.locator('#tribunal-options input:checked').count(), 0)
+  if (!await page.locator('#tribunal-options').isVisible()) await page.locator('.tribunal-trigger').click()
+  await page.getByRole('button', { name: 'Selecionar todos', exact: true }).click()
+  await select.waitFor()
+  assert.ok(requests.every(url => url.searchParams.get('court')))
   await page.locator('.tribunal-trigger').click()
   assert.match(await page.getByRole('heading', { level: 1 }).innerText(), /10 tribunais selecionados/)
   assert.equal(await page.getByLabel('Assunto CNJ (visão geral)', { exact: true }).count(), 0)
@@ -69,8 +91,15 @@ try {
   const cnj = page.getByLabel('Assunto CNJ (visão geral)', { exact: true })
   await cnj.waitFor()
   assert.deepEqual(await cnj.locator('option').allTextContents(), [
-    'Todos os assuntos', 'Assunto CNJ 101 (nome não informado) (4)', 'Assunto CNJ 102 (nome não informado) (10)',
+    'Todos os assuntos', 'Acidente de Trânsito (6)', 'Assunto CNJ 101 (nome não informado) (4)', 'Assunto CNJ 102 (nome não informado) (10)',
   ])
+  await cnj.selectOption('101')
+  await Promise.all([
+    page.waitForResponse(response => response.url().includes('/statistics/') && new URL(response.url()).searchParams.get('subject') === '101'),
+    page.getByRole('button', { name: 'Aplicar filtros', exact: true }).click(),
+  ])
+  await page.getByRole('button', { name: 'Limpar seleção de assunto', exact: true }).click()
+  assert.equal(await cnj.inputValue(), '')
   await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
   await select.waitFor()
   await page.setViewportSize({ width: 320, height: 900 })

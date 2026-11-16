@@ -4,6 +4,7 @@ from django.db.models import Count, Exists, F, Max, Min, OuterRef
 
 from src.db.models import ExtractionRun, FactProcess, FactProcessSubject
 from src.services.outcomes import summarize
+from src.services.subject_groups import matching_codes
 from src.services.period import HISTORY_START, today
 from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
@@ -37,7 +38,7 @@ def filtered_processes(params):
     query = FactProcess.objects.filter(court__in=courts, time__date__range=[start, end])
     if subject:
         query = query.filter(
-            Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code=subject))
+            Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code__in=matching_codes(subject)))
         )
     # EXISTS keeps one row per document without DISTINCT over large JSON payloads.
     return query, {

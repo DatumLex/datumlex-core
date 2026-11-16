@@ -10,6 +10,7 @@ from django.db.models import OuterRef, Subquery
 from src.db.models import NlpTextVersion
 from src.nlp.contracts import bytes_hash, fingerprint
 from src.nlp.topics import classify
+from src.services.subject_groups import matching_codes
 
 VERSION = 'ementa-explicit-stj-v1'
 DISCLAIMER = ('Identificação automática de linguagem na ementa, sem aprovação dos desenvolvedores. '
@@ -99,6 +100,7 @@ def extract(text, source):
 
 
 def summarize(scope, *, page=1, page_size=20):
+    selected_subject_codes = set(matching_codes(scope['subject'])) if scope.get('subject') else set()
     coverage = Counter()
     records = []
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
@@ -123,7 +125,7 @@ def summarize(scope, *, page=1, page_size=20):
                 or not official_source(source.get('source_url', ''))):
             coverage['unverified_source'] += 1
             continue
-        if scope.get('subject') and scope['subject'] not in (source.get('subject_codes') or []):
+        if selected_subject_codes and not selected_subject_codes.intersection(source.get('subject_codes') or []):
             coverage['unconfirmed_subject'] += 1
             continue
         try:
