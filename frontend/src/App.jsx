@@ -178,7 +178,6 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     return () => document.removeEventListener('pointerdown', closeOutside)
   }, [courtMenuOpen])
   function selectCourts(next) {
-    if (!next.length) return
     if (next.length === courts.length && next.every((code) => courts.includes(code))) return
     setCourts(next)
     setLoading(true); setError('')
@@ -217,6 +216,11 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }, [])
 
   useEffect(() => {
+    if (!courts.length) {
+      setData(null); setAlignment(null); setUsage(null)
+      setLoading(false); setUsageLoading(false); setError(''); setUsageError('')
+      return
+    }
     const controller = new AbortController()
     let active = true
     const timeout = setTimeout(() => controller.abort(), 20000)
@@ -259,7 +263,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }, [applied, retry, court, courts, authorizedCourts, topic, activeTab])
 
   useEffect(() => {
-    if (activeTab !== 'precedents') return
+    if (activeTab !== 'precedents' || !courts.length) return
     const controller = new AbortController()
     let active = true
     const timeout = setTimeout(() => controller.abort(), 120000)
@@ -274,6 +278,10 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
 
   function apply(event) {
     event.preventDefault()
+    if (!courts.length) {
+      setValidation('Selecione pelo menos um tribunal para pesquisar.')
+      return
+    }
     if (!draft.start || !draft.end || draft.start > draft.end) {
       setValidation('Informe um período válido: a data inicial deve ser anterior ou igual à final.')
       return
@@ -285,6 +293,14 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     setDraft({ start: '', end: '', subject: '' })
     setTopic('')
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
+  }
+
+  function clearSubject() {
+    setDraft(current => ({ ...current, subject: '' }))
+    if (applied?.subject) {
+      setApplied(current => ({ ...current, subject: '' }))
+      setLoading(courts.length > 0)
+    }
   }
 
   async function exportFile(format = 'pdf') {
@@ -304,7 +320,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const unavailableNote = loading ? 'Consultando a base local.' : error ? 'A consulta falhou. Tente novamente.' : 'Sem documentos com resultado binário identificável neste período.'
   const rateNote = metrics?.binary_denominator ? `Base: ${formatNumber(metrics.binary_denominator)} documentos com resultado mais recente identificado. Indicador por documento, não por recurso individual.` : unavailableNote
   const refreshed = metadata?.last_record_refresh
-  const subjectOptions = [...Object.values(data?.courtScopes || {}).flatMap((scope) => scope.subjects || []).reduce((subjects, subject) => {
+  const subjectOptions = [...Object.values(data?.courtScopes || {}).flatMap((scope) => scope.subject_groups || scope.subjects || []).reduce((subjects, subject) => {
     subject = { ...subject, name: subject.name?.trim() || `Assunto CNJ ${subject.code} (nome não informado)` }
     const current = subjects.get(subject.code)
     subjects.set(subject.code, current
@@ -328,13 +344,13 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
       </section>
       <form className="filter-panel" aria-label="Filtros do dashboard" onSubmit={apply}>
         <div className="filter-grid">
-          <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{courts.length === authorizedCourts.length ? `Todos os tribunais autorizados (${authorizedCourts.length})` : `${courts.length} selecionado(s): ${courts.join(', ')}`}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} aria-disabled={courts.length === 1 && courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
-          {activeTab === 'precedents' && <label className="filter-field"><span>Tema de Responsabilidade Civil</span><select aria-label="Tema de Responsabilidade Civil" value={topic} onChange={(event) => setTopic(event.target.value)}><option value="">Todos os temas</option>{topicOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
-          {activeTab !== 'corpus' && <label className="filter-field"><span>Assunto CNJ (visão geral)</span><select aria-label="Assunto CNJ (visão geral)" value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label>}
+          <div className="filter-field tribunal-filter"><span id="tribunal-label">Tribunais</span><div ref={courtMenuRef} className="tribunal-select" onKeyDown={(event) => { if (event.key === 'Escape') { setCourtMenuOpen(false); courtButtonRef.current?.focus() } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCourtMenuOpen(false) }}><button ref={courtButtonRef} className="tribunal-trigger" type="button" aria-expanded={courtMenuOpen} aria-controls="tribunal-options" aria-labelledby="tribunal-label tribunal-selection" onClick={() => setCourtMenuOpen((open) => !open)}><span id="tribunal-selection">{!courts.length ? 'Nenhum tribunal selecionado' : courts.length === authorizedCourts.length ? `Todos os tribunais autorizados (${authorizedCourts.length})` : `${courts.length} selecionado(s): ${courts.join(', ')}`}</span><ChevronDown size={16} aria-hidden="true" /></button>{courtMenuOpen && <div id="tribunal-options" className="tribunal-options" role="group" aria-label="Selecionar tribunais"><button type="button" className="text-button" title="Selecionar todos os tribunais" onClick={() => selectCourts([...authorizedCourts])}><ListChecks size={19} aria-hidden="true" />Selecionar todos</button><button type="button" className="text-button" title="Desmarcar todos os tribunais" disabled={!courts.length} onClick={() => selectCourts([])}>Desmarcar todos</button>{authorizedCourts.map((option) => <label key={option}><input type="checkbox" checked={courts.includes(option)} onChange={(event) => selectCourts(event.target.checked ? [...courts, option] : courts.filter((code) => code !== option))} />{option}</label>)}</div>}</div></div>
+          {activeTab === 'precedents' && <div className="filter-field"><label><span>Tema de Responsabilidade Civil</span><select aria-label="Tema de Responsabilidade Civil" value={topic} onChange={(event) => setTopic(event.target.value)}><option value="">Todos os temas</option>{topicOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><button className="filter-clear" type="button" disabled={!topic} onClick={() => setTopic('')}>Limpar seleção de tema</button></div>}
+          {activeTab !== 'corpus' && <div className="filter-field"><label><span>Assunto CNJ (visão geral)</span><select aria-label="Assunto CNJ (visão geral)" value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}><option value="">Todos os assuntos</option>{subjectOptions.map((subject) => <option key={subject.code} value={subject.code}>{subject.name} ({formatNumber(subject.record_count)})</option>)}</select></label><button className="filter-clear" type="button" disabled={!draft.subject && !applied?.subject} onClick={clearSubject}>Limpar seleção de assunto</button></div>}
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min='2016-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
-        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || !!exporting} onClick={() => exportFile('xlsx')}>{exporting === 'xlsx' ? 'Gerando Excel…' : 'Exportar Excel'}</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={() => exportFile('pdf')}>{exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
+        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start || !courts.length}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || !!exporting} onClick={() => exportFile('xlsx')}>{exporting === 'xlsx' ? 'Gerando Excel…' : 'Exportar Excel'}</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={() => exportFile('pdf')}>{exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
         {exportError && <p role="alert">{exportError}</p>}
         <p className="filter-help">{activeTab === 'corpus' ? 'Selecione abaixo um dos dez temas de Responsabilidade Civil. O acervo usa a data de julgamento ou publicação, quando informada, e permite pesquisar desde 2016. A disponibilidade depende dos documentos carregados e dos tribunais autorizados.' : 'O assunto CNJ filtra os metadados da visão geral por data de ajuizamento. Os dez temas de Responsabilidade Civil são selecionados na aba Acervo por assunto.'}</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
@@ -346,7 +362,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         <button id="tab-sources" type="button" role="tab" aria-selected={activeTab === 'sources'} aria-controls="panel-sources" className={activeTab === 'sources' ? 'is-active' : ''} onClick={() => setActiveTab('sources')}>Fontes e cobertura</button>
       </nav>
       <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
-        {activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
+        {!courts.length ? 'Selecione pelo menos um tribunal para pesquisar.' : activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
       </div>
       {activeTab === 'overview' && <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
       <section className="indicator-grid" aria-label="Indicadores do recorte selecionado" aria-busy={loading}>
@@ -365,7 +381,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </ChartCard>
       </section>
       </div>}
-      {activeTab === 'corpus' && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
+      {activeTab === 'corpus' && courts.length > 0 && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
         {usageLoading && <p role="status" className="chart-note">Analisando os textos para identificar a aplicação de precedentes. As teses e os demais indicadores carregam separadamente.</p>}
