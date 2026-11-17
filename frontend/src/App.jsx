@@ -7,6 +7,7 @@ import ThesisGroups from './ThesisGroups'
 import SourceReferences from './SourceReferences'
 import { thesisTitle } from './thesisPresentation'
 import PrecedentUsage from './PrecedentUsage'
+import NlpPanel from './NlpPanel'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -202,6 +203,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [retry, setRetry] = useState(0)
+  const [corpusReset, setCorpusReset] = useState(0)
 
   useEffect(() => {
     const refreshIfVisible = () => {
@@ -239,7 +241,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         )
         const filteredScope = await getData('scope', { ...filters, court }, controller.signal)
         const filteredScopes = Object.fromEntries(courts.map(code => [code, { metadata: filteredScope.by_court?.[code] || (courts.length === 1 ? filteredScope.metadata : null) }]))
-        const alignmentResult = activeTab === 'precedents' && courts.includes('TJDFT')
+        const alignmentResult = ['precedents', 'sources'].includes(activeTab) && courts.includes('TJDFT')
           ? await getData('alignment', { ...filters, court: 'TJDFT', ...(topic ? { topic } : {}) }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
@@ -290,6 +292,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }
 
   function reset() {
+    setCorpusReset(value => value + 1)
     setDraft({ start: '', end: '', subject: '' })
     setTopic('')
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
@@ -329,6 +332,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     return subjects
   }, new Map()).values()].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
   const selectedSubjectName = subjectOptions.find((subject) => String(subject.code) === String(applied?.subject || draft.subject))?.name
+  const chatContext = JSON.stringify({ courts, start: applied?.start || bounds.start, end: applied?.end || bounds.end, ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })
 
   return <div className="app-shell"><div className="top-rule" />
     <header className="site-header"><a className="brand" href="#main-content" aria-label="DatumLex, ir ao conteúdo"><span className="brand-mark"><img src="/assets/datumlex-logo.jpeg" alt="" /></span><span>DatumLex</span></a><span className="header-context">Análise de Recursos</span></header>
@@ -360,6 +364,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         <button id="tab-overview" type="button" role="tab" aria-selected={activeTab === 'overview'} aria-controls="panel-overview" className={activeTab === 'overview' ? 'is-active' : ''} onClick={() => setActiveTab('overview')}>Visão geral</button>
         {courts.includes('TJDFT') && <button id="tab-precedents" type="button" role="tab" aria-selected={activeTab === 'precedents'} aria-controls="panel-precedents" className={activeTab === 'precedents' ? 'is-active' : ''} onClick={() => setActiveTab('precedents')}>Precedentes e teses</button>}
         <button id="tab-sources" type="button" role="tab" aria-selected={activeTab === 'sources'} aria-controls="panel-sources" className={activeTab === 'sources' ? 'is-active' : ''} onClick={() => setActiveTab('sources')}>Fontes e cobertura</button>
+        <button id="tab-chat" type="button" role="tab" aria-selected={activeTab === 'chat'} aria-controls="panel-chat" className={activeTab === 'chat' ? 'is-active' : ''} onClick={() => setActiveTab('chat')}>Chat de análise · IA</button>
       </nav>
       <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
         {!courts.length ? 'Selecione pelo menos um tribunal para pesquisar.' : activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
@@ -381,7 +386,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </ChartCard>
       </section>
       </div>}
-      {activeTab === 'corpus' && courts.length > 0 && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
+      {activeTab === 'corpus' && courts.length > 0 && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}:${corpusReset}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
         {usageLoading && <p role="status" className="chart-note">Analisando os textos para identificar a aplicação de precedentes. As teses e os demais indicadores carregam separadamente.</p>}
@@ -446,6 +451,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
           })()}
         </>}
       </section>}
+      {activeTab === 'chat' && courts.length > 0 && <section id="panel-chat" role="tabpanel" aria-labelledby="tab-chat"><NlpPanel key={chatContext} contextKey={chatContext} chatOnly /></section>}
       {activeTab === 'sources' && <section id="panel-sources" className="tab-content" role="tabpanel" aria-labelledby="tab-sources">
         <div className="alignment-heading"><span className="eyebrow">Rastreabilidade</span><h2>Fontes, cobertura e limitações</h2><p>Consulte origem, período disponível e situação de cada extração. As contagens abaixo refletem os dados carregados localmente, não a cobertura total dos tribunais.</p></div>
         <div className="source-cards">{courts.map((courtCode) => {
