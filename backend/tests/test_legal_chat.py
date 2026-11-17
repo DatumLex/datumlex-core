@@ -2,16 +2,15 @@ import json
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import TestCase, SimpleTestCase, override_settings
+from django.test import SimpleTestCase, override_settings
 from src.db.models import LegalNarrativeDraft
 from src.services import legal_chat as chat
 from tests import test_nlp_dashboard as fixtures
 
 
-class LegalChatTests(TestCase):
-    setUp = fixtures.DashboardTests.setUp
-    document = fixtures.DashboardTests.document
-    create = fixtures.DashboardTests.create
+class LegalChatTests(fixtures.DashboardTests):
+    # Snapshot creation sets transaction isolation before querying PostgreSQL.
+    # Reuse the real transactional fixtures and their guarded disposable-DB cleanup.
 
     def prepare(self):
         cache.clear()
