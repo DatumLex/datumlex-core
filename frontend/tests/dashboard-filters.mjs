@@ -35,6 +35,16 @@ await page.route('**/api/**', route => {
       { code: 101, name: '', record_count: 4 }, { code: 102, name: '  ', record_count: 10 },
       { code: 301, codes: [301, 302], name: 'Acidente de Trânsito', record_count: 6 },
     ],
+  } : resource === 'filter-options' ? {
+    default_context: { courts, sources: ['stj_jurisprudence'], outcomes: ['unknown'], subject_codes: [10433] },
+    sources: [{ id: 'stj_jurisprudence' }], outcomes: ['unknown'],
+  } : resource === 'analysis-snapshots' ? {
+    snapshot_id: 'app-chat-snapshot', context: route.request().postDataJSON().context,
+    populations: {}, exclusions: {}, data_mode: 'fixture',
+  } : resource === 'alignment' ? {
+    metadata: { ...metadata, approved_references: { precedents: 7, doctrine: 2 },
+      review_queue: { pending_or_unreviewed: 3 }, sources: [], limitations: [], coverage: 'Cobertura de teste' },
+    metrics: { validated_links: 4 },
   } : resource === 'statistics' ? {
     status: 'empty', metadata, metrics: { process_records: 0, binary_denominator: 0 },
   } : { metadata, series: [] }
@@ -100,6 +110,38 @@ try {
   ])
   await page.getByRole('button', { name: 'Limpar seleção de assunto', exact: true }).click()
   assert.equal(await cnj.inputValue(), '')
+  await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
+  await select.waitFor()
+  // Clearing global filters must reset local catalog state even at the default period.
+  await page.getByLabel('Buscar no título').fill('transporte')
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click()
+  await page.getByLabel('Somente assuntos com os três tipos').check()
+  await page.getByLabel('Incluir referências sem data confirmada').uncheck()
+  await page.getByRole('button', { name: 'Doutrina (0)', exact: true }).click()
+  await Promise.all([page.waitForResponse(response => {
+    const url = new URL(response.url())
+    return url.pathname.endsWith('/corpus/') && url.searchParams.get('q') === ''
+      && url.searchParams.get('complete_only') === 'false'
+      && url.searchParams.get('include_undated') === 'true'
+      && url.searchParams.get('category') === 'jurisprudence'
+  }), page.getByRole('button', { name: 'Limpar filtros', exact: true }).click()])
+  assert.equal(await page.getByLabel('Buscar no título').inputValue(), '')
+  assert.equal(await page.getByLabel('Somente assuntos com os três tipos').isChecked(), false)
+  assert.equal(await page.getByLabel('Incluir referências sem data confirmada').isChecked(), true)
+  // Source coverage must fetch and retain the legal corpus on direct entry and re-entry.
+  for (let visit = 0; visit < 2; visit++) {
+    await page.getByRole('tab', { name: 'Fontes e cobertura', exact: true }).click()
+    await page.getByRole('heading', { name: 'Precedentes STJ e doutrina BDJur', exact: true }).waitFor()
+    assert.ok(await page.getByText('Cobertura de teste', { exact: true }).isVisible())
+    await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
+    await select.waitFor()
+  }
+  // The application must mount the chat from the user's active filter context.
+  await page.getByRole('tab', { name: 'Chat de análise · IA', exact: true }).click()
+  await page.getByRole('heading', { name: 'Chat de análise com fontes · Gemini', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Enviar pergunta', exact: true }).isDisabled(), true)
+  const snapshotRequest = requests.find(url => url.pathname.endsWith('/analysis-snapshots/'))
+  assert.ok(snapshotRequest)
   await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
   await select.waitFor()
   await page.setViewportSize({ width: 320, height: 900 })

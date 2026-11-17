@@ -1,6 +1,8 @@
 """Dimensional reference implemented at DataJud document grain, not appeal grain."""
 
 from django.db import models
+from django.conf import settings
+import uuid
 
 from .evidence_models import (  # noqa: F401
     NlpDocument,
@@ -435,3 +437,17 @@ class LegalCorpusTopicMatch(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['item','topic'], name='legal_corpus_topic_unique')]
+
+
+class LegalNarrativeDraft(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    snapshot = models.ForeignKey(NlpSnapshot, on_delete=models.PROTECT)
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True)
+    question = models.TextField()
+    payload = models.JSONField()
+    sha256 = models.CharField(max_length=64)
+    status = models.CharField(max_length=20, default='draft')
+    user_conclusions = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_at = models.DateTimeField(null=True)
