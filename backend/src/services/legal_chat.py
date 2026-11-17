@@ -6,7 +6,7 @@ import re
 import time
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.core.cache import cache
@@ -137,6 +137,10 @@ def generate(actor, snapshot_id, question, consent, parent_id=None):
         raise ValueError('Não há trechos revisados e liberados neste snapshot. Nenhum dado foi enviado ao Gemini.')
     parent = None
     if parent_id:
+        try:
+            parent_id = UUID(str(parent_id))
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError('invalid_parent_id') from None
         parent = LegalNarrativeDraft.objects.get(pk=parent_id, owner=actor, snapshot=record)
     lock = f'legal-chat:{actor.pk}'
     if not cache.add(lock, True, timeout=60):

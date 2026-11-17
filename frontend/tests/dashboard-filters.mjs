@@ -35,6 +35,12 @@ await page.route('**/api/**', route => {
       { code: 101, name: '', record_count: 4 }, { code: 102, name: '  ', record_count: 10 },
       { code: 301, codes: [301, 302], name: 'Acidente de Trânsito', record_count: 6 },
     ],
+  } : resource === 'filter-options' ? {
+    default_context: { courts, sources: ['stj_jurisprudence'], outcomes: ['unknown'], subject_codes: [10433] },
+    sources: [{ id: 'stj_jurisprudence' }], outcomes: ['unknown'],
+  } : resource === 'analysis-snapshots' ? {
+    snapshot_id: 'app-chat-snapshot', context: route.request().postDataJSON().context,
+    populations: {}, exclusions: {}, data_mode: 'fixture',
   } : resource === 'alignment' ? {
     metadata: { ...metadata, approved_references: { precedents: 7, doctrine: 2 },
       review_queue: { pending_or_unreviewed: 3 }, sources: [], limitations: [], coverage: 'Cobertura de teste' },
@@ -130,6 +136,14 @@ try {
     await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
     await select.waitFor()
   }
+  // The application must mount the chat from the user's active filter context.
+  await page.getByRole('tab', { name: 'Chat de análise · IA', exact: true }).click()
+  await page.getByRole('heading', { name: 'Chat de análise com fontes · Gemini', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Enviar pergunta', exact: true }).isDisabled(), true)
+  const snapshotRequest = requests.find(url => url.pathname.endsWith('/analysis-snapshots/'))
+  assert.ok(snapshotRequest)
+  await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
+  await select.waitFor()
   await page.setViewportSize({ width: 320, height: 900 })
   const selectBounds = await select.boundingBox()
   assert.ok(selectBounds.width > 0 && selectBounds.x + selectBounds.width <= 320, 'Topic selector exceeds mobile width')

@@ -59,6 +59,14 @@ class LegalChatTests(TestCase):
                 chat.generate(self.actor, record.pk, 'Analisar pesquisa', True)
             provider.assert_not_called()
 
+    def test_invalid_parent_is_a_controlled_error_without_provider_call(self):
+        with self.prepare(), patch.object(chat, 'invoke') as provider:
+            response = self.client.post(f'/api/v2/analysis-snapshots/{self.record.pk}/chat/',
+                data=json.dumps({'question': 'Analisar pesquisa', 'consent': True, 'parent_id': 'invalid'}),
+                content_type='application/json')
+            self.assertEqual(response.status_code, 400)
+            provider.assert_not_called()
+
     def test_bad_citation_and_conflict_are_blocked_without_draft(self):
         with self.prepare():
             for change in ({'facts': [{'evidence_id': self.item['id'], 'quote': 'Inventado'}]}, {'status': 'conflicting'}, {'status': 'insufficient'},

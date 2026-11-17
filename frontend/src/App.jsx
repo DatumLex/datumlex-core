@@ -7,6 +7,7 @@ import ThesisGroups from './ThesisGroups'
 import SourceReferences from './SourceReferences'
 import { thesisTitle } from './thesisPresentation'
 import PrecedentUsage from './PrecedentUsage'
+import NlpPanel from './NlpPanel'
 
 const number = new Intl.NumberFormat('pt-BR')
 const formatNumber = (value) => value == null ? '—' : number.format(value)
@@ -331,6 +332,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
     return subjects
   }, new Map()).values()].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
   const selectedSubjectName = subjectOptions.find((subject) => String(subject.code) === String(applied?.subject || draft.subject))?.name
+  const chatContext = JSON.stringify({ courts, start: applied?.start || bounds.start, end: applied?.end || bounds.end, ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })
 
   return <div className="app-shell"><div className="top-rule" />
     <header className="site-header"><a className="brand" href="#main-content" aria-label="DatumLex, ir ao conteúdo"><span className="brand-mark"><img src="/assets/datumlex-logo.jpeg" alt="" /></span><span>DatumLex</span></a><span className="header-context">Análise de Recursos</span></header>
@@ -362,6 +364,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         <button id="tab-overview" type="button" role="tab" aria-selected={activeTab === 'overview'} aria-controls="panel-overview" className={activeTab === 'overview' ? 'is-active' : ''} onClick={() => setActiveTab('overview')}>Visão geral</button>
         {courts.includes('TJDFT') && <button id="tab-precedents" type="button" role="tab" aria-selected={activeTab === 'precedents'} aria-controls="panel-precedents" className={activeTab === 'precedents' ? 'is-active' : ''} onClick={() => setActiveTab('precedents')}>Precedentes e teses</button>}
         <button id="tab-sources" type="button" role="tab" aria-selected={activeTab === 'sources'} aria-controls="panel-sources" className={activeTab === 'sources' ? 'is-active' : ''} onClick={() => setActiveTab('sources')}>Fontes e cobertura</button>
+        <button id="tab-chat" type="button" role="tab" aria-selected={activeTab === 'chat'} aria-controls="panel-chat" className={activeTab === 'chat' ? 'is-active' : ''} onClick={() => setActiveTab('chat')}>Chat de análise · IA</button>
       </nav>
       <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
         {!courts.length ? 'Selecione pelo menos um tribunal para pesquisar.' : activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
@@ -448,6 +451,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
           })()}
         </>}
       </section>}
+      {activeTab === 'chat' && courts.length > 0 && <section id="panel-chat" role="tabpanel" aria-labelledby="tab-chat"><NlpPanel key={chatContext} contextKey={chatContext} chatOnly /></section>}
       {activeTab === 'sources' && <section id="panel-sources" className="tab-content" role="tabpanel" aria-labelledby="tab-sources">
         <div className="alignment-heading"><span className="eyebrow">Rastreabilidade</span><h2>Fontes, cobertura e limitações</h2><p>Consulte origem, período disponível e situação de cada extração. As contagens abaixo refletem os dados carregados localmente, não a cobertura total dos tribunais.</p></div>
         <div className="source-cards">{courts.map((courtCode) => {

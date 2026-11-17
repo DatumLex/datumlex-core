@@ -1,7 +1,7 @@
 from django.urls import path
 
 from src.accounts import views as accounts
-from src.routes import corpus, excel_report, nlp_dashboard, nlp_evidence, pdf_report, statistics
+from src.routes import corpus, excel_report, legal_chat, nlp_dashboard, nlp_evidence, pdf_report, statistics
 
 urlpatterns = [
     path("api/corpus/", corpus.catalog),
@@ -12,6 +12,9 @@ urlpatterns = [
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/', nlp_dashboard.detail),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/export/', nlp_dashboard.export),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/report/', nlp_dashboard.report),
+    path('api/v2/analysis-snapshots/<uuid:snapshot_id>/chat/', legal_chat.generate),
+    path('api/v2/legal-drafts/<uuid:draft_id>/', legal_chat.detail),
+    path('api/v2/legal-drafts/<uuid:draft_id>/export/', legal_chat.export),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/<str:resource>/', nlp_dashboard.ranking),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/<str:resource>/<str:group_id>/sources/', nlp_dashboard.ranking),
     path('api/v1/extractions/<uuid:extraction_id>/', nlp_evidence.extraction),

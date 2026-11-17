@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { nlpRequest, reportUrl, safeOfficialUrl } from './nlpApi'
 import './nlp.css'
+import LegalChat from './LegalChat'
 import { thesisTitle, thesisSummary } from './thesisPresentation'
 
 const sourceLabels = { datajud: 'DataJud (metadados)', tjdft_jurisprudence: 'Jurisprudência TJDFT', stj_jurisprudence: 'Jurisprudência STJ', stj_precedent: 'Precedentes STJ', bdjur_doctrine: 'Doutrina BDJur' }
@@ -144,7 +145,7 @@ function FrozenResults({ snapshot }) {
   </>
 }
 
-export default function NlpPanel({ contextKey }) {
+export default function NlpPanel({ contextKey, chatOnly = false }) {
   const [choices, setChoices] = useState(null)
   const [applied, setApplied] = useState(null)
   const [version, setVersion] = useState(0)
@@ -161,7 +162,7 @@ export default function NlpPanel({ contextKey }) {
     setChoices({ ...selected, [field]: checked ? [...selected[field], value] : selected[field].filter(item => item !== value) })
   }
   return <section className="nlp-panel" aria-labelledby="nlp-title">
-    <h2 id="nlp-title">Teses identificadas nas decisões</h2>
+    <h2 id="nlp-title">{chatOnly ? 'Fontes revisadas para o chat' : 'Teses identificadas nas decisões'}</h2>
     <p>Tribunais, assunto e período seguem o recorte aplicado acima. Fontes e desfechos abaixo filtram somente este painel de NLP; as taxas DataJud mantêm sua própria população.</p>
     <Feedback state={options} retry={retryOptions} />
     {options.data && <><form onSubmit={event => { event.preventDefault(); setApplied({ sources: selected.sources, outcomes: selected.outcomes }); setVersion(value => value + 1) }}>
@@ -169,6 +170,6 @@ export default function NlpPanel({ contextKey }) {
         <fieldset><legend>Desfechos exibidos nos textos de decisões</legend>{options.data.outcomes.map(value => <label key={value}><input type="checkbox" checked={selected.outcomes.includes(value)} onChange={event => toggle('outcomes', value, event.target.checked)} />{outcomeLabels[value]}</label>)}</fieldset></div>
       <button className="apply-button" type="submit">Aplicar filtros de NLP</button> <button className="secondary-button" type="button" onClick={() => { setChoices(null); setApplied(null); setVersion(value => value + 1) }}>Restaurar padrões do NLP</button>
     </form>
-    <div aria-busy={state.status === 'loading'}><Feedback state={state} retry={retry} />{state.data && <FrozenResults key={state.data.snapshot_id} snapshot={state.data} />}</div></>}
+    <div aria-busy={state.status === 'loading'}><Feedback state={state} retry={retry} />{state.data && (chatOnly ? <LegalChat key={state.data.snapshot_id} snapshot={state.data} /> : <FrozenResults key={state.data.snapshot_id} snapshot={state.data} />)}</div></>}
   </section>
 }

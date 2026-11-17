@@ -42,7 +42,7 @@ O rascunho técnico é persistido para rastreabilidade. Não se torna uma análi
 ## Validação executada
 
 ```powershell
-backend/.venv/Scripts/python.exe backend/manage.py test tests.test_legal_chat tests.test_nlp_dashboard tests.test_excel_report --settings=config.test_settings
+backend/.venv/Scripts/python.exe backend/manage.py test tests.test_legal_chat tests.test_nlp_dashboard --noinput
 cd frontend
 npm.cmd run build
 npm.cmd run lint
