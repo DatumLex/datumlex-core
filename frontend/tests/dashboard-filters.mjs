@@ -35,6 +35,10 @@ await page.route('**/api/**', route => {
       { code: 101, name: '', record_count: 4 }, { code: 102, name: '  ', record_count: 10 },
       { code: 301, codes: [301, 302], name: 'Acidente de Trânsito', record_count: 6 },
     ],
+  } : resource === 'alignment' ? {
+    metadata: { ...metadata, approved_references: { precedents: 7, doctrine: 2 },
+      review_queue: { pending_or_unreviewed: 3 }, sources: [], limitations: [], coverage: 'Cobertura de teste' },
+    metrics: { validated_links: 4 },
   } : resource === 'statistics' ? {
     status: 'empty', metadata, metrics: { process_records: 0, binary_denominator: 0 },
   } : { metadata, series: [] }
@@ -102,6 +106,30 @@ try {
   assert.equal(await cnj.inputValue(), '')
   await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
   await select.waitFor()
+  // Clearing global filters must reset local catalog state even at the default period.
+  await page.getByLabel('Buscar no título').fill('transporte')
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click()
+  await page.getByLabel('Somente assuntos com os três tipos').check()
+  await page.getByLabel('Incluir referências sem data confirmada').uncheck()
+  await page.getByRole('button', { name: 'Doutrina (0)', exact: true }).click()
+  await Promise.all([page.waitForResponse(response => {
+    const url = new URL(response.url())
+    return url.pathname.endsWith('/corpus/') && url.searchParams.get('q') === ''
+      && url.searchParams.get('complete_only') === 'false'
+      && url.searchParams.get('include_undated') === 'true'
+      && url.searchParams.get('category') === 'jurisprudence'
+  }), page.getByRole('button', { name: 'Limpar filtros', exact: true }).click()])
+  assert.equal(await page.getByLabel('Buscar no título').inputValue(), '')
+  assert.equal(await page.getByLabel('Somente assuntos com os três tipos').isChecked(), false)
+  assert.equal(await page.getByLabel('Incluir referências sem data confirmada').isChecked(), true)
+  // Source coverage must fetch and retain the legal corpus on direct entry and re-entry.
+  for (let visit = 0; visit < 2; visit++) {
+    await page.getByRole('tab', { name: 'Fontes e cobertura', exact: true }).click()
+    await page.getByRole('heading', { name: 'Precedentes STJ e doutrina BDJur', exact: true }).waitFor()
+    assert.ok(await page.getByText('Cobertura de teste', { exact: true }).isVisible())
+    await page.getByRole('tab', { name: 'Acervo por assunto', exact: true }).click()
+    await select.waitFor()
+  }
   await page.setViewportSize({ width: 320, height: 900 })
   const selectBounds = await select.boundingBox()
   assert.ok(selectBounds.width > 0 && selectBounds.x + selectBounds.width <= 320, 'Topic selector exceeds mobile width')

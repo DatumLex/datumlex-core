@@ -202,6 +202,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [retry, setRetry] = useState(0)
+  const [corpusReset, setCorpusReset] = useState(0)
 
   useEffect(() => {
     const refreshIfVisible = () => {
@@ -239,7 +240,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         )
         const filteredScope = await getData('scope', { ...filters, court }, controller.signal)
         const filteredScopes = Object.fromEntries(courts.map(code => [code, { metadata: filteredScope.by_court?.[code] || (courts.length === 1 ? filteredScope.metadata : null) }]))
-        const alignmentResult = activeTab === 'precedents' && courts.includes('TJDFT')
+        const alignmentResult = ['precedents', 'sources'].includes(activeTab) && courts.includes('TJDFT')
           ? await getData('alignment', { ...filters, court: 'TJDFT', ...(topic ? { topic } : {}) }, controller.signal)
           : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
@@ -290,6 +291,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }
 
   function reset() {
+    setCorpusReset(value => value + 1)
     setDraft({ start: '', end: '', subject: '' })
     setTopic('')
     setValidation(''); setLoading(true); setError(''); setData(null); setApplied(null); setRetry((value) => value + 1)
@@ -381,7 +383,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
         </ChartCard>
       </section>
       </div>}
-      {activeTab === 'corpus' && courts.length > 0 && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
+      {activeTab === 'corpus' && courts.length > 0 && <div id="panel-corpus" role="tabpanel" aria-labelledby="tab-corpus"><CorpusPanel key={`${court}:${applied?.start || bounds.start}:${applied?.end || bounds.end}:${corpusReset}`} court={court} start={applied?.start || bounds.start} end={applied?.end || bounds.end} topic={topic} onTopicChange={setTopic} onTopicsChange={setTopicOptions} /></div>}
       {activeTab === 'precedents' && courts.includes('TJDFT') && <section id="panel-precedents" className="tab-content" role="tabpanel" aria-labelledby="tab-precedents" aria-busy={loading}>
         <div className="precedent-heading-row"><div className="alignment-heading"><span className="eyebrow">Apoio à análise · Pangea + DataJud</span><h2 id="alignment-title">Precedentes, teses e doutrina</h2><p>Explore os enunciados por assunto, consulte as decisões relacionadas e abra as fontes originais. A visão geral reúne todos os assuntos; use o filtro do painel para restringir a um tema.</p></div><details className="precedent-limits"><summary>ⓘ Limites da classificação</summary><p>Classificação assistida. As avaliações mostradas foram revisadas; sugestões por identificador ainda precisam de revisão e não comprovam aderência jurídica. A frequência conta referências STJ com tese agrupada.</p></details></div>
         {usageLoading && <p role="status" className="chart-note">Analisando os textos para identificar a aplicação de precedentes. As teses e os demais indicadores carregam separadamente.</p>}
