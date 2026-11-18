@@ -357,8 +357,7 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 .corpus-options label { display: flex; align-items: center; gap: 8px; }
 .corpus-options input { accent-color: #1f4e5f; }
 .corpus-topics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin: 20px 0; }
-.corpus-topics button { text-align: left; display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); background: #fafaf7; color: #203c48; cursor: pointer; }
-.corpus-topics button span { font-size: 12px; }
+.corpus-topics button { text-align: center; display: grid; place-items: center; padding: 14px; border: 1px solid var(--border); background: #fafaf7; color: #203c48; cursor: pointer; }
 .corpus-topics button[aria-pressed=true], .corpus-categories button[aria-pressed=true] { border-color: #1f4e5f; background: #eaf2ee; box-shadow: inset 0 0 0 1px #1f4e5f; }
 .corpus-categories, .corpus-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
 .corpus-results { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
