@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -56,7 +57,11 @@ class SchedulePlanTests(SimpleTestCase):
                               capture_output=True, text=True, encoding='utf8', errors='replace', timeout=30)
 
     def copy_scripts(self, directory):
-        for relative in ('scripts/install-schedule.ps1', 'backend/scripts/install_datajud_schedule.ps1'):
+        for relative in (
+            'scripts/install-schedule.ps1',
+            'backend/scripts/install_datajud_schedule.ps1',
+            'scripts/run-etl.ps1',
+        ):
             target = directory / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(PROJECT / relative, target)
@@ -75,11 +80,14 @@ class SchedulePlanTests(SimpleTestCase):
                     "$plan | ConvertTo-Json -Compress")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 plan = json.loads(next(line for line in result.stdout.splitlines() if line.startswith('{')))
-                self.assertEqual(plan['WorkingDirectory'], str(clone / 'backend'))
+                # The runner may expand the Windows 8.3 alias in the temporary path.
+                self.assertTrue(Path(plan['WorkingDirectory']).samefile(clone / 'backend'), plan)
                 self.assertIn('-Once', plan['Arguments'])
                 self.assertIn('-BatchSize 75', plan['Arguments'])
                 self.assertIn('-Sources tjdft,pangea', plan['Arguments'])
-                self.assertIn('"' + str(clone / 'scripts/run-etl.ps1') + '"', plan['Arguments'])
+                runner = re.search(r'(?:^|\s)-File "([^"]+)"', plan['Arguments'])
+                self.assertIsNotNone(runner, plan['Arguments'])
+                self.assertTrue(Path(runner[1]).samefile(clone / 'scripts/run-etl.ps1'), plan)
                 plans.append(plan)
         self.assertNotEqual(plans[0]['TaskName'], plans[1]['TaskName'])
 

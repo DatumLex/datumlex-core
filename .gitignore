@@ -10,3 +10,6 @@ __pycache__/
 
 # Local Python virtual environments, including backups
 .venv*/
+
+# Generated local test coverage report
+/output/coverage/
