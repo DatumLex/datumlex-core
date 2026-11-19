@@ -8,6 +8,31 @@
 
 ## Required secrets
 
+### Pesquisa e chat integrados
+
+O React abre a pesquisa após o login. O Django atende `/api/research/`, `/api/research/sources/`,
+`/api/research/chat/` e `/api/research/export/` no serviço de API existente. O chat padrão consulta o banco
+e as ementas sem acessar a OpenAI. Os indicadores são calculados no servidor em ambos os modos.
+
+Para testar o React local com um backend já atualizado no Render, use `VITE_API_BASE_URL=/api` e
+`DATUMLEX_DEV_API_TARGET` em `frontend/.env.local`, com a origem HTTPS pública exibida pelo serviço Django.
+Reinicie o Vite. O destino padrão do proxy é `http://127.0.0.1:8000`. Para testes de login pelo proxy,
+autorize a origem local exata em `CSRF_TRUSTED_ORIGINS` no ambiente de teste do Django. A conexão com o
+PostgreSQL permanece em `DATABASE_URL` no backend.
+
+No workspace que já usa `datumlex-demo-api`, `datumlex-demo-web` e `datumlex-demo-db`, publique a
+mesma revisão do repositório na API e no site já existentes, atualizando primeiro a API. O Blueprint
+abaixo usa outros nomes de recursos. Confirme `/api/health/`, faça login e confira os filtros de TJDFT + STJ,
+uma fonte de doutrina, um precedente, uma pergunta com citação e a exportação do recorte.
+
+O modo generativo é opcional. Depois de verificar o saldo e o faturamento da organização de API,
+configure `OPENAI_API_KEY` como segredo do backend, `RESEARCH_OPENAI_MODEL` como modelo autorizado
+e `RESEARCH_OPENAI_ENABLED=true`. Nesse modo uma pergunta envia a pergunta, o contexto recente,
+os indicadores e trechos selecionados à OpenAI. O carregamento do painel continua usando a síntese local.
+Se a API externa estiver indisponível, a interface identifica a resposta de consulta direta ao banco.
+
+### Credenciais do Blueprint
+
 The Render Blueprint prompts for two values. Do not commit either value:
 
 - `DATUMLEX_SUPPORT_PASSWORD`: the initial immutable `suport` account password;

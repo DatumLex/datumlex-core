@@ -163,8 +163,8 @@ function OutcomeChart({ series }) {
   </>
 }
 
-export default function App({ court: initialCourt, courts: authorizedCourts }) {
-  const [courts, setCourts] = useState(() => authorizedCourts.length ? [...authorizedCourts] : [initialCourt])
+export default function App({ court: initialCourt, courts: authorizedCourts, initialSelection }) {
+  const [courts, setCourts] = useState(() => initialSelection?.court || (authorizedCourts.length ? [...authorizedCourts] : [initialCourt]))
   const court = courts.join(',')
   const [courtMenuOpen, setCourtMenuOpen] = useState(false)
   const courtMenuRef = useRef(null)
@@ -185,10 +185,11 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('corpus')
-  const [topic, setTopic] = useState('')
+  const [topic, setTopic] = useState(initialSelection?.topics.length === 1 ? initialSelection.topics[0] : '')
   const [topicOptions, setTopicOptions] = useState([])
-  const [draft, setDraft] = useState({ start: '', end: '', subject: '' })
-  const [applied, setApplied] = useState(null)
+  const initialFilters = initialSelection && { start: initialSelection.start, end: initialSelection.end, subject: initialSelection.subject.length === 1 ? initialSelection.subject[0] : '' }
+  const [draft, setDraft] = useState(initialFilters || { start: '', end: '', subject: '' })
+  const [applied, setApplied] = useState(initialFilters || null)
   const bounds = supportedPeriod()
   const [data, setData] = useState(null)
   const [alignment, setAlignment] = useState(null)

@@ -2,6 +2,7 @@
 import re
 from collections import Counter
 from datetime import date
+from itertools import chain, groupby
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -102,11 +103,21 @@ def summarize(scope, *, page=1, page_size=20):
     coverage = Counter()
     records = []
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
-    latest = NlpTextVersion.objects.filter(document_id=OuterRef('document_id')).order_by('-created_at', '-pk')
+    latest = NlpTextVersion.objects.filter(document_id=OuterRef('document_id')).order_by('-created_at')
     versions = NlpTextVersion.objects.filter(
-        pk=Subquery(latest.values('pk')[:1]), document__court__in=scope['court'].split(','),
+        created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
     ).select_related('document').order_by('document__source_key')
-    for version in versions.iterator(chunk_size=100):
+    for _, current_versions in groupby(versions.iterator(chunk_size=100), key=lambda row: row.document_id):
+        version = next(current_versions)
+        other = next(current_versions, None)
+        if other is not None:
+            # UUIDs are random. Equal timestamps cannot establish which text is authoritative.
+            coverage['source_documents'] += 1
+            coverage['ambiguous_latest_version'] += 1
+            if any(bytes_hash(row.text.encode('utf-8')) != row.sha256
+                   for row in chain((version, other), current_versions)):
+                coverage['integrity_failed'] += 1
+            continue
         source = version.source
         if (source.get('category', 'jurisprudence') != 'jurisprudence'
                 or source.get('content_kind') in ('precedent_reference', 'publication_excerpt', 'doctrine')
@@ -115,7 +126,8 @@ def summarize(scope, *, page=1, page_size=20):
                 or source.get('data_mode') == 'fixture'):
             continue
         coverage['source_documents'] += 1
-        if scope.get('topic') and scope['topic'] not in classify(version.text):
+        topics = scope.get('topics') or ([scope['topic']] if scope.get('topic') else [])
+        if topics and not set(topics).intersection(classify(version.text)):
             coverage['outside_topic'] += 1
             continue
         if (source.get('court') != version.document.court
@@ -123,7 +135,8 @@ def summarize(scope, *, page=1, page_size=20):
                 or not official_source(source.get('source_url', ''))):
             coverage['unverified_source'] += 1
             continue
-        if scope.get('subject') and scope['subject'] not in (source.get('subject_codes') or []):
+        subjects = scope.get('subject_codes') or ([scope['subject']] if scope.get('subject') else [])
+        if subjects and not set(subjects).intersection(source.get('subject_codes') or []):
             coverage['unconfirmed_subject'] += 1
             continue
         try:
