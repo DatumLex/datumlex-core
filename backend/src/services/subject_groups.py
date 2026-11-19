@@ -11,10 +11,17 @@ def name_key(name):
 
 
 def matching_codes(code):
+    return matching_subject_codes([code])
+
+
+def matching_subject_codes(codes):
+    requested = set(codes)
+    if not requested:
+        return []
     subjects = list(DimSubject.objects.values('code', 'name'))
-    chosen = next((item for item in subjects if item['code'] == code), None)
-    key = name_key(chosen['name']) if chosen else ''
-    return [item['code'] for item in subjects if name_key(item['name']) == key] if key else [code]
+    names = {name_key(item['name']) for item in subjects if item['code'] in requested}
+    names.discard('')
+    return sorted(requested | {item['code'] for item in subjects if name_key(item['name']) in names})
 
 
 def grouped_options(subjects, courts):

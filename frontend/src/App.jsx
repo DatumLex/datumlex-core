@@ -164,8 +164,8 @@ function OutcomeChart({ series }) {
   </>
 }
 
-export default function App({ court: initialCourt, courts: authorizedCourts }) {
-  const [courts, setCourts] = useState(() => authorizedCourts.length ? [...authorizedCourts] : [initialCourt])
+export default function App({ court: initialCourt, courts: authorizedCourts, initialSelection }) {
+  const [courts, setCourts] = useState(() => initialSelection?.court || (authorizedCourts.length ? [...authorizedCourts] : [initialCourt]))
   const court = courts.join(',')
   const [courtMenuOpen, setCourtMenuOpen] = useState(false)
   const courtMenuRef = useRef(null)
@@ -181,20 +181,25 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   function selectCourts(next) {
     if (next.length === courts.length && next.every((code) => courts.includes(code))) return
     setCourts(next)
-    setLoading(true); setError('')
+    setLoading(next.length > 0)
+    setError('')
+    if (!next.length) {
+      setData(null)
+      setAlignment(null)
+      setUsageResult(null)
+    }
   }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('corpus')
-  const [topic, setTopic] = useState('')
+  const [topic, setTopic] = useState(initialSelection?.topics.length === 1 ? initialSelection.topics[0] : '')
   const [topicOptions, setTopicOptions] = useState([])
-  const [draft, setDraft] = useState({ start: '', end: '', subject: '' })
-  const [applied, setApplied] = useState(null)
+  const initialFilters = initialSelection && { start: initialSelection.start, end: initialSelection.end, subject: initialSelection.subject.length === 1 ? initialSelection.subject[0] : '' }
+  const [draft, setDraft] = useState(initialFilters || { start: '', end: '', subject: '' })
+  const [applied, setApplied] = useState(initialFilters || null)
   const bounds = supportedPeriod()
   const [data, setData] = useState(null)
   const [alignment, setAlignment] = useState(null)
-  const [usage, setUsage] = useState(null)
-  const [usageLoading, setUsageLoading] = useState(false)
-  const [usageError, setUsageError] = useState('')
+  const [usageResult, setUsageResult] = useState(null)
   const [selectedThesisId, setSelectedThesisId] = useState(null)
   const [evidenceDrawerItem, setEvidenceDrawerItem] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -204,6 +209,11 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   const [exportError, setExportError] = useState('')
   const [retry, setRetry] = useState(0)
   const [corpusReset, setCorpusReset] = useState(0)
+  const usageKey = JSON.stringify([court, applied, topic, retry, bounds.start, bounds.end])
+  const currentUsage = usageResult?.key === usageKey ? usageResult : null
+  const usage = currentUsage?.data
+  const usageError = currentUsage?.error || ''
+  const usageLoading = activeTab === 'precedents' && Boolean(court) && !currentUsage
 
   useEffect(() => {
     const refreshIfVisible = () => {
@@ -218,11 +228,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }, [])
 
   useEffect(() => {
-    if (!courts.length) {
-      setData(null); setAlignment(null); setUsage(null)
-      setLoading(false); setUsageLoading(false); setError(''); setUsageError('')
-      return
-    }
+    if (!courts.length) return
     const controller = new AbortController()
     let active = true
     const timeout = setTimeout(() => controller.abort(), 20000)
@@ -265,18 +271,17 @@ export default function App({ court: initialCourt, courts: authorizedCourts }) {
   }, [applied, retry, court, courts, authorizedCourts, topic, activeTab])
 
   useEffect(() => {
-    if (activeTab !== 'precedents' || !courts.length) return
+    if (activeTab !== 'precedents' || !court) return
     const controller = new AbortController()
     let active = true
     const timeout = setTimeout(() => controller.abort(), 120000)
-    setUsage(null); setUsageLoading(true); setUsageError('')
     const filters = applied || { start: bounds.start, end: bounds.end }
     getData('precedent-usage', { ...filters, court, ...(topic ? { topic } : {}) }, controller.signal)
-      .then(result => { if (active) setUsage(result) })
-      .catch(error => { if (active) setUsageError(error.name === 'AbortError' ? 'A análise textual ainda não respondeu. Tente novamente; os demais dados continuam disponíveis.' : error.message) })
-      .finally(() => { clearTimeout(timeout); if (active) setUsageLoading(false) })
+      .then(result => { if (active) setUsageResult({ key: usageKey, data: result }) })
+      .catch(error => { if (active) setUsageResult({ key: usageKey, error: error.name === 'AbortError' ? 'A análise textual ainda não respondeu. Tente novamente; os demais dados continuam disponíveis.' : error.message }) })
+      .finally(() => clearTimeout(timeout))
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [activeTab, applied, court, topic, retry, bounds.start, bounds.end])
+  }, [activeTab, applied, court, topic, usageKey, bounds.start, bounds.end])
 
   function apply(event) {
     event.preventDefault()

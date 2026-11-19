@@ -26,6 +26,14 @@ def parse_date(value):
 def fingerprint(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False,default=str).encode()).hexdigest()
 
+def scoped_items(scope, include_undated=True):
+    base = LegalCorpusItem.objects.filter(Q(category='doctrine') | Q(court__in=scope['court'].split(',')))
+    period = Q(date__range=[scope['start'], scope['end']])
+    if include_undated:
+        period |= Q(date__isnull=True)
+    return base.filter(period, topic_matches__isnull=False).distinct()
+
+
 def inventory(params):
     allowed={'court','start','end','topic','category','page','page_size','q','include_undated','complete_only'}
     if set(params)-allowed or any(len(params.getlist(k))!=1 for k in params):
@@ -46,11 +54,7 @@ def inventory(params):
     except ValueError:raise InvalidQuery('Invalid page or page size') from None
     query=params.get('q','').strip()
     if len(query)>120:raise InvalidQuery('Search title limited to 120 characters')
-    base=LegalCorpusItem.objects.filter(Q(category='doctrine') | Q(court__in=scope['court'].split(',')))
-    base=base.filter(topic_matches__isnull=False).distinct()
-    in_period=Q(date__range=[scope['start'],scope['end']])
-    if params.get('include_undated','true')=='true':in_period|=Q(date__isnull=True)
-    base=base.filter(in_period)
+    base=scoped_items(scope, params.get('include_undated','true')=='true')
     if query:base=base.filter(title__icontains=query)
     aggregated=LegalCorpusTopicMatch.objects.filter(item__in=base).values('topic','item__category').annotate(count=Count('item_id',distinct=True))
     counts_by_topic={key:dict.fromkeys(CATEGORIES,0) for key,_,_ in TOPICS}
