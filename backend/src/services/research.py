@@ -1,0 +1,268 @@
+"""Research context shared by the panel, conversational search, exports and the optional model."""
+
+import re
+from collections import Counter
+
+from django.conf import settings
+from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Value, When
+
+from src.db.court_catalog import ACTIVE_COURTS
+from src.db.models import FactProcessSubject, LegalCorpusTopicMatch
+from src.nlp.topics import TOPICS, classify, folded
+from src.services.analytical_context import OUTCOMES
+from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
+from src.services.precedent_usage import summarize as usage_summary
+from src.services.statistics_service import InvalidQuery, filtered_processes, instance_series, metrics
+from src.services.subject_groups import matching_subject_codes
+
+
+TOPIC_LABELS = {key: label for key, label, _ in TOPICS}
+SOURCES = ("datajud", *CATEGORIES)
+TYPES = {"jurisprudence": "Decisão", "precedent": "Precedente", "doctrine": "Doutrina"}
+RELATIONS = {
+    "applied": "aplicação explícita",
+    "not_applied": "afastamento explícito",
+    "mentioned": "menção",
+    "ambiguous": "vínculo ambíguo",
+}
+SOURCE_ID = re.compile(r"\bF([1-9][0-9]{0,17})\b", re.I)
+STOP = set(
+    "sobre esses essas deste desta quais algum alguma doutrina jurisprudencia jurisprudência precedente precedentes dados fonte fontes pesquisa trecho trechos decisao decisão decisões quero favor explique mostre tema período periodo".split()
+)
+
+
+def follows_up(question):
+    return bool(
+        re.search(r"^e\s|\b(isso|nesse|nessa|desse|dessa|mesmo tema|sobre ele|sobre ela)\b", folded(question))
+    )
+
+
+def question_scope(params, question, previous):
+    courts = set(params.get("court", "TJDFT").split(","))
+    named = set(re.findall(r"\b[A-Z]{2,8}\b", question.upper())) & set(ACTIVE_COURTS)
+    if not named and previous and follows_up(question):
+        named = set(re.findall(r"\b[A-Z]{2,8}\b", previous[-1].upper())) & set(ACTIVE_COURTS)
+    if named - courts:
+        raise InvalidQuery("O tribunal mencionado está fora deste recorte. Ajuste os filtros da pesquisa.")
+    filtered = params.copy()
+    if named:
+        filtered["court"] = ",".join(sorted(named))
+    return filtered
+
+
+def options(params, name, choices, default=()):
+    raw = params.get(name)
+    values = list(default) if raw is None else list(dict.fromkeys(filter(None, raw.split(","))))
+    if any(v not in choices for v in values):
+        raise InvalidQuery(f"Seleção inválida: {name}.")
+    return sorted(values)
+
+
+def selection(params):
+    allowed = {"court", "start", "end", "subject", "topics", "sources", "outcomes", "undated"}
+    if set(params) - allowed or any(len(params.getlist(k)) != 1 for k in params):
+        raise InvalidQuery("Filtro de pesquisa desconhecido ou repetido.")
+    process_filters = params.copy()
+    for k in set(params) - {"court", "start", "end"}:
+        process_filters.pop(k)
+    query, scope = filtered_processes(process_filters)
+    subjects = list(dict.fromkeys(filter(None, params.get("subject", "").split(","))))
+    if len(subjects) > 50 or any(not re.fullmatch(r"[1-9][0-9]{0,8}", code) for code in subjects):
+        raise InvalidQuery("Assunto CNJ inválido.")
+    subjects = matching_subject_codes(map(int, subjects))
+    if subjects:
+        query = query.filter(
+            Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code__in=subjects))
+        )
+    sources = options(params, "sources", SOURCES, SOURCES)
+    outcomes = options(params, "outcomes", OUTCOMES, OUTCOMES)
+    topics = options(params, "topics", TOPIC_LABELS)
+    undated = params.get("undated", "true")
+    if not sources or undated not in ("true", "false") or ("datajud" in sources and not outcomes):
+        raise InvalidQuery("Selecione fontes e resultados válidos.")
+    if "datajud" not in sources:
+        query = query.none()
+    elif set(outcomes) != set(OUTCOMES):
+        query = query.filter(
+            result__name__in=[v if v != "outside_appellate_degree" else "outside_degree" for v in outcomes]
+        )
+    scope.update(
+        subject_codes=subjects, topics=topics, sources=sources, outcomes=outcomes, undated=undated == "true"
+    )
+    indexed = scoped_items(scope, scope["undated"]).filter(category__in=sources)
+    if topics:
+        indexed = indexed.filter(topic_matches__topic__in=topics).distinct()
+    return query, scope, indexed
+
+
+def context(params, question="", previous=()):
+    query, scope, indexed = selection(params)
+    counts = {key: 0 for key in CATEGORIES}
+    counts.update(dict(indexed.order_by().values_list("category").annotate(n=Count("pk", distinct=True))))
+    docs = retrieve(indexed, question, previous)
+    # Relation counts concern the complete selected set, independent of examples returned to the chat.
+    usage = (
+        usage_summary(scope, page_size=4)
+        if {"precedent", "jurisprudence"}.issubset(scope["sources"])
+        else None
+    )
+    if usage:
+        for item in usage["items"]:
+            docs.append(
+                {
+                    "id": "V" + item["id"],
+                    "kind": "link",
+                    "title": item["authority_literal"],
+                    "origin": item["court"],
+                    "date": item["decision_date"],
+                    "excerpt": item["excerpt"],
+                    "url": safe_url(item["source_url"]),
+                    "relation": RELATIONS[item["status"]],
+                }
+            )
+    return {
+        "scope": scope,
+        "metrics": metrics(query),
+        "history": instance_series(query),
+        "counts": counts,
+        "sources": docs,
+        "usage": usage["counts"] if usage else None,
+        "topics": TOPIC_LABELS,
+        "provider": "openai" if ai_ready() else "local",
+    }
+
+
+def retrieve(indexed, question, previous):
+    # Earlier document mentions help with follow-ups, but can never extend the authorized queryset.
+    direct = SOURCE_ID.findall(question)
+    recent = previous[-1] if previous and follows_up(question) else ""
+    ids = list(map(int, direct or SOURCE_ID.findall(recent)))
+    inferred = classify(question) or classify(recent)
+    if ids and not inferred:
+        inferred = set(indexed.filter(pk__in=ids).values_list("topic_matches__topic", flat=True))
+    if inferred and not direct:
+        indexed = indexed.filter(topic_matches__topic__in=inferred).distinct()
+    terms = list(dict.fromkeys(t for t in re.findall(r"[\w-]{4,}", question.lower()) if t not in STOP))[:8]
+    score = Value(0, output_field=IntegerField())
+    if ids:
+        score += Case(When(pk__in=ids, then=100), default=0)
+    if inferred:
+        matches = LegalCorpusTopicMatch.objects.filter(item_id=OuterRef("pk"), topic__in=inferred)
+        score += Case(When(Exists(matches), then=15), default=0)
+    for term in terms:
+        score += Case(When(title__icontains=term, then=3), When(excerpt__icontains=term, then=1), default=0)
+    ranked = indexed.annotate(relevance=score).order_by("-relevance", F("date").desc(nulls_last=True), "pk")
+    docs = []
+    for kind in CATEGORIES:
+        for item in ranked.filter(category=kind)[:3]:
+            docs.append(source_item(item))
+    return docs
+
+
+def source_item(item):
+    return {
+        "id": f"F{item.pk}",
+        "kind": item.category,
+        "title": item.title,
+        "origin": item.source_name or item.court,
+        "date": item.date,
+        "excerpt": item.excerpt[:1000],
+        "url": safe_url(item.source_url),
+        "authors": item.authors,
+    }
+
+
+def ai_ready():
+    return bool(
+        settings.RESEARCH_OPENAI_ENABLED and settings.OPENAI_API_KEY and settings.RESEARCH_OPENAI_MODEL
+    )
+
+
+def block(text, refs=()):
+    return {"text": text, "refs": list(refs)}
+
+
+def number(n):
+    return f"{n:,}".replace(",", ".")
+
+
+def local_answer(data, question="", previous=()):
+    phrase = folded(question)
+    docs = data["sources"]
+    m = data["metrics"]
+    asked_ids = {f"F{i}" for i in SOURCE_ID.findall(question)}
+    if asked_ids:
+        found = [d for d in docs if d["id"] in asked_ids]
+        return [
+            block(d["excerpt"] or "A fonte tem apenas referência bibliográfica.", [d["id"]]) for d in found
+        ] + [
+            block(f"{i} não está entre os trechos recuperados neste recorte.")
+            for i in sorted(asked_ids - {d["id"] for d in found})
+        ]
+    sections = []
+    general = not question or any(term in phrase for term in ("resum", "sintese", "panorama"))
+    if general or any(
+        term in phrase for term in ("indicador", "taxa", "provimento", "quantos processos", "registros")
+    ):
+        if "datajud" not in data["scope"]["sources"]:
+            sections.append(block("O DataJud está desmarcado neste recorte."))
+        else:
+            text = f"O DataJud reúne {number(m['process_records'])} registros por data de ajuizamento nos tribunais selecionados ({data['scope']['court']})."
+            if m["binary_denominator"]:
+                rate = f"{m['grant_rate'] * 100:.1f}%".replace(".", ",")
+                text += f" Entre {number(m['binary_denominator'])} resultados elegíveis, houve {number(m['granted'])} providos e {number(m['denied'])} desprovidos. A taxa de provimento foi {rate}."
+            else:
+                text += " Não há resultados elegíveis para calcular a taxa de provimento."
+            sections.append(block(text))
+    if general or any(s in phrase for s in ("histor", "trimestr", "volume", "evolu")):
+        quarters = Counter()
+        for row in data["history"]:
+            quarters[(row["time__year"], row["time__quarter"])] += row["count"]
+        if quarters:
+            peak = max(quarters.values())
+            periods = [f"T{quarter}/{year}" for (year, quarter), n in sorted(quarters.items()) if n == peak]
+            sections.append(
+                block(f"O maior volume trimestral foi de {number(peak)} registros em {', '.join(periods)}.")
+            )
+        elif not general:
+            sections.append(block("Sem registros de ajuizamento para compor o histórico."))
+    kinds = [
+        k
+        for k, stem in (("doctrine", "doutrin"), ("precedent", "precedent"), ("jurisprudence", "decis"))
+        if stem in phrase
+    ]
+    if general:
+        kinds = ["precedent", "doctrine"]
+    if "precedent" in kinds or any(s in phrase for s in ("afast", "aplica", "citad")):
+        counts = data["usage"]
+        if counts is not None:
+            links = [d["id"] for d in docs if d["kind"] == "link"]
+            sections.append(
+                block(
+                    f"O NLP identificou {counts['applied']} aplicações explícitas, {counts['not_applied']} afastamentos, {counts['mentioned']} menções e {counts['ambiguous']} vínculos ambíguos em ementas. Um vínculo temático por si só não prova aplicação.",
+                    links[:2],
+                )
+            )
+    for kind in kinds:
+        examples = [d for d in docs if d["kind"] == kind]
+        if not examples:
+            sections.append(block(f"{TYPES[kind]}: nenhuma fonte no recorte selecionado."))
+        else:
+            doc = examples[0]
+            sections.append(
+                block(
+                    f"{TYPES[kind]} · {doc['title']}. "
+                    + (doc["excerpt"][:420] or "Item bibliográfico sem trecho indexado."),
+                    [doc["id"]],
+                )
+            )
+    if not sections:
+        terms = set(re.findall(r"\w{4,}", phrase)) - STOP
+        hits = [d for d in docs if any(t in folded(d["title"] + " " + d["excerpt"]) for t in terms)]
+        for d in hits[:3]:
+            sections.append(block(d["excerpt"][:420] or d["title"], [d["id"]]))
+    return sections or [
+        block(
+            "Não encontrei um trecho que responda à pergunta. Indique um tema, o código de uma fonte ou um indicador do painel."
+        )
+    ]

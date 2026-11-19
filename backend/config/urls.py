@@ -2,8 +2,13 @@ from django.urls import path
 
 from src.accounts import views as accounts
 from src.routes import corpus, excel_report, legal_chat, nlp_dashboard, nlp_evidence, pdf_report, statistics
+from src.routes import research
 
 urlpatterns = [
+    path("api/research/", research.panel),
+    path("api/research/sources/", research.sources),
+    path("api/research/chat/", research.chat),
+    path("api/research/export/", research.export),
     path("api/corpus/", corpus.catalog),
     path("api/report.pdf/", pdf_report.report),
     path("api/report.xlsx/", excel_report.report),

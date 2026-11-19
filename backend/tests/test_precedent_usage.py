@@ -1,7 +1,10 @@
 """Engineering fixtures stay in the isolated test database, never the public corpus."""
+from datetime import timedelta
 from io import BytesIO
+from unittest.mock import patch
 
 from django.test import TestCase
+from django.utils import timezone
 from pypdf import PdfReader
 
 from src.db.models import NlpDocument, NlpTextVersion
@@ -18,9 +21,12 @@ class PrecedentUsageTests(TestCase):
         source = dict(document_id=key, court=document.court, text_field='inteiroTeor',
                       decision_date='2024-05-01', source_url='https://jurisdf.tjdft.jus.br/acordaos/test-only')
         source.update(metadata)
-        return NlpTextVersion.objects.create(document=document, text=text,
-            sha256=bytes_hash(text.encode()), fingerprint=bytes_hash((text + str(metadata)).encode()),
-            source=source, representation={})
+        previous = NlpTextVersion.objects.filter(document=document).order_by('-created_at').first()
+        timestamp = max(timezone.now(), previous.created_at + timedelta(microseconds=1)) if previous else timezone.now()
+        with patch('django.utils.timezone.now', return_value=timestamp):
+            return NlpTextVersion.objects.create(document=document, text=text,
+                sha256=bytes_hash(text.encode()), fingerprint=bytes_hash((text + str(metadata)).encode()),
+                source=source, representation={})
 
     def ementa(self, value):
         return 'EMENTA\n' + value + '\nACÓRDÃO\nRELATÓRIO\nO apelante alega aplicação da Súmula 7/STJ.'
@@ -96,11 +102,13 @@ class PrecedentUsageTests(TestCase):
 
     def test_tampered_text_and_fixture_sources_are_excluded(self):
         version = self.version(self.ementa('Aplica-se a Súmula 54/STJ.'))
-        NlpTextVersion.objects.create(document=version.document, text=version.text + ' altered',
-            sha256=version.sha256, fingerprint='0' * 64, source=version.source, representation={})
+        with patch('django.utils.timezone.now', return_value=version.created_at):
+            NlpTextVersion.objects.create(document=version.document, text=version.text + ' altered',
+                sha256=version.sha256, fingerprint='0' * 64, source=version.source, representation={})
         result = summarize(self.scope)
         self.assertEqual(result['denominator'], 0)
         self.assertEqual(result['coverage']['integrity_failed'], 1)
+        self.assertEqual(result['coverage']['ambiguous_latest_version'], 1)
         self.version(self.ementa('Aplica-se a Súmula 54/STJ.'), key='TJDFT:fixture', data_mode='fixture')
         self.assertEqual(summarize(self.scope)['denominator'], 0)
 
