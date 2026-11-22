@@ -97,7 +97,7 @@ if SYNTHETIC_PREVIEW:
         or os.environ.get("RAILWAY_SERVICE_NAME") != "datumlex-api-preview"
         or not database_url
         or DATABASES["default"]["HOST"] != "postgres.railway.internal"
-        or DATABASES["default"]["NAME"] != "datumlex_preview_4f_synthetic"
+        or DATABASES["default"]["NAME"] != "datumlex_preview_4f_demo"
         or RESEARCH_CIVIL_COHORT != "civil-synthetic-4f"
         or os.environ.get("GEMINI_API_KEY")
         or os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() != "false"
