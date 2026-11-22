@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import { randomInt, randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 
-const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href)
+const { chromium } = process.env.PLAYWRIGHT_MODULE
+  ? await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href)
+  : await import('@playwright/test')
 const origin = process.env.FRONTEND_URL || 'http://127.0.0.1:5174'
 const secret = process.env.DATUMLEX_SUPPORT_PASSWORD
 assert.ok(secret, 'Support deployment credential required through environment')
-const browser = await chromium.launch({ channel: 'msedge', headless: true })
+const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge', headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
 const errors = []
@@ -24,7 +26,8 @@ function cpf() {
 async function api(path, method = 'GET', data) {
   const csrf = await context.request.get(`${origin}/api/auth/csrf/`)
   const { csrfToken } = await csrf.json()
-  return context.request.fetch(`${origin}/api/${path}/`, { method, data, headers: { 'X-CSRFToken': csrfToken } })
+  const [resource, query] = path.split('?')
+  return context.request.fetch(`${origin}/api/${resource}/${query ? '?' + query : ''}`, { method, data, headers: { 'X-CSRFToken': csrfToken } })
 }
 async function login(identifier, pass) {
   await page.getByLabel('E-mail ou CPF').fill(identifier)
@@ -98,7 +101,17 @@ try {
   assert.equal((await api('users')).status(), 403)
   await page.reload()
   await page.getByRole('button', { name: 'Menu', exact: true }).waitFor()
-  assert.equal(await page.getByLabel('Tribunal', { exact: true }).inputValue(), 'TJDFT')
+  await page.getByRole('heading', { name: 'Síntese da pesquisa' }).waitFor()
+  const session = await api('auth/me')
+  assert.deepEqual((await session.json()).user.courts, ['TJDFT'])
+  assert.equal((await api('research?court=STJ')).status(), 403)
+  const forbidden = await context.request.post(`${origin}/api/auth/logout/`)
+  assert.equal(forbidden.status(), 403)
+  assert.equal((await forbidden.json()).error.code, 'csrf_failed')
+  await logout()
+  assert.equal((await api('research')).status(), 401)
+  await login(pendingEmail, 'invalid-test-password')
+  await page.getByRole('alert').filter({ hasText: 'inválidos' }).waitFor()
   await page.setViewportSize({ width: 320, height: 850 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
   assert.deepEqual(errors, [])

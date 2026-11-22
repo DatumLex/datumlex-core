@@ -1,0 +1,8 @@
+.env
+.env.*
+.venv*
+data/
+tests/
+**/__pycache__/
+*.sqlite3
+*.dump

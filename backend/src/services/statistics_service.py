@@ -5,7 +5,7 @@ from django.db.models import Count, Exists, F, Max, Min, OuterRef
 from src.db.models import ExtractionRun, FactProcess, FactProcessSubject
 from src.services.outcomes import summarize
 from src.services.subject_groups import matching_codes
-from src.services.period import HISTORY_START, today
+from src.services.period import EARLIEST_DATE, HISTORY_START, today
 from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 
@@ -28,13 +28,13 @@ def filtered_processes(params):
     try:
         start = date.fromisoformat(params.get("start", HISTORY_START.isoformat()))
         end = date.fromisoformat(params.get("end", today().isoformat()))
-        if start < HISTORY_START or start > end or end > today():
+        if start < EARLIEST_DATE or start > end or end > today():
             raise ValueError
         subject = int(params["subject"]) if params.get("subject") else None
         if subject is not None and subject < 1:
             raise ValueError
     except ValueError:
-        raise InvalidQuery("Invalid date range (2016..today) or subject code") from None
+        raise InvalidQuery("Invalid date range (2010..today) or subject code") from None
     query = FactProcess.objects.filter(court__in=courts, time__date__range=[start, end])
     if subject:
         query = query.filter(

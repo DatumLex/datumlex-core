@@ -451,3 +451,5 @@ class LegalNarrativeDraft(models.Model):
     user_conclusions = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     approved_at = models.DateTimeField(null=True)
+
+from .sampling_models import CivilSampleMember, CivilSamplingCohort  # noqa: E402,F401

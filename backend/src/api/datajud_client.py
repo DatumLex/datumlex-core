@@ -63,7 +63,7 @@ class DataJudClient:
         )
         body = {
             "size": scope["page_size"],
-            "track_total_hits": True,
+            "track_total_hits": scope.get("track_total_hits", True),
             "_source": SOURCE_FIELDS,
             "query": {
                 "bool": {

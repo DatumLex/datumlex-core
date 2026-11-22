@@ -3,9 +3,9 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-EARLIEST_DATE = date(2016, 1, 1)
+EARLIEST_DATE = date(2010, 1, 1)
 EARLIEST_DATE_ISO = EARLIEST_DATE.isoformat()
-HISTORY_START = EARLIEST_DATE
+HISTORY_START = date(2016, 1, 1)
 
 
 def today():

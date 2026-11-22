@@ -1,9 +1,7 @@
 import io
 import json
-from urllib.error import URLError
 from xml.sax.saxutils import escape
 
-from django.core.cache import cache
 from django.db import DatabaseError
 from django.db.models import F
 from django.http import HttpResponse, JsonResponse
@@ -43,7 +41,7 @@ def sources(request):
         or int(page) < 1
     ):
         raise InvalidQuery("Categoria, página ou termo de busca inválido.")
-    _, _, items = research.selection(params)
+    _, _, items, _ = research.selection(params)
     if category:
         items = items.filter(category=category)
     if term:
@@ -70,9 +68,11 @@ def chat(request):
             raise ValueError
         question = body.get("question")
         previous = body.get("previous", [])
+        use_gemini = body.get("use_gemini", False)
         if (
             not isinstance(question, str)
             or not 1 <= len(question.strip()) <= 1200
+            or not isinstance(use_gemini, bool)
             or not isinstance(previous, list)
             or len(previous) > 4
             or any(not isinstance(q, str) or len(q) > 1200 for q in previous)
@@ -88,16 +88,21 @@ def chat(request):
         return error("O banco está indisponível para esta consulta.", 503)
     mode, notice = "local", ""
     paragraphs = None
-    if research.ai_ready():
-        if not cache.add(f"research:inflight:{request.user.pk}", True, timeout=40):
-            return error("Uma resposta ainda está em andamento. Aguarde um instante.", 429)
-        try:
-            paragraphs = research_ai.generate(data, question, previous)
-            mode = "openai"
-        except (OSError, URLError, ValueError, KeyError, TypeError):
-            notice = "A IA está indisponível. A resposta abaixo usa consulta direta ao acervo."
-        finally:
-            cache.delete(f"research:inflight:{request.user.pk}")
+    if use_gemini and research.ai_ready():
+        available = research_ai.findings(data)
+        if not available:
+            notice = "O recorte não contém dados suficientes para análise com Gemini."
+        else:
+            try:
+                research_ai.claim_request(request.user.pk)
+                paragraphs = research_ai.generate(available, data["scope"], question)
+                mode = "gemini"
+            except research_ai.AnalysisUnavailable as exc:
+                notice = f"{exc} Veja a consulta direta ao acervo abaixo."
+            except DatabaseError:
+                return error("O banco está indisponível para esta consulta.", 503)
+    elif use_gemini:
+        notice = "Gemini não está configurado. Veja a consulta direta ao acervo abaixo."
     paragraphs = paragraphs or research.local_answer(data, question, previous)
     cited = {ref for para in paragraphs for ref in para["refs"]}
     return JsonResponse(
@@ -131,10 +136,22 @@ def export(request):
         ["Temas", ", ".join(data["topics"][k] for k in scope["topics"]) or "Todos"],
         ["Fontes", ", ".join(scope["sources"])],
         ["Resultados DataJud", ", ".join(scope["outcomes"])],
+        ["Amostra DataJud", scope["cohort"] or "Base carregada (cobertura parcial)"],
         ["Referências sem data", "Incluídas" if scope["undated"] else "Excluídas"],
     ]
+    metrics_rows = [
+        ["Registros DataJud", str(data["metrics"]["process_records"])],
+        ["Números CNJ distintos", str(data["metrics"]["distinct_process_numbers"])],
+        ["Resultados integrais antes do filtro de resultado", str(data["merit_baseline"]["binary_denominator"])],
+        ["Jurisprudência no índice do recorte", str(data["counts"]["jurisprudence"])],
+        ["Precedentes no índice do recorte", str(data["counts"]["precedent"])],
+        ["Doutrina no índice do recorte", str(data["counts"]["doctrine"])],
+    ]
+    rate = data["merit_baseline"]["grant_rate"]
+    metrics_rows.append(["Taxa de provimento antes do filtro de resultado",
+                         f"{rate:.1%}".replace(".", ",") if rate is not None else "Indisponível"])
     refs = [
-        [s["id"], s["title"], s["origin"], str(s["date"] or "Sem data"), s["excerpt"], s["url"]]
+        [s["id"], s["title"], s["origin"], str(s["date"] or "Sem data"), s["excerpt"], s["url"], s.get("review_status", "pending")]
         for s in data["sources"]
     ]
     summary = [[p["text"], ", ".join(p["refs"])] for p in paragraphs]
@@ -142,7 +159,8 @@ def export(request):
         sheets = [
             ("Recorte", scope_rows),
             ("Síntese", [["Texto", "Referências"], *summary]),
-            ("Fontes da síntese", [["ID", "Título", "Origem", "Data", "Trecho", "Link"], *refs]),
+            ("Fontes da síntese", [["ID", "Título", "Origem", "Data", "Trecho", "Link", "Revisão"], *refs]),
+            ("Indicadores", [["Indicador", "Valor"], *metrics_rows]),
             (
                 "Histórico",
                 [
@@ -161,12 +179,15 @@ def export(request):
         buffer = io.BytesIO()
         styles = getSampleStyleSheet()
         story = [Paragraph("DatumLex · Síntese da pesquisa", styles["Title"])]
-        for line in (
-            [" · ".join(row) for row in scope_rows]
-            + [" ".join(row) for row in summary]
-            + [" · ".join(row) for row in refs]
-        ):
-            story.extend([Paragraph(escape(line), styles["BodyText"]), Spacer(1, 5)])
+        for row in scope_rows + metrics_rows + summary:
+            story.extend([Paragraph(escape(" · ".join(row)), styles["BodyText"]), Spacer(1, 5)])
+        for ref_id, title, origin, day, excerpt, url, review in refs:
+            label = escape(f"{ref_id} · {title} · {origin} · {day} · revisão: {review}")
+            if url:
+                link = escape(url, {'"': "&quot;", "'": "&#39;"})
+                label += f' · <link href="{link}" color="blue">Abrir fonte original</link>'
+            story.extend([Paragraph(label, styles["BodyText"]),
+                          Paragraph(escape(excerpt), styles["BodyText"]), Spacer(1, 7)])
         SimpleDocTemplate(buffer).build(story)
         response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
     response["Content-Disposition"] = (

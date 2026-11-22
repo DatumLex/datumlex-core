@@ -43,7 +43,7 @@ class ExcelTests(TestCase):
     def test_permissions_validation_and_method(self):
         for court in ('STJ', 'TJDFT,STJ'):
             self.assertEqual(self.client.get('/api/report.xlsx/?court=' + court).status_code, 403)
-        self.assertEqual(self.client.get('/api/report.xlsx/?start=2015-01-01').status_code, 400)
+        self.assertEqual(self.client.get('/api/report.xlsx/?start=2009-01-01').status_code, 400)
         self.assertEqual(self.client.get('/api/report.xlsx/?outcome=granted').status_code, 400)
         self.assertEqual(self.client.post('/api/report.xlsx/').status_code, 405)
         self.client.logout()

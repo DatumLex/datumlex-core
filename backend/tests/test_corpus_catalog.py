@@ -62,7 +62,7 @@ class CorpusCatalogTests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get('/api/corpus/').status_code,401)
     def test_invalid_filters_rejected(self):
-        for query in ('topic=invalid','category=bad','page=0','page_size=100','include_undated=maybe','start=2015-01-01'):
+        for query in ('topic=invalid','category=bad','page=0','page_size=100','include_undated=maybe','start=2009-01-01'):
             self.assertEqual(self.client.get('/api/corpus/?'+query).status_code,400,query)
     def test_topic_overlap_does_not_double_count_document(self):
         item=self.item('unique')

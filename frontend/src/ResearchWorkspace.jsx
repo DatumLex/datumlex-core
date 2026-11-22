@@ -66,10 +66,10 @@ const today = () =>
 const defaults = (courts) => ({
   court: [...courts].sort(),
   topics: [],
-  subject: [],
+  subject: ['10431'],
   sources: Object.keys(sourceLabels),
   outcomes: Object.keys(results),
-  start: '2016-01-01',
+  start: '2010-01-01',
   end: today(),
   undated: true,
 })
@@ -145,7 +145,7 @@ function Filters({ applied, courts, topics, subjects, onApply, onClose }) {
             <input
               type="date"
               required
-              min="2016-01-01"
+              min="2010-01-01"
               max={today()}
               value={draft[k]}
               onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
@@ -156,7 +156,7 @@ function Filters({ applied, courts, topics, subjects, onApply, onClose }) {
       <Choice name="topics" title="Temas do acervo e das ementas" options={topics} {...{ draft, setDraft }} />
       <Choice
         name="subject"
-        title="Assuntos CNJ dos indicadores e das ementas"
+        title="Responsabilidade civil e subassuntos CNJ dos indicadores"
         options={subjects}
         {...{ draft, setDraft }}
       />
@@ -213,7 +213,8 @@ function SourceRow({ doc, onOpen }) {
           {kinds[doc.kind]} · {doc.origin}
         </small>
         <strong>{doc.title}</strong>
-        {doc.relation && <small>{doc.relation}</small>}
+        {doc.relation && <small>Candidato NLP · {doc.relation}</small>}
+        {doc.review_status === 'pending' && <small>Revisão pendente</small>}
       </span>
       <ChevronRight size={16} />
     </button>
@@ -268,6 +269,7 @@ function History({ series }) {
   )
 }
 function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
+  const [useGemini, setUseGemini] = useState(false)
   const tail = useRef(null)
   useEffect(() => {
     if (thread.turns.length) tail.current?.scrollIntoView({ block: 'nearest' })
@@ -276,7 +278,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
     <section className="rw-card rw-chat">
       <div className="rw-heading">
         <h2>Conversa sobre o recorte</h2>
-        <small>{provider === 'openai' ? 'IA generativa habilitada' : 'Consulta direta ao acervo'}</small>
+        <small>{provider === 'gemini' ? 'Gemini disponível' : 'Consulta direta ao acervo'}</small>
       </div>
       <p className="rw-note">
         A conversa acompanha os filtros aplicados. Abra as referências para conferir o texto original.
@@ -284,7 +286,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
       {!thread.turns.length && (
         <div className="rw-prompts">
           {prompts.map((q) => (
-            <button key={q} disabled={thread.busy} onClick={() => onAsk(q)}>
+            <button key={q} disabled={thread.busy} onClick={() => onAsk(q, useGemini)}>
               {q}
             </button>
           ))}
@@ -296,7 +298,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
             <strong>Você</strong>
             {t.question}
           </p>
-          <small>{t.mode === 'openai' ? 'DatumLex · IA generativa' : 'DatumLex · Consulta ao acervo'}</small>
+          <small>{t.mode === 'gemini' ? 'DatumLex · Seleção de achados com Gemini' : 'DatumLex · Consulta ao acervo'}</small>
           {t.notice && <p>{t.notice}</p>}
           <Paragraphs blocks={t.paragraphs} docs={t.sources} onOpen={onOpen} />
         </article>
@@ -306,7 +308,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
         className="rw-compose"
         onSubmit={(e) => {
           e.preventDefault()
-          onAsk(thread.draft)
+          onAsk(thread.draft, useGemini)
         }}
       >
         <label htmlFor="rw-question">Sua pergunta</label>
@@ -325,6 +327,13 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
           }}
           placeholder="Pergunte sobre um indicador, tema ou fonte…"
         />
+        {provider === 'gemini' && (
+          <label>
+            <input type="checkbox" checked={useGemini} disabled={thread.busy}
+              onChange={(event) => setUseGemini(event.target.checked)} />
+            {' '}Usar Gemini para selecionar achados com dados agregados do recorte
+          </label>
+        )}
         <div className="rw-actions">
           <button className="apply-button" disabled={thread.busy || !thread.draft.trim()}>
             <Send size={15} /> Enviar pergunta
@@ -373,22 +382,24 @@ export default function ResearchWorkspace({ session }) {
       })
     return () => controller.abort()
   }, [key, retry])
-  const courtParam = params.court
+  const { court: courtParam, start: startParam, end: endParam } = params
   useEffect(() => {
     const c = new AbortController()
     setSubjects({})
-    getData('scope', { court: courtParam }, c.signal)
+    getData('scope', { court: courtParam, start: startParam, end: endParam }, c.signal)
       .then((r) => {
-        if (!c.signal.aborted)
-          setSubjects(
-            Object.fromEntries((r.subject_groups || r.subjects || []).map((s) => [
-              String(s.code), s.name + ' (' + (s.codes || [s.code]).join(', ') + ')',
-            ])),
-          )
+        if (!c.signal.aborted) {
+          const tree = Object.fromEntries((r.civil_subjects || []).map((item) => [item.code, item]))
+          setSubjects(Object.fromEntries(Object.values(tree).map((item) => [
+            String(item.code),
+            [tree[item.parent]?.name, item.name].filter(Boolean).join(' › ')
+              + ' (' + item.code + ' · ' + number(item.record_count) + ' registros)',
+          ])))
+        }
       })
       .catch(() => {})
     return () => c.abort()
-  }, [courtParam])
+  }, [courtParam, startParam, endParam])
   function navigate(id) {
     setPage(id)
     setExportError('')
@@ -401,7 +412,7 @@ export default function ResearchWorkspace({ session }) {
   function open(doc) {
     setDrawer({ doc })
   }
-  async function ask(raw) {
+  async function ask(raw, useGemini = false) {
     const q = raw.trim()
     if (!q || !data || live.current.has(key)) return
     const c = new AbortController()
@@ -418,6 +429,7 @@ export default function ResearchWorkspace({ session }) {
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
         body: JSON.stringify({
           question: q,
+          use_gemini: useGemini,
           previous: thread.turns
             .slice(-4)
             .map((turn) =>
@@ -557,12 +569,9 @@ export default function ResearchWorkspace({ session }) {
                   <Sparkles size={18} />
                 </div>
                 <Paragraphs blocks={data.summary} docs={docs} onOpen={open} />
-                {data.provider === 'openai' && (
+                {data.provider === 'gemini' && (
                   <button
-                    onClick={() => {
-                      navigate('chat')
-                      ask('Gere uma síntese dos indicadores, dos precedentes e da doutrina deste recorte.')
-                    }}
+                    onClick={() => navigate('chat')}
                   >
                     <Sparkles size={16} /> Interpretar com IA
                   </button>
@@ -593,8 +602,8 @@ export default function ResearchWorkspace({ session }) {
             <div className="rw-metrics">
               {[
                 ['Registros DataJud', number(m.process_records)],
-                ['Resultados elegíveis', number(m.binary_denominator)],
-                ['Taxa de provimento', rate(m.grant_rate)],
+                ['Elegíveis antes do filtro de resultado', number(data.merit_baseline.binary_denominator)],
+                ['Taxa no recorte antes do filtro de resultado', rate(data.merit_baseline.grant_rate)],
               ].map(([l, v]) => (
                 <article className="rw-card" key={l}>
                   <small>{l}</small>
@@ -602,6 +611,7 @@ export default function ResearchWorkspace({ session }) {
                 </article>
               ))}
             </div>
+            {data.scope.cohort && <p className="rw-note">Indicadores DataJud da amostra {data.scope.cohort}.</p>}
             <History series={data.history} />
           </>
         ) : page === 'chat' ? (
@@ -699,7 +709,8 @@ export default function ResearchWorkspace({ session }) {
               <blockquote>
                 {selected.excerpt || 'O índice contém a referência bibliográfica, sem trecho disponível.'}
               </blockquote>
-              {selected.relation && <p>Classificação do NLP: {selected.relation}.</p>}
+              {selected.relation && <p>Classificação candidata do NLP: {selected.relation}.</p>}
+              {selected.review_status === 'pending' && <p>Fonte com revisão pendente.</p>}
               <div className="rw-actions">
                 {selected.url && (
                   <a className="rw-link" href={selected.url} target="_blank" rel="noreferrer">

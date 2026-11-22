@@ -3,7 +3,7 @@ from datetime import date
 
 from src.nlp.contracts import fingerprint
 from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES
-from src.services.period import HISTORY_START, today
+from src.services.period import EARLIEST_DATE, HISTORY_START, today
 from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 SOURCES = ('datajud', 'tjdft_jurisprudence', 'stj_jurisprudence', 'stj_precedent', 'bdjur_doctrine')
@@ -45,7 +45,7 @@ def resolve(actor, supplied):
         value = result[field]
         if not isinstance(value, str) or len(value) != 10 or date.fromisoformat(value).isoformat() != value:
             raise ValueError(f'invalid_{field}')
-    if not HISTORY_START.isoformat() <= result['start'] <= result['end'] <= today().isoformat():
+    if not EARLIEST_DATE.isoformat() <= result['start'] <= result['end'] <= today().isoformat():
         raise ValueError('invalid_period')
     authorize(actor, result)
     return result

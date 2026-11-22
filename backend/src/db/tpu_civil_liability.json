@@ -1,0 +1,138 @@
+{
+  "source": "https://sgt.cloud.cnj.jus.br/api/v1/soap",
+  "version": "2026-11-05",
+  "subjects": [
+    {
+      "code": 10431,
+      "name": "Responsabilidade Civil",
+      "parent": 899,
+      "status": "A"
+    },
+    {
+      "code": 14694,
+      "name": "DPVAT",
+      "parent": 10431,
+      "status": "A"
+    },
+    {
+      "code": 10439,
+      "name": "Indenização por Dano Material",
+      "parent": 10431,
+      "status": "A"
+    },
+    {
+      "code": 10433,
+      "name": "Indenização por Dano Moral",
+      "parent": 10431,
+      "status": "A"
+    },
+    {
+      "code": 15762,
+      "name": "Responsabilidade Civil por Atos de Preconceito",
+      "parent": 10431,
+      "status": "A"
+    },
+    {
+      "code": 15367,
+      "name": "SPVAT",
+      "parent": 10431,
+      "status": "A"
+    },
+    {
+      "code": 11954,
+      "name": "Acidente de Trabalho - Ressarcimento ao Erário",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 10441,
+      "name": "Acidente de Trânsito",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 14919,
+      "name": "Atraso na Entrega do Imóvel",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 14921,
+      "name": "Direito Autoral",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 10443,
+      "name": "Direito de Imagem",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 10442,
+      "name": "Lei de Imprensa",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 10440,
+      "name": "Serviços de Saúde",
+      "parent": 10439,
+      "status": "A"
+    },
+    {
+      "code": 10435,
+      "name": "Acidente de Trânsito",
+      "parent": 10433,
+      "status": "A"
+    },
+    {
+      "code": 14920,
+      "name": "Atraso na Entrega do Imóvel",
+      "parent": 10433,
+      "status": "A"
+    },
+    {
+      "code": 14922,
+      "name": "Direito Autoral",
+      "parent": 10433,
+      "status": "A"
+    },
+    {
+      "code": 10437,
+      "name": "Direito de Imagem",
+      "parent": 10433,
+      "status": "A"
+    },
+    {
+      "code": 10436,
+      "name": "Lei de Imprensa",
+      "parent": 10433,
+      "status": "A"
+    },
+    {
+      "code": 10434,
+      "name": "Serviços de Saúde",
+      "parent": 10433,
+      "status": "A"
+    },
+    {
+      "code": 15764,
+      "name": "Discriminação de Gênero",
+      "parent": 15762,
+      "status": "A"
+    },
+    {
+      "code": 15765,
+      "name": "Discriminação por Orientação Sexual e/ou Identidade de Gênero",
+      "parent": 15762,
+      "status": "A"
+    },
+    {
+      "code": 15763,
+      "name": "Discriminação Racial",
+      "parent": 15762,
+      "status": "A"
+    }
+  ]
+}

@@ -80,9 +80,9 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 ).split(",")
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS)).split(",")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
-RESEARCH_OPENAI_ENABLED = os.environ.get("RESEARCH_OPENAI_ENABLED", "false").lower() == "true"
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-RESEARCH_OPENAI_MODEL = os.environ.get("RESEARCH_OPENAI_MODEL", "gpt-4.1-mini")
+RESEARCH_CIVIL_COHORT = os.environ.get("RESEARCH_CIVIL_COHORT", "").strip()
+RESEARCH_GEMINI_ENABLED = os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() == "true"
+RESEARCH_GEMINI_MODEL = os.environ.get("RESEARCH_GEMINI_MODEL", "gemini-3.5-flash-lite")
 PANGEA_SEARCH_BASE_URL = os.environ.get(
     "PANGEA_SEARCH_BASE_URL", "https://pangeabnp.pdpj.jus.br"
 ).rstrip("/")

@@ -28,11 +28,11 @@ class HistoricalReportTests(TestCase):
         response = self.client.get("/api/statistics/?start=2016-01-01&end=2016-12-31")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["metrics"]["process_records"], 1)
-        self.assertEqual(self.client.get("/api/statistics/?start=2015-12-31").status_code, 400)
+        self.assertEqual(self.client.get("/api/statistics/?start=2009-12-31").status_code, 400)
         actor = response.wsgi_request.user
         self.assertEqual(resolve(actor, {"start": "2016-01-01"})["start"], "2016-01-01")
         with self.assertRaises(ValueError):
-            resolve(actor, {"start": "2015-12-31"})
+            resolve(actor, {"start": "2009-12-31"})
 
     @patch("src.api.datajud_client.DataJudClient.search")
     def test_extraction_accepts_2016_and_preserves_scope_on_resume(self, search):
@@ -58,7 +58,7 @@ class HistoricalReportTests(TestCase):
         self.assertEqual(run.status, "completed")
         self.assertEqual(run.scope["start"], "2016-01-01")
         with self.assertRaises(CommandError):
-            call_command("extract_datajud", start="2015-12-31", stdout=io.StringIO())
+            call_command("extract_datajud", start="2009-12-31", stdout=io.StringIO())
 
     def test_pdf_filtering_permissions_and_empty_denominator(self):
         from pypdf import PdfReader
@@ -86,7 +86,7 @@ class HistoricalReportTests(TestCase):
         self.assertNotIn("historical-2016", text)
         self.assertEqual(self.client.get("/api/report.pdf/?court=STJ").status_code, 403)
         self.assertEqual(self.client.get("/api/report.pdf/?court=TJDFT,STJ").status_code, 403)
-        self.assertEqual(self.client.get("/api/report.pdf/?start=2015-01-01").status_code, 400)
+        self.assertEqual(self.client.get("/api/report.pdf/?start=2009-01-01").status_code, 400)
         self.assertEqual(
             self.client.get(f"/api/report.pdf/?end={date.today().year + 1}-01-01").status_code, 400
         )

@@ -6,14 +6,16 @@ from collections import Counter
 from django.conf import settings
 from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Value, When
 
+from src.db.civil_subjects import branch_codes
 from src.db.court_catalog import ACTIVE_COURTS
 from src.db.models import FactProcessSubject, LegalCorpusTopicMatch
+from src.db.sampling_models import CivilSampleMember
 from src.nlp.topics import TOPICS, classify, folded
 from src.services.analytical_context import OUTCOMES
 from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
 from src.services.precedent_usage import summarize as usage_summary
 from src.services.statistics_service import InvalidQuery, filtered_processes, instance_series, metrics
-from src.services.subject_groups import matching_subject_codes
+from src.services.outcomes import summarize
 
 
 TOPIC_LABELS = {key: label for key, label, _ in TOPICS}
@@ -69,7 +71,7 @@ def selection(params):
     subjects = list(dict.fromkeys(filter(None, params.get("subject", "").split(","))))
     if len(subjects) > 50 or any(not re.fullmatch(r"[1-9][0-9]{0,8}", code) for code in subjects):
         raise InvalidQuery("Assunto CNJ inválido.")
-    subjects = matching_subject_codes(map(int, subjects))
+    subjects = sorted(set().union(*(branch_codes(int(code)) for code in subjects)))
     if subjects:
         query = query.filter(
             Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code__in=subjects))
@@ -80,23 +82,28 @@ def selection(params):
     undated = params.get("undated", "true")
     if not sources or undated not in ("true", "false") or ("datajud" in sources and not outcomes):
         raise InvalidQuery("Selecione fontes e resultados válidos.")
+    cohort = settings.RESEARCH_CIVIL_COHORT
+    if cohort:
+        query = query.filter(Exists(CivilSampleMember.objects.filter(fact=OuterRef("pk"), cohort__name=cohort)))
     if "datajud" not in sources:
         query = query.none()
-    elif set(outcomes) != set(OUTCOMES):
+    merit_query = query
+    if "datajud" in sources and set(outcomes) != set(OUTCOMES):
         query = query.filter(
             result__name__in=[v if v != "outside_appellate_degree" else "outside_degree" for v in outcomes]
         )
     scope.update(
-        subject_codes=subjects, topics=topics, sources=sources, outcomes=outcomes, undated=undated == "true"
+        subject_codes=subjects, topics=topics, sources=sources, outcomes=outcomes, undated=undated == "true",
+        cohort=cohort or None
     )
     indexed = scoped_items(scope, scope["undated"]).filter(category__in=sources)
     if topics:
         indexed = indexed.filter(topic_matches__topic__in=topics).distinct()
-    return query, scope, indexed
+    return query, scope, indexed, merit_query
 
 
 def context(params, question="", previous=()):
-    query, scope, indexed = selection(params)
+    query, scope, indexed, merit_query = selection(params)
     counts = {key: 0 for key in CATEGORIES}
     counts.update(dict(indexed.order_by().values_list("category").annotate(n=Count("pk", distinct=True))))
     docs = retrieve(indexed, question, previous)
@@ -120,15 +127,19 @@ def context(params, question="", previous=()):
                     "relation": RELATIONS[item["status"]],
                 }
             )
+    values = metrics(query)
     return {
         "scope": scope,
-        "metrics": metrics(query),
+        "metrics": values,
+        "merit_baseline": summarize(merit_query) if set(scope["outcomes"]) != set(OUTCOMES) else {
+            key: values[key] for key in ("binary_denominator", "granted", "denied", "grant_rate", "denial_rate")
+        },
         "history": instance_series(query),
         "counts": counts,
         "sources": docs,
         "usage": usage["counts"] if usage else None,
         "topics": TOPIC_LABELS,
-        "provider": "openai" if ai_ready() else "local",
+        "provider": "gemini" if ai_ready() else "local",
     }
 
 
@@ -169,12 +180,13 @@ def source_item(item):
         "excerpt": item.excerpt[:1000],
         "url": safe_url(item.source_url),
         "authors": item.authors,
+        "review_status": item.review_status,
     }
 
 
 def ai_ready():
     return bool(
-        settings.RESEARCH_OPENAI_ENABLED and settings.OPENAI_API_KEY and settings.RESEARCH_OPENAI_MODEL
+        settings.RESEARCH_GEMINI_ENABLED and settings.GEMINI_API_KEY and settings.RESEARCH_GEMINI_MODEL
     )
 
 
@@ -190,6 +202,7 @@ def local_answer(data, question="", previous=()):
     phrase = folded(question)
     docs = data["sources"]
     m = data["metrics"]
+    baseline = data["merit_baseline"]
     asked_ids = {f"F{i}" for i in SOURCE_ID.findall(question)}
     if asked_ids:
         found = [d for d in docs if d["id"] in asked_ids]
@@ -208,9 +221,9 @@ def local_answer(data, question="", previous=()):
             sections.append(block("O DataJud está desmarcado neste recorte."))
         else:
             text = f"O DataJud reúne {number(m['process_records'])} registros por data de ajuizamento nos tribunais selecionados ({data['scope']['court']})."
-            if m["binary_denominator"]:
-                rate = f"{m['grant_rate'] * 100:.1f}%".replace(".", ",")
-                text += f" Entre {number(m['binary_denominator'])} resultados elegíveis, houve {number(m['granted'])} providos e {number(m['denied'])} desprovidos. A taxa de provimento foi {rate}."
+            if baseline["binary_denominator"]:
+                rate = f"{baseline['grant_rate'] * 100:.1f}%".replace(".", ",")
+                text += f" Entre {number(baseline['binary_denominator'])} resultados elegíveis antes do filtro de resultado, houve {number(baseline['granted'])} providos e {number(baseline['denied'])} desprovidos. A taxa de provimento foi {rate}."
             else:
                 text += " Não há resultados elegíveis para calcular a taxa de provimento."
             sections.append(block(text))

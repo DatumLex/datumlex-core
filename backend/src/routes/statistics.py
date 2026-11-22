@@ -3,12 +3,15 @@ from functools import wraps
 from src.nlp.thesis_display import describe_thesis
 from src.nlp.topics import TOPICS
 
+from django.conf import settings
 from django.db import DatabaseError, connection
-from django.db.models import Count, Max, Prefetch, Q
+from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q
 from django.db.models.functions import TruncQuarter
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
+from src.db.civil_subjects import CATALOG, branch_codes
+from src.db.sampling_models import CivilSampleMember
 from src.db.models import (
     CrossSourceLinkCandidate,
     DecisionAssessment,
@@ -80,7 +83,18 @@ def scope(request):
         subject["name"] = (subject["name"] or "").strip() or (
             f"Assunto CNJ {subject['code']} (nome não informado)"
         )
+    sample_query = query
+    if settings.RESEARCH_CIVIL_COHORT:
+        sample_query = query.filter(Exists(CivilSampleMember.objects.filter(
+            fact=OuterRef("pk"), cohort__name=settings.RESEARCH_CIVIL_COHORT
+        )))
+    civil = [
+        {**item, "record_count": sample_query.filter(subjects__code__in=branch_codes(item["code"])).aggregate(n=Count("pk", distinct=True))["n"]}
+        for item in CATALOG["subjects"]
+    ]
     return {
+        "civil_subjects": civil,
+        "civil_subject_version": CATALOG["version"],
         "metadata": metadata(query, selected),
         "by_court": metadata_by_court(query, selected),
         "subjects": subjects,
