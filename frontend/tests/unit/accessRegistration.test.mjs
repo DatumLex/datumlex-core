@@ -55,6 +55,46 @@ test('authRequest inicializa CSRF, envia cadastro público e atualiza o token ro
   }
 })
 
+test('authRequest propaga erro 503 quando cadastro público está indisponível sem encerrar sessão', async () => {
+  const originalFetch = globalThis.fetch
+  const originalWindow = globalThis.window
+  let sessionEnded = false
+  globalThis.window = {
+    dispatchEvent(event) {
+      if (event?.type === 'datumlex:session-ended') sessionEnded = true
+    },
+  }
+  globalThis.fetch = async (url) => {
+    if (url.endsWith('/auth/csrf/')) {
+      return { ok: true, status: 200, json: async () => ({ csrfToken: 'csrf-unavailable' }) }
+    }
+    if (url.endsWith('/auth/register/')) {
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({
+          error: {
+            code: 'registration_unavailable',
+            message: 'O cadastro público está indisponível porque nenhum tribunal padrão está configurado.',
+          },
+        }),
+      }
+    }
+    throw new Error(`Unexpected URL: ${url}`)
+  }
+
+  try {
+    await assert.rejects(
+      () => authRequest('auth/register', 'POST', { name: 'Pessoa Teste' }),
+      (err) => err.status === 503 && /nenhum tribunal padrão/i.test(err.message),
+    )
+    assert.equal(sessionEnded, false)
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.window = originalWindow
+  }
+})
+
 test('AccessApp autentica direto no cadastro e não exige aprovação manual local', async () => {
   const source = await readFile(new URL('../../src/AccessApp.jsx', import.meta.url), 'utf8')
   assert.match(source, /authRequest\('auth\/register', 'POST'/)

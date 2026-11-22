@@ -26,6 +26,10 @@ from .models import AuditEvent, Court, RequestLimit, User
 from src.db.court_catalog import ACTIVE_COURTS
 
 
+class RegistrationUnavailableError(RuntimeError):
+    pass
+
+
 def csrf_failure(request, reason=""):
     return denied("A sessão de segurança expirou. Atualize a página e tente novamente.", code="csrf_failed")
 
@@ -47,6 +51,8 @@ def api(methods):
                 return denied("CPF ou e-mail já cadastrado, ou dados incompatíveis.", 409, "conflict")
             except PermissionError as exc:
                 return denied(str(exc))
+            except RegistrationUnavailableError as exc:
+                return denied(str(exc), 503, "registration_unavailable")
             except User.DoesNotExist:
                 return denied("Usuário não encontrado.", 404, "not_found")
 
@@ -160,9 +166,13 @@ def register(request):
     throttle(request, "register", maximum=20)
     if set(request.payload) - {"name", "email", "cpf", "password"}:
         raise ValueError("O cadastro público aceita somente nome, CPF, e-mail e senha.")
+    assigned_courts = registration_courts()
+    if not assigned_courts:
+        raise RegistrationUnavailableError(
+            "O cadastro público está indisponível porque nenhum tribunal padrão está configurado."
+        )
     values = identity(request.payload)
     secret = password(request.payload)
-    assigned_courts = registration_courts()
     with transaction.atomic():
         user = User(
             username=uuid.uuid4().hex,
@@ -175,8 +185,7 @@ def register(request):
         )
         user.set_password(secret)
         user.save()
-        if assigned_courts:
-            user.courts.set(assigned_courts)
+        user.courts.set(assigned_courts)
         audit(
             request,
             "user.registered",

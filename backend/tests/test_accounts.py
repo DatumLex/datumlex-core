@@ -140,7 +140,21 @@ class AccessTests(TestCase):
             self.send("auth/login", {"login": user.email, "password": "abcdefgh"}).status_code, 403
         )
 
-    def test_register_defaults_to_no_courts_and_rejects_privileged_fields(self):
+    def test_register_fails_closed_when_no_default_courts_are_configured_or_available(self):
+        for configured in ((), ("FAKE", "INVALID"), ("TJSP",)):
+            with self.subTest(configured=configured), override_settings(PUBLIC_REGISTRATION_COURTS=configured):
+                result = self.send("auth/register", self.payload)
+                self.assertEqual(result.status_code, 503)
+                body = result.json()
+                self.assertEqual(body["error"]["code"], "registration_unavailable")
+                self.assertIn("nenhum tribunal padrão", body["error"]["message"].lower())
+                self.assertFalse(User.objects.filter(email="test@example.com").exists())
+                self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+                self.assertFalse(AuditEvent.objects.filter(action="user.registered").exists())
+                self.assertFalse(AuditEvent.objects.filter(action="login.succeeded").exists())
+
+    @override_settings(PUBLIC_REGISTRATION_COURTS=("TJDFT",))
+    def test_register_rejects_privileged_fields(self):
         for forbidden in (
             {"role": "Master"},
             {"role": "Admin"},
@@ -153,12 +167,7 @@ class AccessTests(TestCase):
             {"must_change_password": False},
         ):
             self.assertEqual(self.send("auth/register", {**self.payload, **forbidden}).status_code, 400)
-
-        result = self.send("auth/register", self.payload)
-        self.assertEqual(result.status_code, 200)
-        self.assertEqual(result.json()["user"]["courts"], [])
-        self.assertEqual(self.client.get("/api/statistics/?court=TJDFT").status_code, 403)
-        self.assertEqual(self.client.get("/api/research/?court=TJDFT").status_code, 403)
+        self.assertFalse(User.objects.filter(email="test@example.com").exists())
 
     @override_settings(SYNTHETIC_PREVIEW=True, PUBLIC_REGISTRATION_COURTS=("TJDFT",))
     def test_register_blocked_in_synthetic_preview(self):
@@ -166,6 +175,7 @@ class AccessTests(TestCase):
         self.assertEqual(result.status_code, 403)
         self.assertFalse(User.objects.filter(email="test@example.com").exists())
 
+    @override_settings(PUBLIC_REGISTRATION_COURTS=("TJDFT",))
     def test_identity_validation_and_database_uniqueness(self):
         for change in (
             {"cpf": "11111111111"},

@@ -131,7 +131,7 @@ Copy-Item .env.example .env
 
 ### Registration and approval
 
-Public registration requires full name, valid CPF, email, password, and password confirmation in the interface. CPF and email cannot be reused; email uniqueness is case-insensitive. A new self-registered account is immediately created as an active, approved Standard user (`Padrão`, `support=False`), signed in with a rotated CSRF token, and does not require an initial password change. Court access for self-registered accounts is restricted to the explicit `DATUMLEX_PUBLIC_REGISTRATION_COURTS` subset intersected with `ACTIVE_COURTS` (default empty when unset). Public registration remains closed (`403`) whenever `DATUMLEX_SYNTHETIC_PREVIEW=true`.
+Public registration requires full name, valid CPF, email, password, and password confirmation in the interface. CPF and email cannot be reused; email uniqueness is case-insensitive. A new self-registered account is immediately created as an active, approved Standard user (`Padrão`, `support=False`), signed in with a rotated CSRF token, and does not require an initial password change. Court access for self-registered accounts is restricted to the explicit `DATUMLEX_PUBLIC_REGISTRATION_COURTS` subset intersected with `ACTIVE_COURTS` and available `Court` records. When this setting is unset or yields no available courts, public registration fails closed (`503 registration_unavailable`) without creating an account. Public registration remains closed (`403`) whenever `DATUMLEX_SYNTHETIC_PREVIEW=true`.
 
 Master manages all ordinary profiles and may delete users. Admin lists users, but only creates, edits, approves, deactivates, and assigns courts to Standard accounts; it cannot delete users or assign Master/Admin. Standard accesses only Menu/consultations and cannot access administrative or legal-source review endpoints. Management prevents removal of the signed-in user's own access. Accounts marked Pending or Inactive by an administrator remain blocked at login and by `AccessMiddleware`.
 
@@ -153,7 +153,7 @@ All API paths except health, CSRF initialization, login, and registration requir
 
 GET /api/auth/csrf/ - Initialize CSRF token/cookie.
 
-POST /api/auth/register/ - Create active Standard account with configured courts, sign in, and rotate CSRF (closed with 403 when `SYNTHETIC_PREVIEW=true`).
+POST /api/auth/register/ - Create active Standard account with configured courts, sign in, and rotate CSRF (503 when no default courts are configured/available; 403 when `SYNTHETIC_PREVIEW=true`).
 
 POST /api/auth/login/ - Sign in and rotate session/CSRF.
 
