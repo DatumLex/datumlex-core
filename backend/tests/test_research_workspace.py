@@ -12,6 +12,7 @@ from django.test import Client, TestCase, override_settings
 
 from src.accounts.models import Court
 from src.db.models import ExtractionRun, LegalCorpusItem, LegalCorpusTopicMatch, LegalReference
+from src.db.sampling_models import CivilSampleMember, CivilSamplingCohort
 from src.etl.loader import load_record
 from src.etl.transformer import normalize
 from tests.test_pipeline import SCOPE, hit
@@ -122,6 +123,32 @@ class ResearchWorkspaceTests(TestCase):
         )
         self.client.logout()
         self.assertEqual(self.ask("doutrina").status_code, 401)
+
+    @override_settings(RESEARCH_CIVIL_COHORT="coverage-test")
+    def test_degree_case_detail_and_coverage_share_authorized_scope(self):
+        run = ExtractionRun.objects.create(scope=SCOPE)
+        load_record(normalize(hit(), SCOPE), run)
+        fact = run.factprocess_set.get()
+        cohort = CivilSamplingCohort.objects.create(name="coverage-test", definition={"target": 325, "start_year": 2022})
+        CivilSampleMember.objects.create(cohort=cohort, fact=fact, process=fact.process_dimension,
+            court="TJDFT", year=fact.time.year, filing_month=fact.time.month, subject_code=10433)
+        ExtractionRun.objects.create(status="failed", scope={"origin": "civil_sampling", "cohort": cohort.name,
+                                                           "court": "TJDFT", "year": 2022})
+        for degree, expected in (("G2", 1), ("G1", 0)):
+            params = self.query + f"&degree={degree}"
+            result = self.client.get("/api/research/" + params).json()
+            details = self.client.get("/api/research/processes/" + params).json()
+            self.assertEqual(result["metrics"]["process_records"], expected)
+            self.assertEqual(details["total"], expected)
+            self.assertEqual(sum(row["count"] for row in result["history"]), expected)
+            if expected:
+                self.assertEqual(details["items"][0]["degree"], degree)
+        coverage = self.client.get("/api/research/coverage/" + self.query).json()["coverage"]
+        status = {cell["year"]: cell["state"] for cell in coverage["cells"]}
+        self.assertEqual(status[2022], "failed")
+        self.assertEqual(status[fact.time.year], "partial")
+        self.assertEqual(status[2025], "unverified")
+        self.assertEqual(self.client.get("/api/research/processes/?court=STJ").status_code, 403)
 
     def test_downloads(self):
         pdf = self.client.get("/api/research/export/" + self.query + "&format=pdf")

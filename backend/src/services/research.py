@@ -4,12 +4,12 @@ import re
 from collections import Counter
 
 from django.conf import settings
-from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Value, When
+from django.db.models import Case, Count, Exists, F, IntegerField, Max, Min, OuterRef, Value, When
 
 from src.db.civil_subjects import branch_codes
 from src.db.court_catalog import ACTIVE_COURTS
-from src.db.models import FactProcessSubject, LegalCorpusTopicMatch
-from src.db.sampling_models import CivilSampleMember
+from src.db.models import ExtractionRun, FactProcessSubject, LegalCorpusTopicMatch
+from src.db.sampling_models import CivilSampleMember, CivilSamplingCohort
 from src.nlp.topics import TOPICS, classify, folded
 from src.services.analytical_context import OUTCOMES
 from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
@@ -20,6 +20,7 @@ from src.services.outcomes import summarize
 
 TOPIC_LABELS = {key: label for key, label, _ in TOPICS}
 SOURCES = ("datajud", *CATEGORIES)
+DEGREES = ("G1", "G2", "JE", "TR", "SUP")
 TYPES = {"jurisprudence": "Decisão", "precedent": "Precedente", "doctrine": "Doutrina"}
 RELATIONS = {
     "applied": "aplicação explícita",
@@ -61,7 +62,7 @@ def options(params, name, choices, default=()):
 
 
 def selection(params):
-    allowed = {"court", "start", "end", "subject", "topics", "sources", "outcomes", "undated"}
+    allowed = {"court", "start", "end", "subject", "topics", "sources", "outcomes", "degree", "undated"}
     if set(params) - allowed or any(len(params.getlist(k)) != 1 for k in params):
         raise InvalidQuery("Filtro de pesquisa desconhecido ou repetido.")
     process_filters = params.copy()
@@ -76,6 +77,9 @@ def selection(params):
         query = query.filter(
             Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code__in=subjects))
         )
+    degrees = options(params, "degree", DEGREES)
+    if degrees:
+        query = query.filter(degree_dimension__code__in=degrees)
     sources = options(params, "sources", SOURCES, SOURCES)
     outcomes = options(params, "outcomes", OUTCOMES, OUTCOMES)
     topics = options(params, "topics", TOPIC_LABELS)
@@ -93,13 +97,42 @@ def selection(params):
             result__name__in=[v if v != "outside_appellate_degree" else "outside_degree" for v in outcomes]
         )
     scope.update(
-        subject_codes=subjects, topics=topics, sources=sources, outcomes=outcomes, undated=undated == "true",
+        subject_codes=subjects, topics=topics, sources=sources, outcomes=outcomes, degree=degrees, undated=undated == "true",
         cohort=cohort or None
     )
     indexed = scoped_items(scope, scope["undated"]).filter(category__in=sources)
     if topics:
         indexed = indexed.filter(topic_matches__topic__in=topics).distinct()
     return query, scope, indexed, merit_query
+
+
+def coverage(scope):
+    cohort = CivilSamplingCohort.objects.filter(name=scope["cohort"]).first() if scope["cohort"] else None
+    if not cohort:
+        return None
+    courts = scope["court"].split(",")
+    members = CivilSampleMember.objects.filter(cohort=cohort, court__in=courts)
+    bounds = members.values("court").annotate(first=Min("fact__time__date"), last=Max("fact__time__date"))
+    by_court = {row["court"]: {"first": row["first"], "last": row["last"]} for row in bounds}
+    first_year = max(int(scope["start"][:4]), cohort.definition["start_year"])
+    last_year = int(scope["end"][:4])
+    target = cohort.definition["target"]
+    counts = {(c, y): n for c, y, n in members.filter(year__range=(first_year, last_year))
+              .values("court", "year").annotate(n=Count("pk")).values_list("court", "year", "n")}
+    failed = set()
+    for run in ExtractionRun.objects.filter(scope__origin="civil_sampling", scope__cohort=cohort.name,
+                                             scope__court__in=courts).values("scope", "status"):
+        details = run["scope"]
+        if run["status"] == "failed" or details.get("remote_scan", {}).get("errors"):
+            failed.add((details["court"], details.get("year")))
+    cells = []
+    for year in range(first_year, last_year + 1):
+        for court in courts:
+            count = counts.get((court, year), 0)
+            failure = (court, year) in failed
+            state = "target_met" if count >= target else "partial" if count else "failed" if failure else "unverified"
+            cells.append({"court": court, "year": year, "members": count, "state": state, "collection_failed": failure})
+    return {"target_per_cell": target, "by_court": by_court, "cells": cells}
 
 
 def context(params, question="", previous=()):

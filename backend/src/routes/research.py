@@ -22,6 +22,35 @@ def panel(request):
 
 
 @endpoint
+def coverage(request):
+    _, scope, _, _ = research.selection(request.GET)
+    return {"coverage": research.coverage(scope)}
+
+
+@endpoint
+def processes(request):
+    params = request.GET.copy()
+    page = params.pop("page", ["1"])
+    if len(page) != 1 or not page[0].isascii() or not page[0].isdigit() or not 1 <= len(page[0]) <= 5:
+        raise InvalidQuery("Página inválida.")
+    page = int(page[0])
+    if page < 1:
+        raise InvalidQuery("Página inválida.")
+    query, _, _, _ = research.selection(params)
+    offset = (page - 1) * 12
+    rows = query.order_by("time__date", "pk").values_list(
+        "pk", "process_dimension__number_process", "court", "time__date", "degree_dimension__code",
+        "result__name", "organization__name", "process_class__name",
+    )[offset:offset + 12]
+    return {"total": query.count(), "items": [
+        {"id": pk, "number": number, "court": court, "filing": filing, "degree": degree,
+         "outcome": "outside_appellate_degree" if outcome == "outside_degree" else outcome,
+         "organization": org, "class_name": cls}
+        for pk, number, court, filing, degree, outcome, org, cls in rows
+    ]}
+
+
+@endpoint
 def sources(request):
     params = request.GET.copy()
 
@@ -141,6 +170,7 @@ def export(request):
         ["Tribunais", scope["court"]],
         ["Período", f"{scope['start']} a {scope['end']}"],
         ["Assuntos CNJ", ", ".join(map(str, scope["subject_codes"])) or "Todos"],
+        ["Graus DataJud", ", ".join(scope["degree"]) or "Todos"],
         ["Temas", ", ".join(data["topics"][k] for k in scope["topics"]) or "Todos"],
         ["Fontes", ", ".join(scope["sources"])],
         ["Resultados DataJud", ", ".join(scope["outcomes"])],

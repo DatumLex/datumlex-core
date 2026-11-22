@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { getData } from './api'
 import App from './App'
+import { formatProcessIdentifier } from './processIdentifier'
 import './research.css'
 
 const api = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
@@ -50,6 +51,7 @@ const results = {
   unknown: 'Sem resultado',
   outside_appellate_degree: 'Fora do grau recursal',
 }
+const degrees = { G1: '1ª instância', G2: '2ª instância', JE: 'Juizados especiais', TR: 'Turmas recursais', SUP: 'Tribunal superior' }
 const prompts = [
   'Como foi calculada a taxa de provimento?',
   'Quais precedentes foram aplicados ou afastados?',
@@ -69,6 +71,7 @@ const defaults = (courts) => ({
   subject: ['10431'],
   sources: Object.keys(sourceLabels),
   outcomes: Object.keys(results),
+  degree: [],
   start: '2010-01-01',
   end: today(),
   undated: true,
@@ -161,6 +164,7 @@ function Filters({ applied, courts, topics, subjects, onApply, onClose }) {
         {...{ draft, setDraft }}
       />
       <Choice name="sources" title="Fontes" options={sourceLabels} {...{ draft, setDraft }} />
+      <Choice name="degree" title="Grau DataJud (sem seleção: todos)" options={degrees} {...{ draft, setDraft }} />
       <Choice name="outcomes" title="Resultados do DataJud" options={results} {...{ draft, setDraft }} />
       <label>
         <input
@@ -524,6 +528,7 @@ export default function ResearchWorkspace({ session }) {
               <small>Período</small>
               {date(filters.start)} – {date(filters.end)}
             </span>
+            {filters.degree.length > 0 && <span><small>Grau DataJud</small>{filters.degree.map((key) => degrees[key]).join(', ')}</span>}
             <button className="secondary-button" onClick={() => setDrawer({ type: 'filter' })}>
               <SlidersHorizontal size={16} /> Filtros
             </button>
@@ -568,7 +573,11 @@ export default function ResearchWorkspace({ session }) {
                   <h2>Síntese da pesquisa</h2>
                   <Sparkles size={18} />
                 </div>
-                <Paragraphs blocks={data.summary} docs={docs} onOpen={open} />
+                <Paragraphs blocks={data.summary.slice(0, 2)} docs={docs} onOpen={open} />
+                {data.summary.length > 2 && <details>
+                  <summary>Ver síntese completa</summary>
+                  <Paragraphs blocks={data.summary.slice(2)} docs={docs} onOpen={open} />
+                </details>}
                 {data.provider === 'gemini' && (
                   <button
                     onClick={() => navigate('chat')}
@@ -593,7 +602,7 @@ export default function ResearchWorkspace({ session }) {
                     <SourceRow key={k} doc={d} onOpen={open} />
                   ) : (
                     <p className="rw-note" key={k}>
-                      {kinds[k]} · sem fonte neste recorte.
+                    {kinds[k]} · sem fonte aprovada neste recorte.
                     </p>
                   )
                 })}
@@ -612,6 +621,9 @@ export default function ResearchWorkspace({ session }) {
               ))}
             </div>
             {data.scope.cohort && <p className="rw-note">Indicadores DataJud da amostra {data.scope.cohort}.</p>}
+            <button className="secondary-button" disabled={!m.process_records} onClick={() => setDrawer({ type: 'processes' })}>
+              Consultar processos do recorte
+            </button>
             <History series={data.history} />
           </>
         ) : page === 'chat' ? (
@@ -679,9 +691,10 @@ export default function ResearchWorkspace({ session }) {
         ) : (
           <section className="rw-card">
             <h2>O que cada fonte cobre</h2>
+            <Coverage scopeKey={key} />
             {Object.entries(data.counts).map(([k, n]) => (
               <p key={k}>
-                <strong>{sourceLabels[k]}</strong> · {number(n)} documentos indexados neste recorte.
+                <strong>{sourceLabels[k]}</strong> · {number(n)} fontes aprovadas neste recorte.
               </p>
             ))}
             <p>
@@ -696,7 +709,7 @@ export default function ResearchWorkspace({ session }) {
       {drawer && (
         <Drawer
           title={
-            selected?.title || { filter: 'Filtros da pesquisa', export: 'Exportar pesquisa' }[drawer.type]
+            selected?.title || { filter: 'Filtros da pesquisa', export: 'Exportar pesquisa', processes: 'Processos do recorte' }[drawer.type]
           }
           onClose={() => setDrawer(null)}
         >
@@ -741,6 +754,8 @@ export default function ResearchWorkspace({ session }) {
               onApply={setFilters}
               onClose={() => setDrawer(null)}
             />
+          ) : drawer.type === 'processes' ? (
+            <CaseBrowser scopeKey={key} />
           ) : (
             <>
               <p>Baixe a síntese, o recorte aplicado e os trechos usados na pesquisa.</p>
@@ -757,6 +772,77 @@ export default function ResearchWorkspace({ session }) {
         </Drawer>
       )}
     </div>
+  )
+}
+
+const coverageLabels = {
+  target_met: 'Meta da amostra atingida',
+  partial: 'Amostra parcial',
+  failed: 'Coleta falha registrada',
+  unverified: 'Sem registros no lote · cobertura não verificada',
+}
+
+function useScopedResult(resource, key) {
+  const [result, setResult] = useState({})
+  useEffect(() => {
+    const controller = new AbortController()
+    getData(resource, Object.fromEntries(new URLSearchParams(key)), controller.signal)
+      .then((data) => { if (!controller.signal.aborted) setResult({ key, data }) })
+      .catch((error) => { if (!controller.signal.aborted) setResult({ key, error: error.message }) })
+    return () => controller.abort()
+  }, [resource, key])
+  return result.key === key ? result : {}
+}
+
+function Coverage({ scopeKey }) {
+  const { data, error } = useScopedResult('research/coverage', scopeKey)
+  if (!data) return <p role={error ? 'alert' : 'status'}>{error || 'Consultando a cobertura…'}</p>
+  if (!data.coverage) return <p>Sem informação de cobertura por coorte.</p>
+  const { cells, by_court, target_per_cell } = data.coverage
+  return (
+    <div>
+      <h3>Cobertura observada no DataJud</h3>
+      <p>{cells.filter((cell) => cell.members > 0).length} de {cells.length} células tribunal/ano com registros no lote.
+        {' '}Meta de {target_per_cell} por célula, com {number(cells.reduce((gap, cell) => gap + Math.max(0, target_per_cell - cell.members), 0))} vagas remanescentes.
+        {' '}O quadro anual considera tribunal e ano.</p>
+      <p>A ausência de registros no lote não comprova zero processos no tribunal. O lote não certifica células vazias.</p>
+      {[...new Set(cells.map((cell) => cell.court))].map((court) => (
+        <details key={court}>
+          <summary>{court} · {by_court[court] ? date(by_court[court].first) + ' a ' + date(by_court[court].last) : 'Sem registros no lote'}</summary>
+          <ul>
+            {cells.filter((cell) => cell.court === court).map((cell) => (
+              <li key={cell.year}>{cell.year} · {coverageLabels[cell.state]}
+                {cell.members > 0 && ` · ${number(cell.members)}/${target_per_cell} registros`}
+                {cell.collection_failed && cell.state !== 'failed' && ' · coleta falha registrada'}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ))}
+    </div>
+  )
+}
+
+function CaseBrowser({ scopeKey }) {
+  const [page, setPage] = useState(1)
+  const { data, error } = useScopedResult('research/processes', scopeKey + '&page=' + page)
+  if (!data) return <p role={error ? 'alert' : 'status'}>{error || 'Consultando processos…'}</p>
+  return (
+    <>
+      <p>{number(data.total)} documentos DataJud no recorte.</p>
+      {data.items.map((item) => (
+        <details key={item.id}>
+          <summary>{item.court} · {formatProcessIdentifier(item.number)}</summary>
+          <p>{item.class_name} · {item.organization}</p>
+          <p>Ajuizamento {date(item.filing)} · {degrees[item.degree] || item.degree} · {results[item.outcome] || item.outcome}</p>
+        </details>
+      ))}
+      <div className="rw-actions">
+        <button disabled={page === 1} onClick={() => setPage(page - 1)}>Anterior</button>
+        <span>Página {page}</span>
+        <button disabled={page * 12 >= data.total} onClick={() => setPage(page + 1)}>Próxima</button>
+      </div>
+    </>
   )
 }
 
@@ -800,7 +886,7 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
       </form>
       {data ? (
         <>
-          <p>{number(data.total)} documentos</p>
+          <p>{data.total ? `${number(data.total)} fontes aprovadas` : 'Nenhuma fonte aprovada neste recorte.'}</p>
           {data.items.map((d) => (
             <SourceRow key={d.id} doc={d} onOpen={onOpen} />
           ))}
