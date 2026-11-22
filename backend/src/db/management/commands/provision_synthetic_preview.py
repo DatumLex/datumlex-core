@@ -13,12 +13,13 @@ import psycopg
 from psycopg import sql
 
 from django.conf import settings
+from django.contrib.sessions.models import Session
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, connections, transaction
 from django.db.migrations.recorder import MigrationRecorder
 
-from src.accounts.models import Court, User
+from src.accounts.models import AuditEvent, Court, SupportIdentity, User
 from src.db.models import ExtractionRun, FactProcess, LegalCorpusItem, LegalReference
 from src.db.sampling_models import CivilSampleMember, CivilSamplingCohort
 from src.etl.loader import load_record
@@ -38,9 +39,21 @@ SCOPE = {"court": "TJDFT", "subject_codes": [10433], "start": "2023-01-01",
 
 def seed():
     secret = environ.get("DATUMLEX_DEMO_PASSWORD", "")
-    if len(secret) < 32 or FactProcess.objects.exists() or LegalCorpusItem.objects.exists() or User.objects.exists():
+    if len(secret) < 32 or FactProcess.objects.exists() or LegalCorpusItem.objects.exists() or LegalReference.objects.exists():
         raise CommandError("A primeira carga exige banco dedicado vazio e credencial sintética.")
     with transaction.atomic():
+        # The first Railway attempt ran the old migration hook on this newly created database.
+        # Remove only that confirmed migration artifact before seeding the sole demo reader.
+        if User.objects.exists():
+            legacy = User.objects.filter(username="suport", role="Master", support=True, email__isnull=True,
+                                         cpf__isnull=True, last_login__isnull=True).first()
+            if (not legacy or User.objects.count() != 1 or Session.objects.exists()
+                    or list(AuditEvent.objects.values_list("actor_id", "action")) != [(legacy.pk, "support.provisioned")]
+                    or not SupportIdentity.objects.filter(user=legacy).exists()):
+                raise CommandError("O banco dedicado contém uma conta fora do provisionamento inicial.")
+            AuditEvent.objects.filter(actor=legacy, action="support.provisioned").delete()
+            SupportIdentity.objects.filter(user=legacy).delete()
+            legacy.delete()
         run = ExtractionRun.objects.create(scope=SCOPE)
         raw = {"_id": PREFIX + "case", "_source": {
             "tribunal": "TJDFT", "numeroProcesso": NUMBER, "nivelSigilo": 0, "grau": "G2",
