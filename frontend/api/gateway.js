@@ -18,8 +18,15 @@ export default async function handler(req, res) {
   }
   const incoming = new URL(req.url, 'https://datumlex.invalid')
   if (!incoming.pathname.startsWith('/api/')) return res.status(404).end()
+  const isRewriteTarget = /^\/api\/gateway\/?$/.test(incoming.pathname)
+  const paths = incoming.searchParams.getAll('datumlex_path')
+  const route = isRewriteTarget ? (paths.length === 1 ? paths[0] : '') : incoming.pathname.slice(5)
+  if (!/^[a-z0-9_-][a-z0-9_./-]*$/i.test(route) || route.split('/').includes('..')) {
+    return res.status(404).end()
+  }
   const destination = new URL(backend)
-  destination.pathname = incoming.pathname
+  destination.pathname = '/api/' + route.replace(/\/*$/, '/')
+  incoming.searchParams.delete('datumlex_path')
   destination.search = incoming.search
   const headers = new Headers()
   for (const key of requestHeaders) {

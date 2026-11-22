@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/gateway?datumlex_path=:path*" }
+  ],
   "functions": {
-    "api/*.js": { "maxDuration": 60 }
+    "api/gateway.js": { "maxDuration": 60 }
   }
 }

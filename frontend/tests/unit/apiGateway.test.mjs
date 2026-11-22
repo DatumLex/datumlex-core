@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import handler from '../../api/[...path].js'
+import handler from '../../api/gateway.js'
 
 function response() {
   return {
@@ -36,7 +36,7 @@ test('forwards authentication and cookies through the configured origin', async 
   })
   const res = response()
   await handler({
-    method: 'POST', url: '/api/auth/login/?demo=1', body: { login: 'fixture' },
+    method: 'POST', url: '/api/gateway?datumlex_path=auth%2Flogin&demo=1', body: { login: 'fixture' },
     headers: {
       'content-type': 'application/json', cookie: 'csrftoken=existing',
       origin: 'https://datumlex-core.vercel.app', 'x-csrftoken': 'enabled',

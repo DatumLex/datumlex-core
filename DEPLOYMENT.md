@@ -30,7 +30,7 @@ forem verificadas. Nenhuma credencial deve ser incorporada à imagem.
 Raiz `frontend`, preset Vite. Defina `DATUMLEX_RAILWAY_ORIGIN` com a origem
 HTTPS pública do Django, apenas hostname e porta se houver. Deixe
 `VITE_API_BASE_URL` ausente ou igual a `/api`. A função
-`frontend/api/[...path].js` encaminha chamadas ao host configurado e preserva
+`frontend/api/gateway.js` encaminha chamadas ao host configurado e preserva
 Origin, token CSRF, cookies e cabeçalhos de download, com cache desabilitado.
 O navegador continua usando o domínio da Vercel. Uma alternativa operacional
 é substituir a função por um rewrite externo nativo depois de fixar o domínio
