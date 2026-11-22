@@ -36,13 +36,13 @@ SCOPE = {"court": "TJDFT", "subject_codes": [10433], "start": "2023-01-01",
          "end": "2023-12-31", "end_exclusive": "2024-01-01", "origin": PREFIX}
 
 
-def seed():
+def seed(*, cohort_name=COHORT, prefix=PREFIX, login=LOGIN):
     secret = environ.get("DATUMLEX_DEMO_PASSWORD", "")
     if len(secret) < 32 or FactProcess.objects.exists() or LegalCorpusItem.objects.exists() or LegalReference.objects.exists() or User.objects.exists():
         raise CommandError("A primeira carga exige banco dedicado vazio e credencial sintética.")
     with transaction.atomic():
-        run = ExtractionRun.objects.create(scope=SCOPE)
-        raw = {"_id": PREFIX + "case", "_source": {
+        run = ExtractionRun.objects.create(scope={**SCOPE, "origin": prefix})
+        raw = {"_id": prefix + "case", "_source": {
             "tribunal": "TJDFT", "numeroProcesso": NUMBER, "nivelSigilo": 0, "grau": "G2",
             "dataAjuizamento": "2023-03-30T10:00:00Z",
             "dataHoraUltimaAtualizacao": "2023-06-01T10:00:00Z",
@@ -51,20 +51,20 @@ def seed():
             "assuntos": [{"codigo": 10433, "nome": "Indenização por Dano Moral"}],
             "movimentos": [{"codigo": 237, "nome": "Provimento sintético", "dataHora": "2023-06-01T10:00:00Z"}],
         }}
-        record = normalize(raw, SCOPE)
+        record = normalize(raw, run.scope)
         record["raw"] = {"synthetic": True}
         load_record(record, run)
         fact = FactProcess.objects.get()
-        cohort = CivilSamplingCohort.objects.create(name=COHORT, definition={"target": 325, "start_year": 2010})
+        cohort = CivilSamplingCohort.objects.create(name=cohort_name, definition={"target": 325, "start_year": 2010})
         CivilSampleMember.objects.create(cohort=cohort, fact=fact, process=fact.process_dimension,
                                         court="TJDFT", year=2023, filing_month=3, subject_code=10433, origin="synthetic")
         court, _ = Court.objects.get_or_create(code="TJDFT", defaults={"name": "TJDFT"})
-        reader = User.objects.create_user(username="synthetic-reader-4f", name="Leitor de demonstração",
-                                          email=LOGIN, password=secret, approved=True)
+        reader = User.objects.create_user(username="synthetic-reader-4f" if cohort_name == COHORT else "synthetic-reader-production", name="Leitor de demonstração",
+                                          email=login, password=secret, approved=True)
         reader.courts.add(court)
         for approved in (True, False):
             label = "Precedente sintético de demonstração" if approved else "Referência sintética pendente"
-            identifier = PREFIX + ("precedent" if approved else "pending")
+            identifier = prefix + ("precedent" if approved else "pending")
             grant = {"display": "allowed"} if approved else {}
             url = "https://example.org/"
             ref = LegalReference.objects.create(
@@ -82,18 +82,18 @@ def seed():
             item.topic_matches.create(topic="dano-moral")
 
 
-def verify(alias):
+def verify(alias, *, prefix=PREFIX, login=LOGIN):
     facts = FactProcess.objects.using(alias)
     if list(facts.values_list("source_id", "process_dimension__number_process", "raw_payload")) != [
-        (PREFIX + "case", NUMBER, {"synthetic": True}),
+        (prefix + "case", NUMBER, {"synthetic": True}),
     ]:
         raise CommandError("Conteúdo processual fora da demonstração.")
-    if list(User.objects.using(alias).values_list("email", "role", "is_superuser")) != [(LOGIN, "Padrão", False)]:
+    if list(User.objects.using(alias).values_list("email", "role", "is_superuser")) != [(login, "Padrão", False)]:
         raise CommandError("Conta fora da demonstração.")
     sources = LegalCorpusItem.objects.using(alias)
     if sources.count() != 2 or sources.exclude(provenance__synthetic=True).exists():
         raise CommandError("Catálogo fora da demonstração.")
-    if LegalReference.objects.using(alias).exclude(identifier__startswith=PREFIX).exists():
+    if LegalReference.objects.using(alias).exclude(identifier__startswith=prefix).exists():
         raise CommandError("Referência fora da demonstração.")
     visible = published_items().using(alias).count()
     report = metrics(facts)

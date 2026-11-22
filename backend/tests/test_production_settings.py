@@ -68,6 +68,25 @@ print(json.dumps({
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("ImproperlyConfigured", result.stderr)
 
+    def test_synthetic_production_requires_its_own_database_and_cohort(self):
+        demo = {
+            "DATUMLEX_PRODUCTION_DEMO": "true",
+            "DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_synthetic"),
+            "RESEARCH_CIVIL_COHORT": "civil-synthetic-production",
+        }
+        script = "from django.conf import settings; assert settings.SYNTHETIC_PREVIEW"
+        result = self.run_production(script, demo)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for mismatch in (
+            {"DATABASE_URL": VALID["DATABASE_URL"]},
+            {"RESEARCH_CIVIL_COHORT": "civil-synthetic-4f"},
+            {"DATUMLEX_PRODUCTION_DEMO": "false"},
+        ):
+            with self.subTest(mismatch=mismatch):
+                result = self.run_production(script, demo | mismatch)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ImproperlyConfigured", result.stderr)
+
     def test_http_rejects_missing_session_csrf_and_foreign_origins(self):
         script = """
 import django

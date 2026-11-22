@@ -22,6 +22,8 @@ if os.environ.get("RAILWAY_ENVIRONMENT_NAME") != "production" or os.environ.get(
     raise ImproperlyConfigured("Production settings require the DatumLex production API service.")
 if DEBUG or SYNTHETIC_PREVIEW:  # noqa: F405
     raise ImproperlyConfigured("Production requires DEBUG and synthetic preview disabled.")
+PRODUCTION_DEMO = os.environ.get("DATUMLEX_PRODUCTION_DEMO") == "true"
+
 if len(SECRET_KEY) < 50:  # noqa: F405
     raise ImproperlyConfigured("Configure a dedicated production secret key.")
 if PUBLIC_REGISTRATION_COURTS:  # noqa: F405
@@ -45,6 +47,16 @@ if (
     or not private_db.password
 ):
     raise ImproperlyConfigured("Use a dedicated release database on the private production PostgreSQL service.")
+
+if PRODUCTION_DEMO:
+    if (
+        private_db.path != "/datumlex_release_synthetic"
+        or RESEARCH_CIVIL_COHORT != "civil-synthetic-production"  # noqa: F405
+    ):
+        raise ImproperlyConfigured("The production demonstration requires its dedicated database and cohort.")
+    SYNTHETIC_PREVIEW = True
+elif private_db.path == "/datumlex_release_synthetic":
+    raise ImproperlyConfigured("The synthetic database requires the demonstration mode.")
 
 DATABASES["default"]["OPTIONS"]["sslmode"] = "require"  # noqa: F405
 ALLOWED_HOSTS = [api_host, "healthcheck.railway.app"]

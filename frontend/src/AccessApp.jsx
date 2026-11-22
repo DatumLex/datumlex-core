@@ -7,7 +7,7 @@ const blankUser = { name: '', cpf: '', email: '', role: 'Padrão', status: 'Pend
 const cpfDigits = (value) => value.replace(/\D/g, '')
 const cpfLabel = (value) => value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
 function DemoNotice() {
-  return <p className="access-info">Demonstração com dados sintéticos. Os indicadores não representam estatísticas reais.</p>
+  return <p className="access-info">AMBIENTE DEMONSTRATIVO — DADOS SINTÉTICOS. Os indicadores não representam estatísticas reais.</p>
 }
 function Logo() { return <img className="access-logo" src="/assets/datumlex-logo-horizontal.jpg" alt="DatumLex" /> }
 function Password({ label = 'Senha', minimum = 8, name = 'password', required = true }) {
