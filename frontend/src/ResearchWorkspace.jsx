@@ -17,6 +17,14 @@ import {
 import { getData } from './api'
 import App from './App'
 import { formatProcessIdentifier } from './processIdentifier'
+import {
+  bibliographyLine,
+  dateDisplay,
+  publisherLine,
+  rowSubtitle,
+  sourceKindLabel,
+  tpuDisplay,
+} from './sourcePresentation'
 import './research.css'
 
 const api = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
@@ -40,10 +48,6 @@ const kinds = {
   precedent: 'Precedente',
   doctrine: 'Doutrina',
   link: 'Vínculo em ementa',
-}
-const precedentKinds = {
-  enunciado_sumular: 'Súmula',
-  recurso_repetitivo: 'Tema repetitivo',
 }
 const legalStatus = {
   consta_na_base_oficial: 'Consta na base oficial de súmulas',
@@ -238,10 +242,9 @@ function SourceRow({ doc, onOpen }) {
         <Icon size={18} />
       </span>
       <span>
-        <small>
-          {precedentKinds[doc.source_kind] || kinds[doc.kind]} · {doc.court || doc.origin}
-        </small>
+        <small>{rowSubtitle(doc)}</small>
         <strong>{doc.title}</strong>
+        {doc.authors?.length > 0 && <small>{doc.authors.join(', ')}</small>}
         {doc.topics?.length > 0 && <small>{doc.topics.join(' · ')}</small>}
         {doc.relation && <small>Candidato NLP · {doc.relation}</small>}
         {doc.review_status === 'pending' && <small>Revisão pendente</small>}
@@ -777,45 +780,18 @@ export default function ResearchWorkspace({ session }) {
           onClose={() => setDrawer(null)}
         >
           {selected ? (
-            <>
-              <p>
-                {precedentKinds[selected.source_kind] || kinds[selected.kind]} · {selected.court || selected.origin}
-                {selected.judging_body && ` · ${selected.judging_body}`}
-              </p>
-              {selected.date && <p>{selected.date_kind === 'decision_date' ? 'Julgamento' : 'Data da fonte'} · {date(selected.date)}</p>}
-              {selected.identifier && <p>Identificador · {selected.identifier}</p>}
-              {legalStatus[selected.official_status] && <p>Situação oficial · {legalStatus[selected.official_status]}</p>}
-              {selected.verified_on && <p>Conferida em {date(selected.verified_on)}</p>}
-              {selected.official_tpu?.length > 0 && <p>TPU da ficha oficial · {selected.official_tpu.join(', ')}</p>}
-              {selected.topics?.length > 0 && <p>Assuntos editoriais · {selected.topics.join(' · ')}.
-                A associação indica afinidade temática e não comprova aplicação a um processo.</p>}
-              {selected.authors?.length > 0 && <p>{selected.authors.join(', ')}</p>}
-              {selected.excerpt ? <blockquote>{selected.excerpt}</blockquote> : (
-                <p className="rw-note">A ficha exibe metadados e link. O texto da fonte está disponível apenas na publicação de origem.</p>
-              )}
-              {selected.relation && <p>Classificação candidata do NLP: {selected.relation}.</p>}
-              {selected.review_status === 'pending' && <p>Fonte com revisão pendente.</p>}
-              <div className="rw-actions">
-                {selected.url && (
-                  <a className="rw-link" href={selected.url} target="_blank" rel="noreferrer">
-                    Abrir publicação original
-                  </a>
-                )}
-                <button
-                  className="secondary-button"
-                  onClick={() =>
-                    setSaved((current) => {
-                      const next = { ...current }
-                      if (next[selected.id]) delete next[selected.id]
-                      else next[selected.id] = selected
-                      return next
-                    })
-                  }
-                >
-                  {saved[selected.id] ? 'Retirar do caderno' : 'Guardar no caderno'}
-                </button>
-              </div>
-            </>
+            <SourceDetail
+              doc={selected}
+              saved={Boolean(saved[selected.id])}
+              onToggleSave={() =>
+                setSaved((current) => {
+                  const next = { ...current }
+                  if (next[selected.id]) delete next[selected.id]
+                  else next[selected.id] = selected
+                  return next
+                })
+              }
+            />
           ) : drawer.type === 'filter' ? (
             <Filters
               applied={filters}
@@ -847,6 +823,72 @@ export default function ResearchWorkspace({ session }) {
         </Drawer>
       )}
     </div>
+  )
+}
+
+function SourceDetail({ doc, saved, onToggleSave }) {
+  const when = dateDisplay(doc)
+  const bibLine = bibliographyLine(doc)
+  const pubLine = publisherLine(doc)
+  const tpu = tpuDisplay(doc)
+  return (
+    <>
+      <p>
+        {sourceKindLabel(doc)} · {doc.court || doc.origin}
+        {doc.judging_body && ` · ${doc.judging_body}`}
+      </p>
+      {doc.authors?.length > 0 && <p>Autores · {doc.authors.join(', ')}</p>}
+      {bibLine && <p>Publicação · {bibLine}</p>}
+      {pubLine && <p>Instituição responsável · {pubLine}</p>}
+      {when && <p>{when.label} · {when.value}</p>}
+      {doc.identifier && <p>Identificador · {doc.identifier}</p>}
+      {doc.case_number && <p>Processo · {formatProcessIdentifier(doc.case_number)}</p>}
+      {doc.reference_number && <p>Referência · {doc.reference_number}</p>}
+      {legalStatus[doc.official_status] && <p>Situação oficial · {legalStatus[doc.official_status]}</p>}
+      {doc.verified_on && <p>Conferida em {date(doc.verified_on)}</p>}
+      {tpu && <p>{tpu.label} · {tpu.codes}</p>}
+      {doc.license?.name && (
+        <>
+          <p>
+            Licença ·{' '}
+            {doc.license.url ? (
+              <a className="rw-link" href={doc.license.url} target="_blank" rel="noreferrer">
+                {doc.license.name}
+              </a>
+            ) : (
+              doc.license.name
+            )}
+          </p>
+          {doc.license.attribution && <p>Atribuição · {doc.license.attribution}</p>}
+          {doc.license.version_note && <p className="rw-note">{doc.license.version_note}</p>}
+        </>
+      )}
+      {doc.topics?.length > 0 && (
+        <p>
+          Assuntos editoriais · {doc.topics.join(' · ')}. A associação indica afinidade temática e não comprova
+          aplicação a um processo.
+        </p>
+      )}
+      {doc.excerpt ? (
+        <blockquote>{doc.excerpt}</blockquote>
+      ) : (
+        <p className="rw-note">
+          A ficha exibe metadados e link. O texto da fonte está disponível apenas na publicação de origem.
+        </p>
+      )}
+      {doc.relation && <p>Classificação candidata do NLP: {doc.relation}.</p>}
+      {doc.review_status === 'pending' && <p>Fonte com revisão pendente.</p>}
+      <div className="rw-actions">
+        {doc.url && (
+          <a className="rw-link" href={doc.url} target="_blank" rel="noreferrer">
+            Abrir publicação original
+          </a>
+        )}
+        <button className="secondary-button" onClick={onToggleSave}>
+          {saved ? 'Retirar do caderno' : 'Guardar no caderno'}
+        </button>
+      </div>
+    </>
   )
 }
 

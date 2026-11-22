@@ -379,3 +379,252 @@ class ResearchWorkspaceTests(TestCase):
             blocked = self.ask("Síntese", query="?court=STJ", use_gemini=True)
             self.assertEqual(blocked.status_code, 403)
             provider.assert_not_called()
+
+    def test_approved_doctrine_and_jurisprudence_expose_allowlisted_metadata_without_leaks(self):
+        doc_ref = LegalReference.objects.create(
+            reference_type="doctrine",
+            source_institution="Senado",
+            identifier="SYNTH:RIL:61:241",
+            source_name="Senado Federal",
+            title="Artigo sintético sobre dano reparável",
+            source_url="https://example.org/ril-61-241",
+            approved=True,
+            source_metadata={"permissions": {"display": "allowed"}},
+        )
+        doctrine = LegalCorpusItem.objects.create(
+            origin_key=f"reference:{doc_ref.pk}",
+            category="doctrine",
+            court="",
+            title="Artigo sintético sobre dano reparável",
+            source_name="Senado Federal",
+            source_url="https://example.org/ril-61-241",
+            content_kind="artigo",
+            date=None,
+            date_kind="publication_period",
+            authors=["Autora Sintética"],
+            excerpt="Trecho privado que não deve aparecer sem grant text.",
+            fingerprint="synth-doc-1",
+            review_status="approved",
+            provenance={
+                "reference_id": doc_ref.pk,
+                "permissions": {"display": "allowed"},
+                "package_sha256": "internal-package-hash",
+                "metadata": {
+                    "id": "SYNTH:RIL:61:241",
+                    "issuer": "Senado Federal",
+                    "year": 2024,
+                    "source_locator": "RIL, v. 61, n. 241, p. 237–254, jan./mar. 2024",
+                    "verified_on": "2026-11-22",
+                    "topics": ["dano-material"],
+                    "bibliography": {
+                        "authors": ["Autora Sintética"],
+                        "publication": "Revista de Informação Legislativa: RIL",
+                        "publisher": "Senado Federal",
+                        "place": "Brasília, DF",
+                        "volume": 61,
+                        "issue": 241,
+                        "edition": None,
+                        "pages": "237–254",
+                        "period": "jan./mar. 2024",
+                        "year": 2024,
+                    },
+                    "rights": {
+                        "license": "CC BY-NC-SA 4.0",
+                        "evidence": [
+                            "https://example.org/ril.pdf",
+                            "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+                        ],
+                        "conditions": "PDF indica 4.0; ficha do fascículo na BDSF indica 3.0 Brasil.",
+                    },
+                    "archive_provenance": {"text_version_id": "secret-uuid", "text_sha256": "secret-sha"},
+                    "nlp": {"potential": ["interno"]},
+                    "notes": ["Nota interna privada"],
+                    "metadata_sha256": "internal-meta-hash",
+                },
+            },
+        )
+        doctrine.topic_matches.create(topic="dano-material")
+
+        jur_datajud = LegalCorpusItem.objects.create(
+            origin_key="synth:jur:datajud",
+            category="jurisprudence",
+            court="TJDFT",
+            title="Acórdão sintético com TPU derivada do DataJud",
+            source_name="TJDFT",
+            source_url="https://example.org/tjdft-1",
+            content_kind="acordao",
+            date=date(2024, 12, 10),
+            date_kind="decision_date",
+            excerpt="Texto integral retido.",
+            fingerprint="synth-jur-1",
+            review_status="approved",
+            provenance={
+                "permissions": {"display": "allowed"},
+                "metadata": {
+                    "id": "SYNTH:TJDFT:1",
+                    "judging_body": "8ª Turma Cível",
+                    "case_number": "0709571-76.2023.8.07.0001",
+                    "verified_on": "2026-11-22",
+                    "topics": ["transito", "dano-moral"],
+                    "tpu": {"state": "verified_linked_datajud", "codes": [10435, 10439]},
+                    "archive_provenance": {"text_sha256": "secret-jur-sha"},
+                },
+            },
+        )
+        jur_datajud.topic_matches.create(topic="transito")
+
+        jur_label = LegalCorpusItem.objects.create(
+            origin_key="synth:jur:label",
+            category="jurisprudence",
+            court="TJDFT",
+            title="Acórdão sintético com referência e TPU por rótulo oficial",
+            source_name="TJDFT",
+            source_url="https://example.org/tjdft-2",
+            content_kind="acordao",
+            date=date(2023, 9, 8),
+            date_kind="publication_date",
+            excerpt="Outro texto retido.",
+            fingerprint="synth-jur-2",
+            review_status="approved",
+            provenance={
+                "permissions": {"display": "allowed"},
+                "metadata": {
+                    "id": "SYNTH:TJDFT:2",
+                    "judging_body": "Turma Sintética",
+                    "case_number": "0000000-00.2023.8.07.0001",
+                    "reference_number": "REsp sintético 123/DF",
+                    "topics": ["saude"],
+                    "tpu": {"state": "verified_official_label", "codes": [10433]},
+                    "rights": {"hide_case_number": True},
+                },
+            },
+        )
+        jur_label.topic_matches.create(topic="saude")
+
+        doc_detail = self.client.get(f"/api/corpus/{doctrine.pk}/").json()
+        self.assertIsNone(doc_detail["date"])
+        self.assertEqual(doc_detail["publication_period"], "jan./mar. 2024")
+        self.assertEqual(doc_detail["publication_year"], 2024)
+        self.assertEqual(doc_detail["authors"], ["Autora Sintética"])
+        self.assertEqual(doc_detail["bibliography"]["publication"], "Revista de Informação Legislativa: RIL")
+        self.assertEqual(doc_detail["bibliography"]["volume"], 61)
+        self.assertEqual(doc_detail["bibliography"]["issue"], 241)
+        self.assertEqual(doc_detail["bibliography"]["pages"], "237–254")
+        self.assertEqual(doc_detail["bibliography"]["publisher"], "Senado Federal")
+        self.assertNotIn("edition", doc_detail["bibliography"])
+        self.assertEqual(doc_detail["license"]["name"], "CC BY-NC-SA 4.0")
+        self.assertIn("Autora Sintética", doc_detail["license"]["attribution"])
+        self.assertEqual(doc_detail["license"]["url"], "https://creativecommons.org/licenses/by-nc-sa/4.0/")
+        self.assertIn("divergência", doc_detail["license"]["version_note"])
+        self.assertEqual(doc_detail["excerpt"], "")
+        self.assertIsNone(doc_detail["tpu"])
+        raw_doc_json = json.dumps(doc_detail, ensure_ascii=False)
+        for internal in ("secret-uuid", "secret-sha", "internal-package-hash", "internal-meta-hash", "Nota interna", "Trecho privado"):
+            self.assertNotIn(internal, raw_doc_json)
+
+        jur1_detail = self.client.get(f"/api/corpus/{jur_datajud.pk}/").json()
+        self.assertEqual(jur1_detail["judging_body"], "8ª Turma Cível")
+        self.assertEqual(jur1_detail["case_number"], "0709571-76.2023.8.07.0001")
+        self.assertEqual(jur1_detail["date_kind"], "decision_date")
+        self.assertEqual(jur1_detail["official_tpu"], [])
+        self.assertEqual(jur1_detail["tpu"]["state"], "verified_linked_datajud")
+        self.assertEqual(jur1_detail["tpu"]["codes"], [10435, 10439])
+        self.assertIn("DataJud", jur1_detail["tpu"]["label"])
+        self.assertEqual(jur1_detail["excerpt"], "")
+        self.assertNotIn("secret-jur-sha", json.dumps(jur1_detail))
+
+        jur2_detail = self.client.get(f"/api/corpus/{jur_label.pk}/").json()
+        self.assertIsNone(jur2_detail["case_number"])
+        self.assertEqual(jur2_detail["reference_number"], "REsp sintético 123/DF")
+        self.assertEqual(jur2_detail["date_kind"], "publication_date")
+        self.assertEqual(jur2_detail["tpu"]["state"], "verified_official_label")
+        self.assertEqual(jur2_detail["tpu"]["codes"], [10433])
+        self.assertEqual(jur2_detail["excerpt"], "")
+
+        # Verify /api/corpus/ (CorpusPanel) also returns enriched allowlisted metadata without leaks.
+        catalog = self.client.get("/api/corpus/?court=TJDFT&start=2022-01-01&end=2025-12-31&category=doctrine").json()
+        found_doc = next(row for row in catalog["items"] if row["id"] == doctrine.pk)
+        self.assertEqual(found_doc["bibliography"]["volume"], 61)
+        self.assertEqual(found_doc["license"]["name"], "CC BY-NC-SA 4.0")
+        self.assertEqual(found_doc["excerpt"], "")
+        self.assertNotIn("secret-uuid", json.dumps(found_doc))
+
+    def test_general_topic_source_visible_only_when_approved_and_unfiltered_by_subtopic(self):
+        ref = LegalReference.objects.create(
+            reference_type="doctrine",
+            source_institution="Senado",
+            identifier="SYNTH:RIL:GENERAL",
+            source_name="Senado Federal",
+            title="Artigo sintético de escopo geral",
+            source_url="https://example.org/ril-general",
+            approved=False,
+            source_metadata={"permissions": {}},
+        )
+        item = LegalCorpusItem.objects.create(
+            origin_key=f"reference:{ref.pk}",
+            category="doctrine",
+            court="",
+            title="Artigo sintético de escopo geral",
+            source_name="Senado Federal",
+            source_url="https://example.org/ril-general",
+            content_kind="artigo",
+            date=None,
+            date_kind="publication_period",
+            authors=["Autor A", "Autor B"],
+            excerpt="Texto retido",
+            fingerprint="synth-general",
+            review_status="pending",
+            provenance={
+                "reference_id": ref.pk,
+                "permissions": {},
+                "metadata": {
+                    "id": "SYNTH:RIL:GENERAL",
+                    "year": 2020,
+                    "topics": ["responsabilidade-civil"],
+                    "bibliography": {
+                        "publication": "Revista de Informação Legislativa: RIL",
+                        "publisher": "Senado Federal",
+                        "volume": 57,
+                        "issue": 226,
+                        "pages": "71–92",
+                        "period": "abr./jun. 2020",
+                        "year": 2020,
+                    },
+                    "rights": {"license": "CC BY-NC-SA 3.0 Brasil"},
+                },
+            },
+        )
+        # No LegalCorpusTopicMatch created (mirrors responsabilidade-civil outside TOPICS).
+        all_topics_url = "/api/research/sources/?court=TJDFT&start=2022-01-01&end=2025-01-01&category=doctrine&q=SYNTH:RIL:GENERAL"
+        self.assertEqual(self.client.get(all_topics_url).json()["total"], 0)
+        self.assertEqual(self.client.get(f"/api/corpus/{item.pk}/").status_code, 404)
+
+        # Grant display only (keeping text, nlp, gemini blocked and without auto-assigning a subtopic).
+        ref.approved = True
+        ref.source_metadata = {"permissions": {"display": "allowed"}}
+        ref.save(update_fields=["approved", "source_metadata"])
+        item.review_status = "approved"
+        item.provenance["permissions"] = {"display": "allowed"}
+        item.save(update_fields=["review_status", "provenance"])
+
+        unfiltered = self.client.get(all_topics_url).json()
+        self.assertEqual(unfiltered["total"], 1)
+        row = unfiltered["items"][0]
+        self.assertEqual(row["topics"], ["Responsabilidade civil (escopo geral)"])
+        self.assertEqual(row["publication_period"], "abr./jun. 2020")
+        self.assertEqual(row["publication_year"], 2020)
+        self.assertEqual(row["license"]["name"], "CC BY-NC-SA 3.0 Brasil")
+        self.assertIsNone(row["license"]["version_note"])
+        self.assertEqual(row["excerpt"], "")
+
+        # Filtering by a specific subtopic does NOT include it without explicit editorial assignment.
+        filtered = self.client.get(all_topics_url + "&topics=dano-material").json()
+        self.assertEqual(filtered["total"], 0)
+        corpus_subtopic = self.client.get("/api/corpus/?court=TJDFT&category=doctrine&topic=dano-material&q=escopo geral").json()
+        self.assertEqual(corpus_subtopic["counts"]["doctrine"], 0)
+
+        # Revoking reference hides it again immediately.
+        ref.approved = False
+        ref.save(update_fields=["approved"])
+        self.assertEqual(self.client.get(all_topics_url).json()["total"], 0)
+        self.assertEqual(self.client.get(f"/api/corpus/{item.pk}/").status_code, 404)

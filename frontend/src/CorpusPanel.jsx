@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getData } from './api'
+import { formatProcessIdentifier } from './processIdentifier'
+import { bibliographyLine, dateDisplay, publisherLine, sourceKindLabel, tpuDisplay } from './sourcePresentation'
 
 const kinds = { jurisprudence: 'Jurisprudência', precedent: 'Precedentes', doctrine: 'Doutrina' }
-const formats = { full_text: 'Inteiro teor', ementa: 'Ementa', publication_excerpt: 'Publicação', doctrine_article: 'Artigo', doctrine_collection: 'Coletânea', precedent_reference: 'Referência de precedente' }
 const count = (value) => new Intl.NumberFormat('pt-BR').format(value || 0)
-const dateLabel = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada'
 
 export default function CorpusPanel({ court, start, end, topic: selectedTopic, onTopicChange, onTopicsChange }) {
   const [localTopic, setLocalTopic] = useState('')
@@ -62,15 +62,29 @@ export default function CorpusPanel({ court, start, end, topic: selectedTopic, o
       <div className="corpus-categories" role="group" aria-label="Tipo de conteúdo">{Object.entries(kinds).map(([key, label]) => <button className="secondary-button" type="button" key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setPage(1) }}>{label} ({count(data.counts[key])})</button>)}</div>
       <h3>{kinds[category]}{topicLabel ? ` · ${topicLabel}` : ''}</h3>
       {data.coverage.undated > 0 && <p className="corpus-message">{count(data.coverage.undated)} referências no recorte estão sem data confirmada. Elas não comprovam cobertura do período selecionado.</p>}
-      {data.items.length ? <div className="corpus-results">{data.items.map((item) => <article className="corpus-result" key={item.id}>
-        <span className="section-kicker">{formats[item.content_kind] || item.content_kind} · {item.court || item.source_name}</span><h4>{item.title}</h4>
-        {item.authors.length > 0 && <p>{item.authors.join(', ')}</p>}
-        <p className="chart-note">{dateLabel(item.date)}{!item.period_confirmed ? ' · período não confirmado' : ''} · {item.review_status === 'approved' ? 'Fonte revisada' : 'Revisão da fonte pendente'}</p>
-        {item.processing_status === 'awaiting_nlp' && <p className="chart-note">Texto coletado; processamento NLP pendente.</p>}
-        <p className="chart-note">Tema sugerido por termos; vínculo jurídico entre documentos não validado.</p>
-        {item.excerpt && <details><summary>Consultar trecho inicial</summary><p className="corpus-excerpt">{item.excerpt}</p></details>}
-        {item.source_url && /^https?:\/\//i.test(item.source_url) ? <a href={item.source_url} target="_blank" rel="noreferrer">Abrir fonte original ↗</a> : <p className="chart-note">Link público não informado.</p>}
-      </article>)}</div> : <p className="corpus-message">Nenhum documento deste tipo corresponde aos filtros. Tente outro assunto ou confira os demais tipos.</p>}
+      {data.items.length ? <div className="corpus-results">{data.items.map((item) => {
+        const when = dateDisplay(item)
+        const bibLine = bibliographyLine(item)
+        const pubLine = publisherLine(item)
+        const tpu = tpuDisplay(item)
+        return <article className="corpus-result" key={item.id}>
+          <span className="section-kicker">{sourceKindLabel(item)} · {item.court || item.source_name}{item.judging_body ? ` · ${item.judging_body}` : ''}</span><h4>{item.title}</h4>
+          {item.authors.length > 0 && <p>Autores · {item.authors.join(', ')}</p>}
+          {bibLine && <p className="chart-note">Publicação · {bibLine}</p>}
+          {pubLine && <p className="chart-note">Instituição responsável · {pubLine}</p>}
+          {item.identifier && <p className="chart-note">Identificador · {item.identifier}</p>}
+          {item.case_number && <p className="chart-note">Processo · {formatProcessIdentifier(item.case_number)}</p>}
+          {item.reference_number && <p className="chart-note">Referência · {item.reference_number}</p>}
+          {tpu && <p className="chart-note">{tpu.label} · {tpu.codes}</p>}
+          <p className="chart-note">{when ? `${when.label}: ${when.value}` : 'Data não informada'}{!item.period_confirmed && !when ? ' · período não confirmado' : ''} · {item.review_status === 'approved' ? 'Fonte revisada' : 'Revisão da fonte pendente'}</p>
+          {item.license?.name && <p className="chart-note">Licença · {item.license.name}{item.license.attribution ? ` · Atribuição: ${item.license.attribution}` : ''}</p>}
+          {item.license?.version_note && <p className="chart-note">{item.license.version_note}</p>}
+          {item.processing_status === 'awaiting_nlp' && <p className="chart-note">Texto coletado; processamento NLP pendente.</p>}
+          <p className="chart-note">Tema sugerido por termos; vínculo jurídico entre documentos não validado.</p>
+          {item.excerpt ? <details><summary>Consultar trecho inicial</summary><p className="corpus-excerpt">{item.excerpt}</p></details> : <p className="chart-note">A ficha exibe metadados e link. O texto da fonte está disponível apenas na publicação de origem.</p>}
+          {item.source_url && /^https?:\/\//i.test(item.source_url) ? <a href={item.source_url} target="_blank" rel="noreferrer">Abrir fonte original ↗</a> : <p className="chart-note">Link público não informado.</p>}
+        </article>
+      })}</div> : <p className="corpus-message">Nenhum documento deste tipo corresponde aos filtros. Tente outro assunto ou confira os demais tipos.</p>}
       <div className="corpus-pagination"><button className="secondary-button" type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Anterior</button><span>Página {page} · {count(data.pagination.total)} documentos</span><button className="secondary-button" type="button" disabled={!data.pagination.has_next} onClick={() => setPage((value) => value + 1)}>Próxima</button></div>
       <p className="chart-note">O acervo apresenta fontes já indexadas. Classificação temática pendente de revisão jurídica. Não representa conclusão do NLP nem aderência a precedentes.</p>
     </>}

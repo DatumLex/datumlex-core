@@ -16,6 +16,7 @@ from src.services.analytical_context import OUTCOMES
 from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
 from src.services.corpus_publication import with_public_excerpt
 from src.services.precedent_usage import summarize as usage_summary
+from src.services.source_metadata import public_source_metadata
 from src.services.statistics_service import InvalidQuery, filtered_processes, instance_series, metrics
 from src.services.outcomes import summarize
 
@@ -214,23 +215,23 @@ def retrieve(indexed, question, previous):
 
 
 def source_item(item):
-    metadata = item.provenance.get("metadata", {})
-    authority = metadata.get("authority") or {}
-    tpu = metadata.get("tpu") or {}
-    permissions = item.provenance.get("permissions", {})
+    permissions = item.provenance.get("permissions", {}) if isinstance(item.provenance, dict) else {}
+    origin = item.source_name or item.court
+    details = public_source_metadata(
+        item.provenance,
+        category=item.category,
+        authors=item.authors,
+        origin=origin,
+        safe_url=safe_url,
+    )
     return {
         "id": f"F{item.pk}",
         "kind": item.category,
         "title": item.title,
-        "origin": item.source_name or item.court,
+        "origin": origin,
         "court": item.court,
         "source_kind": item.content_kind,
-        "identifier": metadata.get("id"),
-        "judging_body": metadata.get("judging_body"),
-        "official_status": authority.get("official_status"),
-        "verified_on": metadata.get("verified_on"),
-        "topics": [TOPIC_LABELS[code] for code in metadata.get("topics", []) if code in TOPIC_LABELS],
-        "official_tpu": tpu.get("codes", []) if tpu.get("state") == "verified_official_code" else [],
+        **details,
         "date": item.date,
         "date_kind": item.date_kind,
         "excerpt": item.excerpt[:1000] if permissions.get("text") == "allowed" else "",
