@@ -17,8 +17,8 @@ para iniciar processos nem segredos na resposta.
 DataJud fornece metadados processuais e movimentos. Pangea fornece precedentes e
 teses. Os coletores de jurisprudência textual STJ e doutrina Senado/STJ não estão
 integrados a esta rodada: aparecem identificados e desabilitados na tela.
-A meta de 300 documentos por trimestre soma os tribunais selecionados, com filtro
-de assuntos CNJ e prioridade aos recortes menos representados. Não é garantia
+A meta de 300 documentos por trimestre soma os tribunais selecionados, com filtro fixo
+de assuntos CNJ de responsabilidade civil e prioridade aos recortes menos representados. Não é garantia
 de cobertura. Cada rodada tem orçamento de páginas; fontes indisponíveis são
 reportadas. Não há aprovação automática de evidências nem preenchimento fictício.
 

@@ -89,7 +89,7 @@ class ServerAutomationTests(TestCase):
 
     def test_validation_disallows_commands_unsupported_sources_and_invalid_ranges(self):
         for name, value in [('daily_at', '19:00; shell'), ('courts', ['INVALID']), ('sources', ['doctrine']),
-                            ('max_pages', True), ('end_year', 2015), ('subject_codes', [True]), ('quarter_target', 0)]:
+                            ('courts', ['STJ']), ('topics', ['dano-moral']), ('subject_codes', [14]), ('max_pages', True), ('end_year', 2015), ('subject_codes', [True]), ('quarter_target', 0)]:
             with self.subTest(name=name):
                 self.assertEqual(self.put({**service.defaults(), name: value}).status_code, 400)
 

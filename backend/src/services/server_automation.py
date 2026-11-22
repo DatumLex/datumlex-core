@@ -41,6 +41,12 @@ def validate(value):
     codes = value['subject_codes']
     if not isinstance(codes, list) or ('datajud' in result['sources'] and not codes) or len(codes) > 50 or any(type(v) is not int or not 1 <= v <= 999999999 for v in codes):
         raise ValueError('Selecione assuntos CNJ válidos.')
+    if not set(value['subject_codes']) <= set(defaults()['subject_codes']):
+        raise ValueError('A coleta está restrita aos assuntos de responsabilidade civil.')
+    if set(result['courts']) != set(ACTIVE_COURTS):
+        raise ValueError('Esta coleta usa os dez tribunais do projeto.')
+    if set(result['topics']) != {key for key, _, _ in TOPICS}:
+        raise ValueError('Esta coleta usa os dez temas de responsabilidade civil.')
     result['subject_codes'] = sorted(set(codes))
     for name, low, high in (('start_year', 2016, today().year), ('end_year', 2016, today().year),
                             ('quarter_target', 1, 10000), ('max_pages', 1, 40)):

@@ -6,14 +6,6 @@ const states = { running: 'Em execução', completed: 'Concluída', partial: 'Co
   partial_failure: 'Concluída com falhas nas fontes', failed: 'Falhou', interrupted: 'Interrompida', blocked: 'Bloqueada por configuração ou acesso' }
 const date = value => value ? new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Não programada'
 
-function SubjectCodes({ codes, disabled, onChange }) {
-  const [text, setText] = useState(codes.join(', '))
-  return <label>Códigos de assuntos CNJ<input value={text} pattern="[0-9, ]*" disabled={disabled} onChange={event => {
-    setText(event.target.value)
-    onChange(event.target.value.split(',').map(value => value.trim()).filter(Boolean).map(Number))
-  }} /></label>
-}
-
 export default function AutomationPanel({ session }) {
   const [remote, setRemote] = useState(null)
   const [draft, setDraft] = useState(null)
@@ -79,18 +71,17 @@ export default function AutomationPanel({ session }) {
           <span>{source.label}<small>{source.provider}{!source.available ? ' · integração com esta automação pendente' : ''}</small></span>
         </label>)}</div><p>O DataJud fornece dados processuais, sem garantia de texto completo. Teses e precedentes vêm do Pangea. Documentos coletados não são aprovados automaticamente pelo NLP.</p>
         {missingKey && <p role="status">A chave DataJud ainda precisa ser configurada pelo responsável no servidor. Você pode salvar a configuração enquanto isso.</p>}</fieldset>
-        <fieldset disabled={busy}><legend>2. Tribunais e temas</legend><div className="automation-actions"><button type="button" className="text-button" onClick={() => setDraft({ ...draft, courts: [...session.courts] })}>Selecionar todos os tribunais</button><span>{draft.courts.length} selecionados</span></div><div className="automation-options">{session.courts.map(code => <label key={code}><input type="checkbox" checked={draft.courts.includes(code)} onChange={event => toggle('courts', code, event.target.checked)} />{code}</label>)}</div>
-        {draft.sources.includes('pangea') && <><p>Temas para buscar no Pangea:</p><div className="automation-options">{remote.topics.map(item => <label key={item.id}><input type="checkbox" checked={draft.topics.includes(item.id)} onChange={event => toggle('topics', item.id, event.target.checked)} />{item.label}</label>)}</div></>}</fieldset>
+        <fieldset disabled={busy}><legend>2. Tribunais e temas</legend><div className="automation-actions"><span>{draft.courts.length} selecionados</span></div><div className="automation-options">{session.courts.map(code => <label key={code}><span className="automation-included" aria-hidden="true">✓</span>{code}</label>)}</div>
+        {draft.sources.includes('pangea') && <><p>Os dez temas de responsabilidade civil são fixos nesta coleta:</p><div className="automation-options">{remote.topics.map(item => <label key={item.id}><span className="automation-included" aria-hidden="true">✓</span>{item.label}</label>)}</div></>}</fieldset>
         <fieldset disabled={busy}><legend>3. Período e horário</legend><div className="automation-fields">
           <label>Ano inicial<input type="number" min="2016" max={new Date().getFullYear()} value={draft.start_year} onChange={event => setDraft({ ...draft, start_year: Number(event.target.value) })} required /></label>
           <label>Ano final<input type="number" min={draft.start_year} max={new Date().getFullYear()} value={draft.end_year} onChange={event => setDraft({ ...draft, end_year: Number(event.target.value) })} required /></label>
           <label>Horário diário, em Brasília<input type="time" value={draft.daily_at} onChange={event => setDraft({ ...draft, daily_at: event.target.value })} required /></label>
-        </div><p>O período vale para os processos DataJud; o ano atual vai até a data da coleta. Precedentes não recebem datas inventadas. O executor verifica a fila periodicamente, então o início pode ocorrer após o horário escolhido.</p>
+        </div><p>A coleta é restrita a responsabilidade civil. O período vale para os processos DataJud; o ano atual vai até a data da coleta. Precedentes não recebem datas inventadas. O executor verifica a fila periodicamente, então o início pode ocorrer após o horário escolhido.</p>
         </fieldset>
         <details className="automation-advanced"><summary>Ajustes avançados</summary><div className="automation-fields">
           <label>Meta total por trimestre<input type="number" min="1" max="10000" value={draft.quarter_target} onChange={event => setDraft({ ...draft, quarter_target: Number(event.target.value) })} required disabled={busy} /></label>
           <label>Páginas DataJud por rodada<input type="number" min="1" max="40" value={draft.max_pages} onChange={event => setDraft({ ...draft, max_pages: Number(event.target.value) })} required disabled={busy} /></label>
-          <SubjectCodes codes={draft.subject_codes} disabled={busy} onChange={codes => setDraft({ ...draft, subject_codes: codes })} />
         </div><p>A meta de {draft.quarter_target} registros é somada entre todos os tribunais selecionados, não por tribunal. Cada página DataJud tem até 100 registros; Pangea consulta até uma página por tema. A disponibilidade das fontes pode impedir o preenchimento da meta.</p></details>
         <section className="automation-summary" aria-label="Resumo da configuração"><strong>Seu agendamento</strong><p>{draft.courts.length} tribunais · {draft.start_year} a {draft.end_year} · todos os dias às {draft.daily_at}, em Brasília.</p></section>
         <div className="automation-actions"><button className="access-primary" type="submit" disabled={busy}>Salvar configuração</button><button className="secondary-button" type="button" disabled={busy || dirty || !remote.executor_ready || missingKey || remote.enabled} onClick={() => act('enable')}>Ativar agendamento</button><button className="secondary-button" type="button" disabled={busy || (!remote.enabled && !remote.requested)} onClick={() => act('pause')}>Pausar</button><button className="secondary-button" type="button" disabled={busy || dirty || !remote.executor_ready || missingKey || remote.requested || last?.status === 'running'} onClick={() => act('run_once')}>Solicitar uma coleta</button></div>

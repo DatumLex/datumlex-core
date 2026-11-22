@@ -14,3 +14,5 @@
 .automation-advanced { background: #fff; border: 1px solid #dcd8cc; border-radius: 8px; padding: 20px; margin: 18px 0; }
 .automation-advanced summary { color: #16364a; cursor: pointer; font-weight: 700; margin-bottom: 14px; }
 .automation-summary { border-left: 3px solid #bba13f; padding: 12px 18px; margin-bottom: 18px; background: #f3f5f2; }
+
+.automation-included { color: #215666; font-weight: 700; flex-shrink: 0; }
