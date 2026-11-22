@@ -139,6 +139,20 @@ def csrf(request):
     return {"csrfToken": get_token(request)}
 
 
+def registration_courts():
+    configured = getattr(settings, "PUBLIC_REGISTRATION_COURTS", ())
+    if isinstance(configured, str):
+        configured = [code.strip().upper() for code in configured.split(",") if code.strip()]
+    allowed = {
+        code.strip().upper()
+        for code in configured
+        if isinstance(code, str) and code.strip()
+    } & set(ACTIVE_COURTS)
+    if not allowed:
+        return []
+    return list(Court.objects.filter(code__in=allowed).order_by("code").values_list("code", flat=True))
+
+
 @api(["POST"])
 def register(request):
     if settings.SYNTHETIC_PREVIEW:
@@ -148,12 +162,34 @@ def register(request):
         raise ValueError("O cadastro público aceita somente nome, CPF, e-mail e senha.")
     values = identity(request.payload)
     secret = password(request.payload)
+    assigned_courts = registration_courts()
     with transaction.atomic():
-        user = User(username=uuid.uuid4().hex, **values)
+        user = User(
+            username=uuid.uuid4().hex,
+            role="Padrão",
+            approved=True,
+            is_active=True,
+            support=False,
+            must_change_password=False,
+            **values,
+        )
         user.set_password(secret)
         user.save()
-        audit(request, "user.registered", user.pk)
-    return {"message": "Cadastro enviado. Aguarde a aprovação de um responsável."}
+        if assigned_courts:
+            user.courts.set(assigned_courts)
+        audit(
+            request,
+            "user.registered",
+            user.pk,
+            {"role": user.role, "approved": user.approved, "courts": assigned_courts},
+        )
+    session_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    audit(request, "login.succeeded", user.pk)
+    return {
+        "user": serialize(user),
+        "csrfToken": get_token(request),
+        "message": "Cadastro concluído.",
+    }
 
 
 @api(["POST"])

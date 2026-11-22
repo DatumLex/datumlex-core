@@ -81,6 +81,13 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS)).split(",")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
 RESEARCH_CIVIL_COHORT = os.environ.get("RESEARCH_CIVIL_COHORT", "").strip()
+PUBLIC_REGISTRATION_COURTS = tuple(
+    dict.fromkeys(
+        code.strip().upper()
+        for code in os.environ.get("DATUMLEX_PUBLIC_REGISTRATION_COURTS", "").split(",")
+        if code.strip()
+    )
+)
 SYNTHETIC_PREVIEW = os.environ.get("DATUMLEX_SYNTHETIC_PREVIEW") == "true"
 PREVIEW_REVISION = os.environ.get("DATUMLEX_PREVIEW_REVISION", "")
 if SYNTHETIC_PREVIEW:

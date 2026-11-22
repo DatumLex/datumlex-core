@@ -1,4 +1,4 @@
-const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+const base = (import.meta.env?.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 let csrfToken = ''
 
 export async function authRequest(path, method = 'GET', body) {
