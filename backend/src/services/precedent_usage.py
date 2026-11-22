@@ -6,7 +6,7 @@ from itertools import chain, groupby
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.db.models import OuterRef, Subquery
+from django.db.models import Exists, OuterRef
 
 from src.db.models import NlpTextVersion
 from src.nlp.contracts import bytes_hash, fingerprint
@@ -107,10 +107,12 @@ def summarize(scope, *, page=1, page_size=20):
     coverage = Counter()
     records = []
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
-    latest = NlpTextVersion.objects.filter(document_id=OuterRef('document_id')).order_by('-created_at')
+    newer = NlpTextVersion.objects.filter(
+        document_id=OuterRef('document_id'), created_at__gt=OuterRef('created_at'),
+    )
     versions = NlpTextVersion.objects.filter(
-        created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
-    ).select_related('document').order_by('document__source_key')
+        ~Exists(newer), document__court__in=scope['court'].split(','),
+    ).select_related('document').defer('representation', 'fingerprint').order_by('document__source_key')
     for _, current_versions in groupby(versions.iterator(chunk_size=100), key=lambda row: row.document_id):
         version = next(current_versions)
         other = next(current_versions, None)

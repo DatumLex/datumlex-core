@@ -95,7 +95,7 @@ def selection(params):
     return query, scope, indexed
 
 
-def context(params, question="", previous=()):
+def context(params, question="", previous=(), *, include_usage=True):
     query, scope, indexed = selection(params)
     counts = {key: 0 for key in CATEGORIES}
     counts.update(dict(indexed.order_by().values_list("category").annotate(n=Count("pk", distinct=True))))
@@ -103,7 +103,7 @@ def context(params, question="", previous=()):
     # Relation counts concern the complete selected set, independent of examples returned to the chat.
     usage = (
         usage_summary(scope, page_size=4)
-        if {"precedent", "jurisprudence"}.issubset(scope["sources"])
+        if include_usage and {"precedent", "jurisprudence"}.issubset(scope["sources"])
         else None
     )
     if usage:
@@ -127,6 +127,7 @@ def context(params, question="", previous=()):
         "counts": counts,
         "sources": docs,
         "usage": usage["counts"] if usage else None,
+        "usage_analysis": "complete" if include_usage else "deferred",
         "topics": TOPIC_LABELS,
         "provider": "openai" if ai_ready() else "local",
     }

@@ -1,5 +1,14 @@
 const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
+async function fetchResponse(url, options) {
+  try {
+    return await fetch(url, options)
+  } catch (failure) {
+    if (failure.name === 'AbortError') throw failure
+    throw new Error('Não foi possível conectar ao servidor. Tente novamente; os demais dados continuam disponíveis.')
+  }
+}
+
 export function reportUrl(snapshotId) {
   return `${base}/v2/analysis-snapshots/${encodeURIComponent(snapshotId)}/report/`
 }
@@ -9,16 +18,16 @@ export function legalDraftExportUrl(draftId) {
 }
 
 export async function legalChatRequest(path, body, { signal } = {}) {
-  const csrf = await fetch(`${base}/auth/csrf/`, { credentials: 'include', signal })
+  const csrf = await fetchResponse(`${base}/auth/csrf/`, { credentials: 'include', signal })
   if (!csrf.ok) throw new Error('Não foi possível iniciar a consulta.')
   const { csrfToken } = await csrf.json()
-  const response = await fetch(`${base}/v2/${path}`, {
+  const response = await fetchResponse(`${base}/v2/${path}`, {
     method: 'POST', credentials: 'include', signal,
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
     body: JSON.stringify(body),
   })
   if (response.status === 401) window.dispatchEvent(new Event('datumlex:session-ended'))
-  const data = await response.json()
+  const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error?.message || 'Não foi possível consultar o chat.')
   const snapshotId = path.match(/^analysis-snapshots\/([^/]+)\/chat\/$/)?.[1]
   if (!data.draft_id || !data.snapshot_id || (snapshotId && data.snapshot_id !== snapshotId)) {
@@ -30,17 +39,17 @@ export async function legalChatRequest(path, body, { signal } = {}) {
 export async function nlpRequest(path, { signal, body } = {}) {
   let csrfToken
   if (body) {
-    const csrf = await fetch(`${base}/auth/csrf/`, { credentials: 'include', signal })
+    const csrf = await fetchResponse(`${base}/auth/csrf/`, { credentials: 'include', signal })
     if (!csrf.ok) throw new Error('Não foi possível iniciar a consulta.')
     const token = await csrf.json()
     csrfToken = token.csrfToken
   }
-  const response = await fetch(`${base}/v2/${path}`, {
+  const response = await fetchResponse(`${base}/v2/${path}`, {
     method: body ? 'POST' : 'GET', credentials: 'include', signal,
     headers: body ? { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken } : {},
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
-  const data = await response.json()
+  const data = await response.json().catch(() => ({}))
   if (response.status === 401) window.dispatchEvent(new Event('datumlex:session-ended'))
   if (!response.ok) throw new Error(data.error?.message || 'Não foi possível consultar as evidências.')
   const expectedSnapshot = path.match(/^analysis-snapshots\/([^/]+)\//)?.[1]

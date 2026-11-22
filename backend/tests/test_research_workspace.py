@@ -81,6 +81,21 @@ class ResearchWorkspaceTests(TestCase):
         self.assertEqual(self.ask(" ", []).status_code, 400)
         self.assertEqual(self.client.get("/api/research/chat/" + self.query).status_code, 405)
 
+    def test_overview_defers_full_text_analysis_and_preserves_scoped_results(self):
+        with patch('src.services.research.usage_summary') as usage:
+            response = self.client.get('/api/research/overview/' + self.query)
+            self.assertEqual(response.status_code, 200)
+            usage.assert_not_called()
+        data = response.json()
+        full = self.client.get('/api/research/' + self.query).json()
+        for key in ('scope', 'metrics', 'history', 'counts', 'topics', 'provider'):
+            self.assertEqual(data[key], full[key])
+        self.assertIsNone(data['usage'])
+        self.assertEqual(data['usage_analysis'], 'deferred')
+        self.assertFalse(any('O NLP identificou' in item['text'] for item in data['summary']))
+        self.assertEqual(self.client.get('/api/research/overview/?court=STJ').status_code, 403)
+        self.assertEqual(self.client.get('/api/research/overview/?topics=invalid').status_code, 400)
+
     def test_combined_courts_subjects_and_selected_outcomes(self):
         self.user.courts.add(Court.objects.get_or_create(code="STJ", defaults={"name": "STJ"})[0])
         run = ExtractionRun.objects.create(scope=SCOPE)

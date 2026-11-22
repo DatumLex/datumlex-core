@@ -15,6 +15,8 @@ import {
   X,
 } from 'lucide-react'
 import { getData } from './api'
+import { createResearchCache } from './researchCache'
+import { loadNotebook, notebookKey, saveNotebook } from './notebookStorage'
 import App from './App'
 import './research.css'
 
@@ -338,11 +340,14 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
 }
 
 export default function ResearchWorkspace({ session }) {
+  const [cache] = useState(() => createResearchCache(getData))
+  const savedKey = notebookKey(session.id, session.courts)
   const [page, setPage] = useState('search'),
     [filters, setFilters] = useState(() => defaults(session.courts))
   const [drawer, setDrawer] = useState(null),
-    [saved, setSaved] = useState({}),
+    [notebook, setNotebook] = useState(() => loadNotebook(savedKey)),
     [threads, setThreads] = useState({})
+  const saved = notebook.items
   const [request, setRequest] = useState({}),
     [retry, setRetry] = useState(0),
     [subjects, setSubjects] = useState({})
@@ -351,8 +356,11 @@ export default function ResearchWorkspace({ session }) {
   const live = useRef(new Map())
   const params = pack(filters),
     key = new URLSearchParams(params).toString()
-  const data = request.key === key ? request.data : null,
-    error = request.key === key ? request.error : ''
+  const resource = page === 'precedents' ? 'research' : 'research/overview'
+  const requestKey = resource + '?' + key
+  const cached = cache.peek(resource, params)
+  const data = cached || (request.key === requestKey ? request.data : null),
+    error = request.key === requestKey ? request.error : ''
   const thread = threads[key] || emptyThread
   const navRef = useRef(null)
   useEffect(() => {
@@ -360,19 +368,28 @@ export default function ResearchWorkspace({ session }) {
     return () => {
       for (const c of pending.values()) c.abort()
       pending.clear()
+      cache.clear()
     }
-  }, [])
+  }, [cache])
   useEffect(() => {
+    if (page === 'notebook' || page === 'legacy') return
     const controller = new AbortController()
-    getData('research', Object.fromEntries(new URLSearchParams(key)), controller.signal)
+    cache.load(resource, Object.fromEntries(new URLSearchParams(key)))
+      .catch((err) => {
+        // Frontend and API roll out independently; support the previous API
+        // during the short window before the new endpoint becomes available.
+        if (resource === 'research/overview' && err.status === 404)
+          return cache.load('research', Object.fromEntries(new URLSearchParams(key)))
+        throw err
+      })
       .then((data) => {
-        if (!controller.signal.aborted) setRequest({ key, data })
+        if (!controller.signal.aborted) setRequest({ key: requestKey, data })
       })
       .catch((err) => {
-        if (!controller.signal.aborted) setRequest({ key, error: err.message })
+        if (!controller.signal.aborted) setRequest({ key: requestKey, error: err.message })
       })
     return () => controller.abort()
-  }, [key, retry])
+  }, [cache, key, resource, requestKey, retry, page])
   const courtParam = params.court
   useEffect(() => {
     const c = new AbortController()
@@ -400,6 +417,12 @@ export default function ResearchWorkspace({ session }) {
   }
   function open(doc) {
     setDrawer({ doc })
+  }
+  function toggleSaved(doc) {
+    const items = { ...saved }
+    if (items[doc.id]) delete items[doc.id]
+    else items[doc.id] = doc
+    setNotebook({ items, error: saveNotebook(savedKey, items) })
   }
   async function ask(raw) {
     const q = raw.trim()
@@ -526,14 +549,16 @@ export default function ResearchWorkspace({ session }) {
           </>
         ) : page === 'notebook' ? (
           <section className="rw-card">
-            <h2>Fontes guardadas nesta sessão</h2>
+            <h2>Fontes guardadas no caderno</h2>
+            <p className="rw-note">As fontes ficam salvas neste navegador para sua conta, mesmo após recarregar a página.</p>
+            {notebook.error && <p role="alert">{notebook.error}</p>}
             {Object.values(saved).length ? (
               Object.values(saved).map((d) => <SourceRow key={d.id} doc={d} onOpen={open} />)
             ) : (
               <p>Abra uma fonte e escolha “Guardar no caderno”.</p>
             )}
           </section>
-        ) : !data ? (
+        ) : !data && page !== 'corpus' ? (
           <div className="rw-card" role={error ? 'alert' : 'status'}>
             {error || 'Consultando a base do DatumLex…'}{' '}
             {error && (
@@ -541,6 +566,7 @@ export default function ResearchWorkspace({ session }) {
                 className="secondary-button"
                 onClick={() => {
                   setRequest({})
+                  cache.clear()
                   setRetry((n) => n + 1)
                 }}
               >
@@ -630,6 +656,7 @@ export default function ResearchWorkspace({ session }) {
               key={key + catalogCategory}
               scopeKey={key}
               category={catalogCategory}
+              cache={cache}
               onOpen={open}
             />
           </section>
@@ -708,18 +735,12 @@ export default function ResearchWorkspace({ session }) {
                 )}
                 <button
                   className="secondary-button"
-                  onClick={() =>
-                    setSaved((current) => {
-                      const next = { ...current }
-                      if (next[selected.id]) delete next[selected.id]
-                      else next[selected.id] = selected
-                      return next
-                    })
-                  }
+                  onClick={() => toggleSaved(selected)}
                 >
                   {saved[selected.id] ? 'Retirar do caderno' : 'Guardar no caderno'}
                 </button>
               </div>
+              {notebook.error && <p role="alert">{notebook.error}</p>}
             </>
           ) : drawer.type === 'filter' ? (
             <Filters
@@ -749,7 +770,7 @@ export default function ResearchWorkspace({ session }) {
   )
 }
 
-function CorpusBrowser({ scopeKey, category, onOpen }) {
+function CorpusBrowser({ scopeKey, category, onOpen, cache }) {
   const [q, setQ] = useState(''),
     [term, setTerm] = useState(''),
     [page, setPage] = useState(1),
@@ -761,7 +782,7 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
   const key = query.toString()
   useEffect(() => {
     const c = new AbortController()
-    getData('research/sources', Object.fromEntries(new URLSearchParams(key)), c.signal)
+    cache.load('research/sources', Object.fromEntries(new URLSearchParams(key)))
       .then((data) => {
         if (!c.signal.aborted) setResult({ key, data })
       })
@@ -769,8 +790,8 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
         if (!c.signal.aborted) setResult({ key, error: e.message })
       })
     return () => c.abort()
-  }, [key])
-  const data = result.key === key ? result.data : null
+  }, [cache, key])
+  const data = cache.peek('research/sources', Object.fromEntries(query)) || (result.key === key ? result.data : null)
   return (
     <>
       <form

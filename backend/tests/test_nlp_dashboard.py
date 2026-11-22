@@ -110,6 +110,17 @@ class DashboardTests(TransactionTestCase if connection.vendor == 'postgresql' el
         self.assertEqual(record.payload['exclusions']['unmapped_documents'], 1)
         self.assertEqual(record.payload['items'], [])
 
+    def test_unmapped_corpus_does_not_fetch_extraction_payloads_or_text(self):
+        self.document()
+        with override_settings(NLP_DASHBOARD_CATALOG={}, NLP_DASHBOARD_RELEASES={}):
+            selected = context.resolve(self.actor, self.supplied)
+            # Two aggregate counts, no model hydration of large NLP payloads.
+            with self.assertNumQueries(2):
+                documents, items, exclusions = dashboard.collect(self.actor, selected)
+        self.assertEqual(documents, [])
+        self.assertEqual(items, [])
+        self.assertEqual(exclusions['unmapped_documents'], 1)
+
     def test_hand_counted_documents_not_segments_or_subjects(self):
         self.document(duplicate=True)
         self.document('two')
