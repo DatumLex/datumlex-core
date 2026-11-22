@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { getData } from './api'
+import { createResearchCache } from './researchCache'
 import { loadNotebook, notebookKey, saveNotebook } from './notebookStorage'
 import App from './App'
 import './research.css'
@@ -339,6 +340,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
 }
 
 export default function ResearchWorkspace({ session }) {
+  const [cache] = useState(() => createResearchCache(getData))
   const savedKey = notebookKey(session.id, session.courts)
   const [page, setPage] = useState('search'),
     [filters, setFilters] = useState(() => defaults(session.courts))
@@ -356,7 +358,8 @@ export default function ResearchWorkspace({ session }) {
     key = new URLSearchParams(params).toString()
   const resource = page === 'precedents' ? 'research' : 'research/overview'
   const requestKey = resource + '?' + key
-  const data = request.key === requestKey ? request.data : null,
+  const cached = cache.peek(resource, params)
+  const data = cached || (request.key === requestKey ? request.data : null),
     error = request.key === requestKey ? request.error : ''
   const thread = threads[key] || emptyThread
   const navRef = useRef(null)
@@ -365,16 +368,18 @@ export default function ResearchWorkspace({ session }) {
     return () => {
       for (const c of pending.values()) c.abort()
       pending.clear()
+      cache.clear()
     }
-  }, [])
+  }, [cache])
   useEffect(() => {
+    if (page === 'notebook' || page === 'legacy') return
     const controller = new AbortController()
-    getData(resource, Object.fromEntries(new URLSearchParams(key)), controller.signal)
+    cache.load(resource, Object.fromEntries(new URLSearchParams(key)))
       .catch((err) => {
         // Frontend and API roll out independently; support the previous API
         // during the short window before the new endpoint becomes available.
         if (resource === 'research/overview' && err.status === 404)
-          return getData('research', Object.fromEntries(new URLSearchParams(key)), controller.signal)
+          return cache.load('research', Object.fromEntries(new URLSearchParams(key)))
         throw err
       })
       .then((data) => {
@@ -384,7 +389,7 @@ export default function ResearchWorkspace({ session }) {
         if (!controller.signal.aborted) setRequest({ key: requestKey, error: err.message })
       })
     return () => controller.abort()
-  }, [key, resource, requestKey, retry])
+  }, [cache, key, resource, requestKey, retry, page])
   const courtParam = params.court
   useEffect(() => {
     const c = new AbortController()
@@ -561,6 +566,7 @@ export default function ResearchWorkspace({ session }) {
                 className="secondary-button"
                 onClick={() => {
                   setRequest({})
+                  cache.clear()
                   setRetry((n) => n + 1)
                 }}
               >
@@ -650,6 +656,7 @@ export default function ResearchWorkspace({ session }) {
               key={key + catalogCategory}
               scopeKey={key}
               category={catalogCategory}
+              cache={cache}
               onOpen={open}
             />
           </section>
@@ -763,7 +770,7 @@ export default function ResearchWorkspace({ session }) {
   )
 }
 
-function CorpusBrowser({ scopeKey, category, onOpen }) {
+function CorpusBrowser({ scopeKey, category, onOpen, cache }) {
   const [q, setQ] = useState(''),
     [term, setTerm] = useState(''),
     [page, setPage] = useState(1),
@@ -775,7 +782,7 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
   const key = query.toString()
   useEffect(() => {
     const c = new AbortController()
-    getData('research/sources', Object.fromEntries(new URLSearchParams(key)), c.signal)
+    cache.load('research/sources', Object.fromEntries(new URLSearchParams(key)))
       .then((data) => {
         if (!c.signal.aborted) setResult({ key, data })
       })
@@ -783,8 +790,8 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
         if (!c.signal.aborted) setResult({ key, error: e.message })
       })
     return () => c.abort()
-  }, [key])
-  const data = result.key === key ? result.data : null
+  }, [cache, key])
+  const data = cache.peek('research/sources', Object.fromEntries(query)) || (result.key === key ? result.data : null)
   return (
     <>
       <form

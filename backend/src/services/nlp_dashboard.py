@@ -62,23 +62,25 @@ def collect(actor, context):
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
     releases = getattr(settings, 'NLP_DASHBOARD_RELEASES', {})
     max_documents = getattr(settings, 'NLP_DASHBOARD_MAX_DOCUMENTS', 10000)
-    runs = NlpExtraction.objects.filter(document__court__in=context['courts']).select_related('document', 'text_version')
+    runs = NlpExtraction.objects.filter(document__court__in=context['courts'])
     if not context['sources'] or not context['subject_codes']:
         return [], [], {'unmapped_documents': 0, 'quality_blocked': 0, 'missing_text': 0,
                         'evidence_not_approved': 0}
     if runs.values('document_id').distinct().count() > max_documents:
         raise nlp_evidence.Conflict('snapshot_capacity_exceeded')
-    documents, evidence, exclusions = [], [], {'unmapped_documents': 0, 'quality_blocked': 0, 'missing_text': 0,
+    mapped_keys = [key for key, metadata in catalog.items() if metadata]
+    unmapped = runs.exclude(document__source_key__in=mapped_keys).values('document_id').distinct().count()
+    documents, evidence, exclusions = [], [], {'unmapped_documents': unmapped, 'quality_blocked': 0, 'missing_text': 0,
                                               'evidence_not_approved': 0}
-    seen = set()
     # A catalog must select an exact run. Do not choose a failed/newest attempt.
-    for run in runs.order_by('document_id', 'created_at', 'id'):
+    # Unmapped rows are counted in SQL, never hydrated with full text/results.
+    mapped_runs = runs.filter(document__source_key__in=mapped_keys).select_related(
+        'document', 'text_version',
+    ).defer('text_version__representation', 'text_version__fingerprint')
+    for run in mapped_runs.order_by('document_id', 'created_at', 'id').iterator(chunk_size=100):
         key = run.document.source_key
         metadata = catalog.get(key)
         if not metadata:
-            if key not in seen:
-                exclusions['unmapped_documents'] += 1
-                seen.add(key)
             continue
         if metadata.get('extraction_id') != str(run.pk):
             continue

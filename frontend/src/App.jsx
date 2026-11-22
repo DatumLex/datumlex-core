@@ -185,7 +185,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
     setError('')
     if (!next.length) {
       setData(null)
-      setAlignment(null)
+      setAlignmentResult(null)
       setUsageResult(null)
     }
   }
@@ -198,7 +198,8 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
   const [applied, setApplied] = useState(initialFilters || null)
   const bounds = supportedPeriod()
   const [data, setData] = useState(null)
-  const [alignment, setAlignment] = useState(null)
+  const [alignmentResult, setAlignmentResult] = useState(null)
+  const [alignmentRetry, setAlignmentRetry] = useState(0)
   const [usageResult, setUsageResult] = useState(null)
   const [selectedThesisId, setSelectedThesisId] = useState(null)
   const [evidenceDrawerItem, setEvidenceDrawerItem] = useState(null)
@@ -209,7 +210,13 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
   const [exportError, setExportError] = useState('')
   const [retry, setRetry] = useState(0)
   const [corpusReset, setCorpusReset] = useState(0)
+  const dataKey = JSON.stringify([court, applied, retry, bounds.start, bounds.end])
+  const coreReady = Boolean(data?.key === dataKey && !loading && !error)
   const usageKey = JSON.stringify([court, applied, topic, retry, bounds.start, bounds.end])
+  const currentAlignment = alignmentResult?.key === usageKey ? alignmentResult : null
+  const alignment = currentAlignment?.data
+  const alignmentError = currentAlignment?.error || ''
+  const alignmentLoading = ['precedents', 'sources'].includes(activeTab) && courts.includes('TJDFT') && !currentAlignment
   const currentUsage = usageResult?.key === usageKey ? usageResult : null
   const usage = currentUsage?.data
   const usageError = currentUsage?.error || ''
@@ -234,9 +241,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
     const timeout = setTimeout(() => controller.abort(), 20000)
     async function load() {
       try {
-        setAlignment(null)
-        setSelectedThesisId(null)
-        setEvidenceDrawerItem(null)
+        setLoading(true)
         if (courts.some((code) => !authorizedCourts.includes(code))) throw new Error('Você não possui acesso a este tribunal.')
         const fullScope = await getData('scope', { court }, controller.signal)
         const courtScopes = { selection: fullScope }
@@ -247,18 +252,14 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
         )
         const filteredScope = await getData('scope', { ...filters, court }, controller.signal)
         const filteredScopes = Object.fromEntries(courts.map(code => [code, { metadata: filteredScope.by_court?.[code] || (courts.length === 1 ? filteredScope.metadata : null) }]))
-        const alignmentResult = ['precedents', 'sources'].includes(activeTab) && courts.includes('TJDFT')
-          ? await getData('alignment', { ...filters, court: 'TJDFT', ...(topic ? { topic } : {}) }, controller.signal)
-          : null
         if (!statistics.metrics || !Array.isArray(instances.series) || !Array.isArray(distribution.series)) throw new Error('A API retornou dados em um formato inesperado.')
         if (!active) return
         if (!applied) setDraft((current) => current.start ? current : { start: available.start || '', end: available.end || '', subject: '' })
-        setData({ statistics, instances, distribution, courtScopes, filteredScopes })
-        setAlignment(alignmentResult)
+        setData({ key: dataKey, statistics, instances, distribution, courtScopes, filteredScopes })
         setError('')
       } catch (failure) {
         if (active) {
-          setData(null); setAlignment(null)
+          setData(null)
           setError(failure.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : failure instanceof TypeError ? 'Não foi possível conectar ao backend. Verifique a conexão e tente novamente.' : failure.message)
         }
       } finally {
@@ -268,10 +269,29 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
     }
     load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [applied, retry, court, courts, authorizedCourts, topic, activeTab])
+  }, [applied, retry, court, courts, authorizedCourts, dataKey])
 
   useEffect(() => {
-    if (activeTab !== 'precedents' || !court) return
+    if (!['precedents', 'sources'].includes(activeTab) || !courts.includes('TJDFT') || !coreReady) return
+    const controller = new AbortController()
+    let active = true
+    const timeout = setTimeout(() => controller.abort(), 20000)
+    const filters = applied || { start: bounds.start, end: bounds.end }
+    getData('alignment', { ...filters, court: 'TJDFT', ...(topic ? { topic } : {}) }, controller.signal)
+      .then(result => {
+        if (active) {
+          setSelectedThesisId(null)
+          setEvidenceDrawerItem(null)
+          setAlignmentResult({ key: usageKey, data: result })
+        }
+      })
+      .catch(failure => { if (active) setAlignmentResult({ key: usageKey, error: failure.name === 'AbortError' ? 'A consulta às avaliações demorou demais. Tente novamente.' : failure.message }) })
+      .finally(() => clearTimeout(timeout))
+    return () => { active = false; clearTimeout(timeout); controller.abort() }
+  }, [activeTab, applied, courts, topic, usageKey, bounds.start, bounds.end, coreReady, alignmentRetry])
+
+  useEffect(() => {
+    if (activeTab !== 'precedents' || !court || !coreReady || alignmentLoading) return
     const controller = new AbortController()
     let active = true
     const timeout = setTimeout(() => controller.abort(), 120000)
@@ -281,7 +301,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
       .catch(error => { if (active) setUsageResult({ key: usageKey, error: error.name === 'AbortError' ? 'A análise textual ainda não respondeu. Tente novamente; os demais dados continuam disponíveis.' : error.message }) })
       .finally(() => clearTimeout(timeout))
     return () => { active = false; clearTimeout(timeout); controller.abort() }
-  }, [activeTab, applied, court, topic, usageKey, bounds.start, bounds.end])
+  }, [activeTab, applied, court, topic, usageKey, bounds.start, bounds.end, coreReady, alignmentLoading])
 
   function apply(event) {
     event.preventDefault()
@@ -402,7 +422,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
           setLoading(true)
         } : undefined} />
         {alignment?.metadata?.source_thesis_coverage?.undated > 0 && <p className="chart-note">Há {formatNumber(alignment.metadata.source_thesis_coverage.undated)} referências sem data confirmada nesta seleção. Elas acompanham o filtro de assunto, mas não comprovam cobertura do período.</p>}
-        {!alignment ? <ChartState title={loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>A consulta ao corpus revisado não foi concluída.</ChartState> : <>
+        {!alignment ? <ChartState title={alignmentLoading || loading ? 'Carregando avaliações…' : 'Avaliações indisponíveis'}>{alignmentError || 'A consulta ao corpus revisado está em andamento.'}{alignmentError && <button className="secondary-button" type="button" onClick={() => { setAlignmentResult(null); setAlignmentRetry(value => value + 1) }}>Tentar avaliações novamente</button>}</ChartState> : <>
           {(() => {
             const groups = alignment.thesis_groups || []
             const selectedGroup = groups.find((group) => group.id === selectedThesisId)
