@@ -339,7 +339,7 @@ def _assert_security_invariants(
     }
 
 
-def _configure_pg_transaction(*, read_only: bool) -> None:
+def _configure_pg_transaction(*, read_only: bool, expected_db: str = EXPECTED_DATABASE) -> None:
     if connection.vendor != "postgresql":
         return
     with connection.cursor() as cursor:
@@ -347,13 +347,13 @@ def _configure_pg_transaction(*, read_only: bool) -> None:
             cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             cursor.execute("SELECT current_database(), current_setting('transaction_read_only')")
             db_name, ro = cursor.fetchone()
-            if db_name != EXPECTED_DATABASE or ro != "on":
+            if db_name != expected_db or ro != "on":
                 raise ApprovalError("PostgreSQL não confirmou banco operacional ou modo somente leitura.")
         else:
             cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
             cursor.execute("SELECT current_database(), pg_try_advisory_xact_lock(%s)", (ADVISORY_LOCK_KEY,))
             db_name, locked = cursor.fetchone()
-            if db_name != EXPECTED_DATABASE or not locked:
+            if db_name != expected_db or not locked:
                 raise ApprovalError("Banco operacional não confirmado ou bloqueio exclusivo indisponível.")
 
 
@@ -367,7 +367,7 @@ def check_candidates(
     db_name = assert_local_environment(allow_test_db=allow_test_db)
     targets = validate_identifiers(list(identifiers) if identifiers else sorted(registry), registry=registry)
     with transaction.atomic(durable=True):
-        _configure_pg_transaction(read_only=True)
+        _configure_pg_transaction(read_only=True, expected_db=db_name)
         items_summary: dict[str, Any] = {}
         for ident in targets:
             spec = registry[ident]
@@ -435,7 +435,7 @@ def apply_display_approval(
 
     try:
         with transaction.atomic(durable=True):
-            _configure_pg_transaction(read_only=False)
+            _configure_pg_transaction(read_only=False, expected_db=db_name)
             fact_count = FactProcess.objects.count()
             baseline_items = set(published_items("display").values_list("pk", flat=True))
             baseline_refs = set(published_references().values_list("pk", flat=True))
@@ -554,7 +554,7 @@ def revoke_display_approval(
 
     now_iso = timezone.localtime().isoformat(timespec="seconds")
     with transaction.atomic(durable=True):
-        _configure_pg_transaction(read_only=False)
+        _configure_pg_transaction(read_only=False, expected_db=db_name)
         fact_count = FactProcess.objects.count()
         baseline_items = set(published_items("display").values_list("pk", flat=True))
         baseline_refs = set(published_references().values_list("pk", flat=True))

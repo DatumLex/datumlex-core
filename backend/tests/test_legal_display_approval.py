@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from importlib import import_module
 import io
 import json
 import os
@@ -13,6 +14,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
+from django.db import connection
 from django.test import TransactionTestCase, override_settings
 
 from src.accounts.models import Court
@@ -48,6 +50,22 @@ DOCTRINE_FP = ALLOWED_CANDIDATES[DOCTRINE_ID].expected_fingerprint
 
 
 class LegalDisplayApprovalTests(TransactionTestCase):
+    def _fixture_teardown(self):
+        if connection.vendor != "postgresql":
+            return super()._fixture_teardown()
+        if not connection.settings_dict["NAME"].startswith("test_"):
+            raise RuntimeError("Refusing cleanup outside a test database")
+        tables = import_module("src.db.migrations.0011_nlp_history_guards").TABLES
+        with connection.cursor() as cursor:
+            for table in tables:
+                cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER nlp_no_truncate")
+        try:
+            super()._fixture_teardown()
+        finally:
+            with connection.cursor() as cursor:
+                for table in tables:
+                    cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER nlp_no_truncate")
+
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.tmp_path = Path(self.tmpdir.name)
@@ -395,10 +413,13 @@ class LegalDisplayApprovalTests(TransactionTestCase):
             with self.assertRaisesRegex(ApprovalError, "ambiente remoto"):
                 assert_local_environment(allow_test_db=True)
 
-        # SQLite test DB must be rejected when allow_test_db=False (production & CLI default).
-        with self.assertRaisesRegex(ApprovalError, "PostgreSQL local operacional"):
+        # Non-operational test DB (SQLite or test_* PostgreSQL) must be rejected when allow_test_db=False.
+        expected_guard_msg = (
+            "Banco-alvo incorreto" if connection.vendor == "postgresql" else "PostgreSQL local operacional"
+        )
+        with self.assertRaisesRegex(ApprovalError, expected_guard_msg):
             assert_local_environment(allow_test_db=False)
-        with self.assertRaisesRegex(CommandError, "PostgreSQL local operacional"):
+        with self.assertRaisesRegex(CommandError, expected_guard_msg):
             call_command("manage_legal_display_approval", "--check", stdout=io.StringIO())
 
         with patch("src.services.legal_display_approval.connection") as mock_conn:
@@ -803,7 +824,8 @@ class LegalDisplayApprovalTests(TransactionTestCase):
         snapshot = self.tmp_path / "cli_snap.json"
         receipt = self.tmp_path / "cli_rcpt.json"
 
-        with patch("src.services.legal_display_approval.assert_local_environment", return_value=EXPECTED_DATABASE):
+        active_db_name = str(connection.settings_dict["NAME"])
+        with patch("src.services.legal_display_approval.assert_local_environment", return_value=active_db_name):
             with self.assertRaisesRegex(CommandError, "--simulate-revoke"):
                 call_command(
                     "manage_legal_display_approval",
