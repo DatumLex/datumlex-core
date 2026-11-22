@@ -194,7 +194,7 @@ def retrieve(indexed, question, previous):
     ids = list(map(int, direct or SOURCE_ID.findall(recent)))
     inferred = classify(question) or classify(recent)
     if ids and not inferred:
-        inferred = set(indexed.filter(pk__in=ids).values_list("topic_matches__topic", flat=True))
+        inferred = {t for t in indexed.filter(pk__in=ids).values_list("topic_matches__topic", flat=True) if t}
     if inferred and not direct:
         indexed = indexed.filter(topic_matches__topic__in=inferred).distinct()
     terms = list(dict.fromkeys(t for t in re.findall(r"[\w-]{4,}", question.lower()) if t not in STOP))[:8]

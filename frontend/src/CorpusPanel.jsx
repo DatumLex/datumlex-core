@@ -69,7 +69,7 @@ export default function CorpusPanel({ court, start, end, topic: selectedTopic, o
         const tpu = tpuDisplay(item)
         return <article className="corpus-result" key={item.id}>
           <span className="section-kicker">{sourceKindLabel(item)} · {item.court || item.source_name}{item.judging_body ? ` · ${item.judging_body}` : ''}</span><h4>{item.title}</h4>
-          {item.authors.length > 0 && <p>Autores · {item.authors.join(', ')}</p>}
+          {item.authors?.length > 0 && <p>Autores · {item.authors.join(', ')}</p>}
           {bibLine && <p className="chart-note">Publicação · {bibLine}</p>}
           {pubLine && <p className="chart-note">Instituição responsável · {pubLine}</p>}
           {item.identifier && <p className="chart-note">Identificador · {item.identifier}</p>}

@@ -93,3 +93,28 @@ class CorpusCatalogTests(TestCase):
         reference.thesis='Acidente de transito';reference.title='Acidente de transito';reference.save()
         call_command('refresh_legal_corpus',category='precedent',stdout=io.StringIO())
         self.assertEqual(list(item.topic_matches.values_list('topic',flat=True)),['transito'])
+
+    def test_complete_only_excludes_general_scope_and_deduplicates_multi_topic_items(self):
+        # Two complete topics (dano-moral and dano-material) sharing one multi-topic jurisprudence item.
+        shared = self.item('shared-jur', topic='dano-moral')
+        LegalCorpusTopicMatch.objects.create(item=shared, topic='dano-material', matched_terms=['reparacao integral'])
+        for topic in ('dano-moral', 'dano-material'):
+            self.item(f'prec-{topic}', 'precedent', topic=topic)
+            self.item(f'doc-{topic}', 'doctrine', court='', topic=topic)
+        # General-scope approved doctrine with zero topic_matches.
+        general = LegalCorpusItem.objects.create(
+            origin_key='general-doc', category='doctrine', court='', title='Geral sem subtema',
+            source_name='Senado Federal', source_url='https://example.org/geral', content_kind='artigo',
+            date=None, fingerprint='general-doc', review_status='approved',
+            provenance={'permissions': {'display': 'allowed'}, 'metadata': {'topics': ['responsabilidade-civil']}},
+        )
+        all_items = self.query('&category=doctrine')
+        self.assertEqual(all_items['counts'], {'jurisprudence': 1, 'precedent': 2, 'doctrine': 3})
+        self.assertEqual(all_items['coverage']['undated'], 1)
+        self.assertIn(general.pk, [row['id'] for row in all_items['items']])
+
+        complete = self.query('&complete_only=true&category=jurisprudence')
+        self.assertEqual(complete['counts'], {'jurisprudence': 1, 'precedent': 2, 'doctrine': 2})
+        self.assertEqual(complete['pagination']['total'], 1)
+        self.assertEqual([row['id'] for row in complete['items']], [shared.pk])
+        self.assertEqual(complete['coverage']['undated'], 0)

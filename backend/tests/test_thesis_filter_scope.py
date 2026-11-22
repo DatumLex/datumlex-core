@@ -11,17 +11,20 @@ class ThesisFilterScopeTests(TestCase):
     def setUp(self):
         authorize_data(self.client)
 
-    def reference(self, identifier, *, topic, year=None, subject=None):
+    def reference(self, identifier, *, topic, year=None, subject=None, approved=True):
+        grants = {"display": "allowed"} if approved else {}
         ref = LegalReference.objects.create(
             reference_type="precedent", source_institution="STJ", identifier=identifier,
             title=identifier, thesis=f"Enunciado sintético {identifier}", source_name="Synthetic",
             source_url="https://www.stj.jus.br/synthetic", subject_code=subject,
             published_at=date(year, 1, 1) if year else None,
+            approved=approved, source_metadata={"permissions": grants},
         )
         item = LegalCorpusItem.objects.create(
             origin_key=f"reference:{ref.pk}", category="precedent", court="STJ", title=identifier,
             source_name="Synthetic", content_kind="precedent_reference", fingerprint=identifier,
-            provenance={"reference_id": ref.pk},
+            review_status="approved" if approved else "pending",
+            provenance={"reference_id": ref.pk, "permissions": grants},
         )
         LegalCorpusTopicMatch.objects.create(item=item, topic=topic, matched_terms=["synthetic"])
         return ref
@@ -36,6 +39,7 @@ class ThesisFilterScopeTests(TestCase):
     def test_shared_topic_restricts_thesis_list_and_exposes_undated_coverage(self):
         self.reference("moral", topic="dano-moral")
         self.reference("material", topic="dano-material")
+        self.reference("pending-moral", topic="dano-moral", approved=False)
         result = self.query(topic="dano-moral")
         self.assertEqual([row["identifier"] for row in result["source_theses"]], ["moral"])
         self.assertEqual(len(result["thesis_groups"]), 1)

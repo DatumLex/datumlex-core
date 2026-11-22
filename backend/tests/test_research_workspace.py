@@ -628,3 +628,151 @@ class ResearchWorkspaceTests(TestCase):
         ref.save(update_fields=["approved"])
         self.assertEqual(self.client.get(all_topics_url).json()["total"], 0)
         self.assertEqual(self.client.get(f"/api/corpus/{item.pk}/").status_code, 404)
+
+    def test_general_scope_followup_multi_topic_dedup_stj_precedents_and_sparse_metadata(self):
+        self.user.courts.add(Court.objects.get_or_create(code="STJ", defaults={"name": "STJ"})[0])
+
+        # 1. General-scope doctrine (0 topic_matches) must not break follow-up chat (None in inferred set).
+        general_doc = LegalCorpusItem.objects.create(
+            origin_key="synth:general-followup",
+            category="doctrine",
+            court="",
+            title="Doutrina sintética geral sem subtema",
+            source_name="Editora Teste",
+            source_url="https://example.org/general-doc",
+            content_kind="artigo",
+            date=None,
+            date_kind="publication_period",
+            authors=[],
+            excerpt="Texto retido sem permissão",
+            fingerprint="synth-general-followup",
+            review_status="approved",
+            provenance={
+                "permissions": {"display": "allowed"},
+                "metadata": {
+                    "id": "SYNTH:GENERAL:1",
+                    "topics": ["responsabilidade-civil"],
+                    "rights": {
+                        "license": "CC BY-NC-SA 4.0",
+                        "evidence": ["javascript:alert(1)", "https://example.org/other"],
+                    },
+                },
+            },
+        )
+        # Sparse metadata never fabricates date/TPU/bibliography or unsafe license URL.
+        sparse_detail = self.client.get(f"/api/corpus/{general_doc.pk}/").json()
+        self.assertIsNone(sparse_detail["date"])
+        self.assertIsNone(sparse_detail["publication_year"])
+        self.assertIsNone(sparse_detail["bibliography"])
+        self.assertIsNone(sparse_detail["tpu"])
+        self.assertIsNone(sparse_detail["license"]["url"])
+        self.assertEqual(sparse_detail["excerpt"], "")
+
+        # Follow-up referencing the general-scope source still retrieves authorized doctrine.
+        follow_up = self.ask(
+            "E a doutrina sobre isso?",
+            previous=[f"O que diz F{general_doc.pk}?"],
+            query="?court=TJDFT&start=2022-01-01&end=2025-01-01",
+        )
+        self.assertEqual(follow_up.status_code, 200)
+        self.assertTrue(any(s["kind"] == "doctrine" for s in follow_up.json()["sources"]))
+
+        # 2. Multi-topic item must never duplicate in counts, source browser, or exports.
+        multi = LegalCorpusItem.objects.create(
+            origin_key="synth:multi-topic",
+            category="jurisprudence",
+            court="TJDFT",
+            title="Decisão sintética multitema",
+            source_name="TJDFT",
+            source_url="https://example.org/multi",
+            content_kind="acordao",
+            date=date(2024, 5, 1),
+            date_kind="decision_date",
+            excerpt="Texto retido",
+            fingerprint="synth-multi",
+            review_status="approved",
+            provenance={"permissions": {"display": "allowed"}, "metadata": {"id": "SYNTH:MULTI:1"}},
+        )
+        multi.topic_matches.create(topic="dano-moral")
+        multi.topic_matches.create(topic="dano-material")
+        multi_query = "?court=TJDFT&start=2024-01-01&end=2024-12-31&topics=dano-moral,dano-material"
+        panel = self.client.get("/api/research/" + multi_query).json()
+        self.assertEqual(panel["counts"]["jurisprudence"], 1)
+        listed = self.client.get("/api/research/sources/" + multi_query + "&category=jurisprudence").json()
+        self.assertEqual(listed["total"], 1)
+        self.assertEqual([row["id"] for row in listed["items"]], [f"F{multi.pk}"])
+
+        # 3. Synthetic equivalents of STJ:SUMULA:37 (1992) and STJ:TEMA:1111 (2022, TPU 10441).
+        for ident, title, kind, day, tpu_meta, topic in (
+            (
+                "STJ:SUMULA:37",
+                "Súmula 37 do STJ sintética",
+                "enunciado_sumular",
+                date(1992, 3, 12),
+                {"state": "pending", "codes": []},
+                "dano-moral",
+            ),
+            (
+                "STJ:TEMA:1111",
+                "Tema 1111 do STJ sintético",
+                "recurso_repetitivo",
+                date(2022, 9, 28),
+                {"state": "verified_official_code", "codes": [10441]},
+                "transito",
+            ),
+        ):
+            ref = LegalReference.objects.create(
+                reference_type="precedent",
+                source_institution="STJ",
+                identifier=ident,
+                source_name="STJ",
+                title=title,
+                source_url="https://example.org/" + ident.lower().replace(":", "-"),
+                approved=True,
+                source_metadata={"permissions": {"display": "allowed"}},
+            )
+            prec = LegalCorpusItem.objects.create(
+                origin_key=f"reference:{ref.pk}",
+                category="precedent",
+                court="STJ",
+                title=title,
+                source_name="STJ",
+                source_url=ref.source_url,
+                content_kind=kind,
+                date=day,
+                date_kind="decision_date",
+                excerpt="Enunciado retido sem grant text",
+                fingerprint=ident,
+                review_status="approved",
+                provenance={
+                    "reference_id": ref.pk,
+                    "permissions": {"display": "allowed"},
+                    "metadata": {"id": ident, "tpu": tpu_meta, "topics": [topic]},
+                },
+            )
+            prec.topic_matches.create(topic=topic)
+
+        stj_default = "/api/research/sources/?court=STJ&start=2010-01-01&end=2026-11-22&category=precedent"
+        default_items = self.client.get(stj_default).json()["items"]
+        default_ids = {row["identifier"] for row in default_items}
+        self.assertIn("STJ:TEMA:1111", default_ids)
+        self.assertNotIn("STJ:SUMULA:37", default_ids)
+        tema = next(row for row in default_items if row["identifier"] == "STJ:TEMA:1111")
+        self.assertEqual(tema["official_tpu"], [10441])
+        self.assertEqual(tema["tpu"]["state"], "verified_official_code")
+        self.assertEqual(tema["excerpt"], "")
+
+        sumula_all_dates = self.client.get(stj_default + "&q=STJ:SUMULA:37&all_dates=true").json()
+        self.assertEqual(sumula_all_dates["total"], 1)
+        self.assertEqual(sumula_all_dates["items"][0]["official_tpu"], [])
+        self.assertIsNone(sumula_all_dates["items"][0]["tpu"])
+        self.assertEqual(sumula_all_dates["items"][0]["excerpt"], "")
+
+        # Neither display-only precedent leaks text into PDF/XLSX exports.
+        export_url = "/api/research/export/?court=STJ&start=2010-01-01&end=2026-11-22"
+        pdf = self.client.get(export_url + "&format=pdf")
+        self.assertEqual(pdf.status_code, 200)
+        pdf_text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(pdf.content)).pages)
+        self.assertIn("Tema 1111 do STJ", pdf_text)
+        self.assertNotIn("Enunciado retido sem grant text", pdf_text)
+        self.assertNotIn("Texto retido sem permissão", pdf_text)
