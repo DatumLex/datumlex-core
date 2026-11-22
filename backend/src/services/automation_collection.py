@@ -53,6 +53,3 @@ def collect_datajud(config, publish):
         result.append({'start': start.isoformat(), 'end': end.isoformat(), 'before': before,
                        'after': current, 'target': target, 'missing': max(0, target-current)})
     return result
-
-
-
