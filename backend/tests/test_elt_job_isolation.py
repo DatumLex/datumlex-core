@@ -33,7 +33,7 @@ class JobIsolationTests(TestCase):
             output=root/'nlp-local/jobs'/job
             self.assertTrue((output/'queue.json').exists())
             pointer=json.loads((output/'current-run.json').read_text())
-            self.assertTrue(Path(pointer['directory']).is_relative_to(output/'runs'))
+            self.assertTrue(Path(pointer['directory']).resolve().is_relative_to((output/'runs').resolve()))
             # A corrupt legacy pointer must not affect this job's import.
             (root/'nlp-local/current-run.json').write_text('{"directory":"wrong"}')
             with patch.object(importer,'ROOT',root),patch.object(sys,'argv',['import_local_results','--job-id',job]),patch('sys.stdout',new_callable=io.StringIO):

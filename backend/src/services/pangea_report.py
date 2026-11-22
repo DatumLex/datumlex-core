@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import F, Q
 
 from src.db.models import LegalReference
 
@@ -25,7 +25,7 @@ def report_references(scope):
         "unmapped_subject_count": inventory.filter(subject_code__isnull=True).count(),
         "sample_count": candidates.count(),
         "items": list(
-            candidates.order_by("-approved", "-source_updated_at", "identifier").values(
+            candidates.order_by("-approved", F("source_updated_at").desc(nulls_last=True), "identifier").values(
                 "identifier",
                 "title",
                 "thesis",
