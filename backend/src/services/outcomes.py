@@ -36,13 +36,19 @@ def _code_map(court):
 
 def classify(process):
     court = getattr(process, "court", "TJDFT")
+    if court not in ("TJDFT", "STJ"):
+        return classify_movements(court, None, ())
+    return classify_movements(court, process.degree, process.movements.all())
+
+
+def classify_movements(court, degree, movements):
     if court not in ('TJDFT', 'STJ'):
         return {'outcome': 'unknown', 'evidence': [], 'selected_evidence': [],
                 'rule_version': VERSION, 'reason': 'court_outcome_mapping_not_validated'}
     code_map = _code_map(court)
     evidence = [
         {"movement_id": movement.pk, "code": movement.code, "date": movement.occurred_at}
-        for movement in process.movements.all()
+        for movement in movements
         if movement.code in code_map
     ]
     dated = [item for item in evidence if item["date"] is not None]
@@ -50,7 +56,7 @@ def classify(process):
     latest = [selected] if selected else []
     states = {code_map[item["code"]] for item in latest}
     allowed_degrees = {"SUP"} if court == "STJ" else {"G2", "TR"}
-    if process.degree not in allowed_degrees:
+    if degree not in allowed_degrees:
         outcome = "outside_appellate_degree"
     elif not states:
         outcome = "unknown"
