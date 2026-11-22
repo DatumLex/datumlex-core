@@ -23,6 +23,26 @@
     },
     {
       "source": "/api/:path*/",
+      "has": [
+        {
+          "type": "host",
+          "value": "datumlex-core.vercel.app"
+        }
+      ],
+      "destination": "https://datumlex-api-pedromattos-production.up.railway.app/api/:path*/"
+    },
+    {
+      "source": "/api/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "datumlex-core.vercel.app"
+        }
+      ],
+      "destination": "https://datumlex-api-pedromattos-production.up.railway.app/api/:path*/"
+    },
+    {
+      "source": "/api/:path*/",
       "destination": "/api/gateway?datumlex_path=:path*"
     },
     {
