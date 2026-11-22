@@ -25,6 +25,7 @@ class ProductionSettingsTests(SimpleTestCase):
     def run_production(self, script, overrides):
         env = {key: os.environ[key] for key in ("PATH", "SYSTEMROOT") if key in os.environ}
         env.update(VALID, **overrides)
+        env["PYTHON_DOTENV_DISABLED"] = "1"
         return subprocess.run(
             [sys.executable, "-c", script], cwd=BACKEND, env=env, capture_output=True, text=True, timeout=10,
         )

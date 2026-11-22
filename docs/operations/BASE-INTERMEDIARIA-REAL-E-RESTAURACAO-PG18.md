@@ -51,7 +51,7 @@ Este documento detalha a preparação técnica de um banco intermediário Postgr
    ```sh
    shasum -a 256 recuperacao/staging_real_deploy/datumlex_staging_real_civil_2026_11.dump
    ```
-   *(Comparar com o campo `dump_sha256` em `datumlex_staging_real_civil_2026_11.manifest.json`.)*
+   *(Comparar com o campo `export_dump.sha256` em `datumlex_staging_real_civil_2026_11.manifest.json`.)*
 2. Se o ambiente de destino já possuir banco anterior, fazer backup lógico do destino antes de alternar a conexão (`pg_dump -Fc --no-owner --no-privileges`).
 
 ### 3.2 Criação de Banco PG 18 Limpo e Restauração (Usando Cliente `pg_restore` 18)
