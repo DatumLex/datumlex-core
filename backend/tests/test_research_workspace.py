@@ -44,7 +44,7 @@ class ResearchWorkspaceTests(TestCase):
                 excerpt="Trecho indexado " + key,
                 fingerprint=key,
                 source_url="https://example.org/" + key,
-                review_status="approved", provenance={"permissions": {"display": "allowed", "gemini": "allowed"}},
+                review_status="approved", provenance={"permissions": {"display": "allowed", "text": "allowed", "gemini": "allowed"}},
             )
             LegalCorpusTopicMatch.objects.create(item=item, topic=topic)
             cls.refs[key] = f"F{item.pk}"
@@ -73,6 +73,36 @@ class ResearchWorkspaceTests(TestCase):
         r = self.client.get("/api/research/" + self.query + "&undated=false&sources=doctrine")
         self.assertFalse(r.json()["sources"])
         self.assertIsNone(r.json()["usage"])
+
+    def test_precedent_lookup_outside_datajud_dates_keeps_publication_gate(self):
+        item = LegalCorpusItem.objects.create(
+            origin_key="synthetic-sumula", title="Súmula 37 sintética", category="precedent",
+            court="TJDFT", source_name="Tribunal de teste", content_kind="enunciado_sumular",
+            source_url="https://example.org/sumula", date=date(1992, 3, 12),
+            excerpt="Trecho sintético retido", review_status="approved",
+            provenance={"permissions": {"display": "allowed"}, "metadata": {
+                "id": "TEST:SUMULA:37", "topics": ["negativacao"], "judging_body": "Colegiado de teste",
+                "verified_on": "2026-11-22", "authority": {"official_status": "consta_na_base_oficial"},
+                "tpu": {"state": "pending", "codes": [10433]},
+            }},
+        )
+        item.topic_matches.create(topic="negativacao")
+        url = "/api/research/sources/" + self.query + "&category=precedent&q=Súmula 37"
+        self.assertEqual(self.client.get(url).json()["total"], 0)
+        expanded = url + "&all_dates=true"
+        found = self.client.get(expanded).json()["items"]
+        self.assertEqual([row["id"] for row in found], [f"F{item.pk}"])
+        self.assertEqual(found[0]["judging_body"], "Colegiado de teste")
+        self.assertEqual(found[0]["verified_on"], "2026-11-22")
+        self.assertEqual(found[0]["official_tpu"], [])
+        self.assertEqual(found[0]["excerpt"], "")
+        self.assertEqual(self.client.get(f"/api/corpus/{item.pk}/").json()["excerpt"], "")
+        self.assertEqual(self.client.get(expanded.replace("Súmula 37", "TEST:SUMULA:37")).json()["total"], 1)
+        self.assertEqual(self.client.get(expanded.replace("negativacao", "saude")).json()["total"], 0)
+        self.assertEqual(self.client.get(expanded.replace("category=precedent", "category=doctrine")).status_code, 400)
+        item.review_status = "pending"
+        item.save(update_fields=["review_status"])
+        self.assertEqual(self.client.get(expanded).json()["total"], 0)
 
     def test_real_follow_up_and_stale_citation(self):
         r = self.ask("O que diz " + self.refs["dec"] + "?")

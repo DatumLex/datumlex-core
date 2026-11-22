@@ -41,6 +41,14 @@ const kinds = {
   doctrine: 'Doutrina',
   link: 'Vínculo em ementa',
 }
+const precedentKinds = {
+  enunciado_sumular: 'Súmula',
+  recurso_repetitivo: 'Tema repetitivo',
+}
+const legalStatus = {
+  consta_na_base_oficial: 'Consta na base oficial de súmulas',
+  transito_em_julgado: 'Trânsito em julgado',
+}
 const results = {
   granted: 'Provido',
   denied: 'Desprovido',
@@ -231,9 +239,10 @@ function SourceRow({ doc, onOpen }) {
       </span>
       <span>
         <small>
-          {kinds[doc.kind]} · {doc.origin}
+          {precedentKinds[doc.source_kind] || kinds[doc.kind]} · {doc.court || doc.origin}
         </small>
         <strong>{doc.title}</strong>
+        {doc.topics?.length > 0 && <small>{doc.topics.join(' · ')}</small>}
         {doc.relation && <small>Candidato NLP · {doc.relation}</small>}
         {doc.review_status === 'pending' && <small>Revisão pendente</small>}
       </span>
@@ -554,6 +563,10 @@ export default function ResearchWorkspace({ session }) {
               setCnjDraft('')
               setFilters({ ...filters, cnj: '' })
             }}>Limpar número CNJ</button>}
+            <button type="button" className="rw-link" onClick={() => {
+              setCatalogCategory('precedent')
+              navigate('corpus')
+            }}>Buscar precedentes</button>
           </form>
         )}
         {showFilters && (
@@ -766,12 +779,20 @@ export default function ResearchWorkspace({ session }) {
           {selected ? (
             <>
               <p>
-                {kinds[selected.kind]} · {selected.origin} · {date(selected.date)}
+                {precedentKinds[selected.source_kind] || kinds[selected.kind]} · {selected.court || selected.origin}
+                {selected.judging_body && ` · ${selected.judging_body}`}
               </p>
+              {selected.date && <p>{selected.date_kind === 'decision_date' ? 'Julgamento' : 'Data da fonte'} · {date(selected.date)}</p>}
+              {selected.identifier && <p>Identificador · {selected.identifier}</p>}
+              {legalStatus[selected.official_status] && <p>Situação oficial · {legalStatus[selected.official_status]}</p>}
+              {selected.verified_on && <p>Conferida em {date(selected.verified_on)}</p>}
+              {selected.official_tpu?.length > 0 && <p>TPU da ficha oficial · {selected.official_tpu.join(', ')}</p>}
+              {selected.topics?.length > 0 && <p>Assuntos editoriais · {selected.topics.join(' · ')}.
+                A associação indica afinidade temática e não comprova aplicação a um processo.</p>}
               {selected.authors?.length > 0 && <p>{selected.authors.join(', ')}</p>}
-              <blockquote>
-                {selected.excerpt || 'O índice contém a referência bibliográfica, sem trecho disponível.'}
-              </blockquote>
+              {selected.excerpt ? <blockquote>{selected.excerpt}</blockquote> : (
+                <p className="rw-note">A ficha exibe metadados e link. O texto da fonte está disponível apenas na publicação de origem.</p>
+              )}
               {selected.relation && <p>Classificação candidata do NLP: {selected.relation}.</p>}
               {selected.review_status === 'pending' && <p>Fonte com revisão pendente.</p>}
               <div className="rw-actions">
@@ -933,12 +954,14 @@ function CaseBrowser({ scopeKey }) {
 
 function CorpusBrowser({ scopeKey, category, onOpen }) {
   const [q, setQ] = useState(''),
-    [term, setTerm] = useState(''),
+    [search, setSearch] = useState({ term: '', allDates: false }),
+    [allDates, setAllDates] = useState(true),
     [page, setPage] = useState(1),
     [result, setResult] = useState({})
   const query = new URLSearchParams(scopeKey)
   query.set('category', category)
-  query.set('q', term)
+  query.set('q', search.term)
+  if (search.allDates) query.set('all_dates', 'true')
   query.set('page', String(page))
   const key = query.toString()
   useEffect(() => {
@@ -960,15 +983,21 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
         onSubmit={(e) => {
           e.preventDefault()
           setPage(1)
-          setTerm(q.trim())
+          const term = q.trim()
+          setSearch({ term, allDates: category === 'precedent' && Boolean(term) && allDates })
         }}
       >
         <label>
-          Buscar no título{' '}
+          Título ou identificador{' '}
           <input type="search" maxLength={120} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
         <button className="secondary-button">Buscar</button>
+        {category === 'precedent' && <label>
+          <input type="checkbox" checked={allDates} onChange={(e) => setAllDates(e.target.checked)} />
+          {' '}Buscar precedentes em todas as datas
+        </label>}
       </form>
+      {search.allDates && <p className="rw-note">Busca por referência em todas as datas. Tribunal e temas selecionados continuam em vigor.</p>}
       {data ? (
         <>
           <p>{data.total ? `${number(data.total)} fontes aprovadas` : 'Nenhuma fonte aprovada neste recorte.'}</p>

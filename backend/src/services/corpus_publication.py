@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from django.db.models import CharField, Q
+from django.db.models import Case, CharField, F, Q, TextField, Value, When
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast
 
@@ -42,6 +42,12 @@ def published_items(use="display"):
     return permitted.annotate(source_reference=KeyTextTransform("reference_id", "provenance")).filter(
         ~Q(provenance__has_key="reference_id") | Q(source_reference__in=approved_refs)
     )
+
+
+def with_public_excerpt(items):
+    return items.annotate(public_excerpt=Case(
+        When(provenance__permissions__text="allowed", then=F("excerpt")), default=Value(""), output_field=TextField(),
+    ))
 
 
 def allowed_versions(*, use="nlp", ids=None):

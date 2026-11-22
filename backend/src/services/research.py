@@ -14,6 +14,7 @@ from src.etl.cross_source_matching import normalize_cnj_identifier
 from src.nlp.topics import TOPICS, classify, folded
 from src.services.analytical_context import OUTCOMES
 from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
+from src.services.corpus_publication import with_public_excerpt
 from src.services.precedent_usage import summarize as usage_summary
 from src.services.statistics_service import InvalidQuery, filtered_processes, instance_series, metrics
 from src.services.outcomes import summarize
@@ -62,7 +63,7 @@ def options(params, name, choices, default=()):
     return sorted(values)
 
 
-def selection(params):
+def selection(params, *, precedent_all_dates=False):
     allowed = {"court", "start", "end", "subject", "topics", "sources", "outcomes", "degree", "undated", "cnj"}
     if set(params) - allowed or any(len(params.getlist(k)) != 1 for k in params):
         raise InvalidQuery("Filtro de pesquisa desconhecido ou repetido.")
@@ -109,7 +110,7 @@ def selection(params):
         topics=topics, sources=sources, outcomes=outcomes, degree=degrees, undated=undated == "true",
         cohort=cohort or None
     )
-    indexed = scoped_items(scope, scope["undated"]).filter(category__in=sources)
+    indexed = scoped_items(scope, scope["undated"], all_dates=precedent_all_dates).filter(category__in=sources)
     if topics:
         indexed = indexed.filter(topic_matches__topic__in=topics).distinct()
     return query, scope, indexed, merit_query
@@ -203,8 +204,8 @@ def retrieve(indexed, question, previous):
         matches = LegalCorpusTopicMatch.objects.filter(item_id=OuterRef("pk"), topic__in=inferred)
         score += Case(When(Exists(matches), then=15), default=0)
     for term in terms:
-        score += Case(When(title__icontains=term, then=3), When(excerpt__icontains=term, then=1), default=0)
-    ranked = indexed.annotate(relevance=score).order_by("-relevance", F("date").desc(nulls_last=True), "pk")
+        score += Case(When(title__icontains=term, then=3), When(public_excerpt__icontains=term, then=1), default=0)
+    ranked = with_public_excerpt(indexed).annotate(relevance=score).order_by("-relevance", F("date").desc(nulls_last=True), "pk")
     docs = []
     for kind in CATEGORIES:
         for item in ranked.filter(category=kind)[:3]:
@@ -213,13 +214,26 @@ def retrieve(indexed, question, previous):
 
 
 def source_item(item):
+    metadata = item.provenance.get("metadata", {})
+    authority = metadata.get("authority") or {}
+    tpu = metadata.get("tpu") or {}
+    permissions = item.provenance.get("permissions", {})
     return {
         "id": f"F{item.pk}",
         "kind": item.category,
         "title": item.title,
         "origin": item.source_name or item.court,
+        "court": item.court,
+        "source_kind": item.content_kind,
+        "identifier": metadata.get("id"),
+        "judging_body": metadata.get("judging_body"),
+        "official_status": authority.get("official_status"),
+        "verified_on": metadata.get("verified_on"),
+        "topics": [TOPIC_LABELS[code] for code in metadata.get("topics", []) if code in TOPIC_LABELS],
+        "official_tpu": tpu.get("codes", []) if tpu.get("state") == "verified_official_code" else [],
         "date": item.date,
-        "excerpt": item.excerpt[:1000],
+        "date_kind": item.date_kind,
+        "excerpt": item.excerpt[:1000] if permissions.get("text") == "allowed" else "",
         "url": safe_url(item.source_url),
         "authors": item.authors,
         "review_status": item.review_status,

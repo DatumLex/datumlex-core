@@ -4,7 +4,7 @@ from itertools import chain
 from xml.sax.saxutils import escape
 
 from django.db import DatabaseError
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from reportlab.lib.styles import getSampleStyleSheet
@@ -65,21 +65,24 @@ def sources(request):
             raise InvalidQuery("Parâmetro repetido.")
         return values[0]
 
-    category, term, page = single("category", ""), single("q", ""), single("page", "1")
+    category, term, page = single("category", ""), single("q", "").strip(), single("page", "1")
+    all_dates = single("all_dates", "false")
     if (
         (category and category not in research.CATEGORIES)
         or len(term) > 120
+        or all_dates not in ("true", "false")
+        or (all_dates == "true" and (category != "precedent" or not term))
         or not page.isascii()
         or not page.isdecimal()
         or len(page) > 6
         or int(page) < 1
     ):
         raise InvalidQuery("Categoria, página ou termo de busca inválido.")
-    _, _, items, _ = research.selection(params)
+    _, _, items, _ = research.selection(params, precedent_all_dates=all_dates == "true")
     if category:
         items = items.filter(category=category)
     if term:
-        items = items.filter(title__icontains=term)
+        items = items.filter(Q(title__icontains=term) | Q(provenance__metadata__id__iexact=term))
     rows = items.order_by(F("date").desc(nulls_last=True), "title", "pk")
     offset = (int(page) - 1) * 12
     return {
