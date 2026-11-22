@@ -110,7 +110,7 @@ def summarize(scope, *, page=1, page_size=20):
     latest = NlpTextVersion.objects.filter(document_id=OuterRef('document_id')).order_by('-created_at')
     versions = NlpTextVersion.objects.filter(
         created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
-    ).select_related('document').order_by('document__source_key')
+    ).select_related('document').defer('representation', 'fingerprint').order_by('document__source_key')
     for _, current_versions in groupby(versions.iterator(chunk_size=100), key=lambda row: row.document_id):
         version = next(current_versions)
         other = next(current_versions, None)
