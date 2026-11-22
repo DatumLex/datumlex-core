@@ -12,6 +12,7 @@ from django.http import QueryDict
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 
 from src.accounts.models import Court
+from src.db.models import LegalCorpusItem
 from src.nlp.contracts import fingerprint
 from src.nlp.extraction import annotation
 from src.services import analytical_context as context
@@ -60,6 +61,10 @@ class DashboardTests(TransactionTestCase if connection.vendor == 'postgresql' el
             result['annotations'].append(annotation(text, ['LEGAL_THESIS'], [(23, 45, text[23:45])], 'model_replay'))
         rehash(result)
         run = evidence.persist_result(result, text, request_key=uuid4())
+        LegalCorpusItem.objects.create(origin_key=f"test:{key}", title=key, category="jurisprudence", court="STJ",
+            source_url=result["source"]["source_url"], review_status="approved", fingerprint=run.text_version.sha256,
+            provenance={"text_version": str(run.text_version_id), "sha256": run.text_version.sha256,
+                        "permissions": {"display": "allowed", "nlp": "allowed", "gemini": "allowed"}})
         for row in run.evidences.all():
             if approved:
                 evidence.review(evidence_id=row.pk, actor=self.actor, expected_revision=0, action='approve',
@@ -78,6 +83,28 @@ class DashboardTests(TransactionTestCase if connection.vendor == 'postgresql' el
     def create(self):
         with override_settings(NLP_DASHBOARD_CATALOG=self.catalog, NLP_DASHBOARD_RELEASES=self.releases):
             return dashboard.create(self.actor, self.supplied)
+
+    def test_public_evidence_details_require_current_review_and_rights(self):
+        run = self.document(duplicate=True, approved=False)
+        approved, pending = list(run.evidences.order_by("annotation_id"))
+        evidence.review(evidence_id=approved.pk, actor=self.actor, expected_revision=0, action="approve",
+                        reason="Reviewed synthetic fixture", request_key=uuid4())
+        ordinary = get_user_model().objects.create_user(username="public-reader", approved=True)
+        ordinary.courts.add("STJ")
+        self.client.force_login(ordinary)
+        listed = self.client.get(f"/api/v1/extractions/{run.pk}/evidences/")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.json()["total"], 1)
+        self.assertEqual(self.client.get(f"/api/v1/evidences/{pending.pk}/").status_code, 403)
+        detail = self.client.get(f"/api/v1/evidences/{approved.pk}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertNotIn("original", detail.json())
+        self.assertEqual(self.client.get(f"/api/v1/evidences/{approved.pk}/?view=original").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/v1/extractions/{run.pk}/").status_code, 403)
+        LegalCorpusItem.objects.filter(origin_key=f"test:{run.document.source_key}").update(review_status="rejected")
+        self.assertEqual(self.client.get(f"/api/v1/evidences/{approved.pk}/").status_code, 403)
+        self.client.force_login(self.actor)
+        self.assertEqual(self.client.get(f"/api/v1/evidences/{pending.pk}/").json()["review_status"], "pending")
 
     def test_canonical_identity_and_explicit_empty(self):
         supplied = self.supplied | {'sources': ['stj_jurisprudence', 'stj_jurisprudence']}
@@ -151,12 +178,10 @@ class DashboardTests(TransactionTestCase if connection.vendor == 'postgresql' el
                         reason='FX115 later review', request_key=uuid4())
         with override_settings(NLP_DASHBOARD_RELEASES=self.releases):
             response = self.client.get(f'/api/v2/analysis-snapshots/{record.pk}/export/')
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload['items'][0]['revision'], 1)
-        self.assertEqual(payload['items'][0]['effective']['segments'][0]['text'], self.source_text)
-        self.assertEqual(payload['query_id'], context.identity(payload['context']))
-        self.assertEqual(payload['sha256'], fingerprint(record.payload))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(record.payload['items'][0]['revision'], 1)
+        self.assertEqual(record.payload['items'][0]['effective']['segments'][0]['text'], self.source_text)
+        self.assertEqual(record.sha256, fingerprint(record.payload))
         self.assertEqual(self.create().payload['items'], [])
 
     def test_report_uses_same_snapshot_passage_and_versions(self):

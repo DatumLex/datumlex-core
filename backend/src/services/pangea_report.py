@@ -1,10 +1,10 @@
 from django.db.models import F, Q
 
-from src.db.models import LegalReference
+from src.services.corpus_publication import published_references
 
 
 def report_references(scope):
-    inventory = LegalReference.objects.filter(
+    inventory = published_references().filter(
         source_institution__in=scope["court"].split(","),
         last_import_run__isnull=False,
         source_name__startswith="Pangea",

@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db.models import OuterRef, Subquery
 
 from src.db.models import NlpTextVersion
+from src.services.corpus_publication import allowed_versions, version_available
 from src.nlp.contracts import bytes_hash, fingerprint
 from src.nlp.topics import classify
 from src.services.subject_groups import matching_codes
@@ -107,10 +108,11 @@ def summarize(scope, *, page=1, page_size=20):
     coverage = Counter()
     records = []
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
+    allowed = allowed_versions()
     topics = set(scope.get('topics') or ([scope['topic']] if scope.get('topic') else []))
     latest = NlpTextVersion.objects.filter(document_id=OuterRef('document_id')).order_by('-created_at')
     versions = NlpTextVersion.objects.filter(
-        created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
+        pk__in=allowed, created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
     ).select_related('document').order_by('document__source_key')
     if selected_subject_codes:
         # Missing TPU confirmation is common; avoid loading the entire text corpus for that case.
@@ -127,6 +129,8 @@ def summarize(scope, *, page=1, page_size=20):
                 coverage['integrity_failed'] += 1
             continue
         source = version.source
+        if not version_available(version, allowed):
+            continue
         if (source.get('category', 'jurisprudence') != 'jurisprudence'
                 or source.get('content_kind') in ('precedent_reference', 'publication_excerpt', 'doctrine')
                 or source.get('text_field') in ('tese', 'questao')

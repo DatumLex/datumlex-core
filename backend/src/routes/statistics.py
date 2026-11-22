@@ -23,6 +23,7 @@ from src.db.models import (
     ProcessMovement,
 )
 from src.services.outcomes import CODES, classify, summarize
+from src.services.corpus_publication import published_items, published_references, reviewer
 from src.services.precedent_usage import summarize as summarize_usage
 from src.services.subject_groups import grouped_options, matching_codes
 from src.services.statistics_service import (
@@ -212,10 +213,11 @@ def alignment(request):
         raise InvalidQuery("Unknown responsibility-civil topic")
     params.pop("topic", None)
     _, selected = filtered_processes(params)
+    references_in_scope = published_references()
     topic_reference_ids = None
     if topic:
         topic_reference_ids = list(LegalCorpusTopicMatch.objects.filter(
-            topic=topic, item__category="precedent",
+            topic=topic, item__category="precedent", item__in=published_items(),
         ).values_list("item__provenance__reference_id", flat=True))
         topic_reference_ids = [int(value) for value in topic_reference_ids if str(value).isdigit()]
     if selected["court"] != "TJDFT":
@@ -224,7 +226,7 @@ def alignment(request):
         local_decision__court="TJDFT",
         decision_date__range=[selected["start"], selected["end"]],
         review_state=DecisionAssessment.REVIEW_APPROVED,
-        reference__approved=True,
+        reference__in=references_in_scope,
         reference__reference_type=LegalReference.PRECEDENT,
         reference__source_institution="STJ",
     ).select_related("local_decision__process_dimension", "reference")
@@ -235,6 +237,7 @@ def alignment(request):
     assessments = assessments.order_by()
     period_assessments = DecisionAssessment.objects.filter(
         local_decision__court="TJDFT", decision_date__range=[selected["start"], selected["end"]],
+        reference__in=references_in_scope,
         reference__reference_type=LegalReference.PRECEDENT, reference__source_institution="STJ",
     )
     if selected["subject"]:
@@ -277,7 +280,7 @@ def alignment(request):
         )
         .order_by("-validated_links", "reference__title")[:20]
     )
-    source_theses_query = LegalReference.objects.filter(
+    source_theses_query = references_in_scope.filter(
         reference_type=LegalReference.PRECEDENT,
         source_institution="STJ",
     ).filter(Q(published_at__isnull=True) | Q(published_at__range=[selected["start"], selected["end"]]))
@@ -303,7 +306,8 @@ def alignment(request):
         reference__reference_type=LegalReference.PRECEDENT,
         reference__source_institution="STJ",
     )
-    candidate_scope = candidate_scope.filter(reference_id__in=selected_reference_ids)
+    candidate_scope = (candidate_scope.filter(reference_id__in=selected_reference_ids)
+                       if reviewer(request.user) else candidate_scope.none())
     if selected["subject"]:
         candidate_scope = candidate_scope.filter(local_decision__subjects__code__in=matching_codes(selected["subject"])).distinct()
     matched_by_reference = {
@@ -364,8 +368,7 @@ def alignment(request):
         .select_related("reference").order_by("reference__title", "cited_identifier")[:100]
     )
     references = list(
-        LegalReference.objects.filter(approved=True)
-        .order_by("source_institution", "source_name", "identifier")
+        references_in_scope.order_by("source_institution", "source_name", "identifier")
         .values(
             "reference_type", "source_institution", "identifier", "title", "authority", "source_name",
             "source_url", "source_locator", "approval_reference", "published_at", "imported_at",
@@ -477,10 +480,10 @@ def alignment(request):
                 "display_limit": 100,
             },
             "approved_references": {
-                "precedents": LegalReference.objects.filter(approved=True, reference_type=LegalReference.PRECEDENT, source_institution="STJ").count(),
-                "doctrine": LegalReference.objects.filter(approved=True, reference_type=LegalReference.DOCTRINE, source_institution="BDJur").count(),
+                "precedents": references_in_scope.filter(reference_type=LegalReference.PRECEDENT, source_institution="STJ").count(),
+                "doctrine": references_in_scope.filter(reference_type=LegalReference.DOCTRINE, source_institution="BDJur").count(),
             },
-            "last_corpus_import": LegalReference.objects.filter(approved=True).aggregate(last=Max("imported_at"))["last"],
+            "last_corpus_import": references_in_scope.aggregate(last=Max("imported_at"))["last"],
             "review_queue": {
                 "pending_or_unreviewed": period_assessments.exclude(review_state=DecisionAssessment.REVIEW_APPROVED).count(),
                 "approved_assessments_with_unapproved_reference": period_assessments.filter(

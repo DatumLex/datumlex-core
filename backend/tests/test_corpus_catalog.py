@@ -27,7 +27,8 @@ class CorpusCatalogTests(TestCase):
     def item(self,key,category='jurisprudence',court='TJDFT',topic='dano-moral',day=date(2020,1,1)):
         item=LegalCorpusItem.objects.create(origin_key=key,category=category,court=court,
             title=key,source_name='Teste',source_url='https://www.tjdft.jus.br/',
-            content_kind='full_text',date=day,fingerprint=key)
+            content_kind='full_text',date=day,fingerprint=key,review_status='approved',
+            provenance={'permissions':{'display':'allowed'}})
         LegalCorpusTopicMatch.objects.create(item=item,topic=topic,matched_terms=['dano moral'])
         return item
     def query(self,extra=''):
@@ -42,7 +43,7 @@ class CorpusCatalogTests(TestCase):
         self.assertTrue(result['topics'][0]['has_all_three'])
         result=self.query('&complete_only=true')
         self.assertEqual(result['counts'],{'jurisprudence':1,'precedent':1,'doctrine':1})
-        self.assertEqual(result['items'][0]['review_status'],'pending')
+        self.assertEqual(result['items'][0]['review_status'],'approved')
     def test_dates_and_unknown_period_are_separate(self):
         self.item('known')
         self.item('unknown',day=None)

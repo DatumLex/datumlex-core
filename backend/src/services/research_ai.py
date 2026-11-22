@@ -10,10 +10,12 @@ from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 
 from src.accounts.models import RequestLimit
 from src.nlp.topics import folded
+from src.services.corpus_catalog import CATEGORIES, scoped_items
 from src.services.research import block, number
 
 
@@ -73,19 +75,25 @@ def findings(data):
             {"by_year": dict(sorted(years.items()))},
             block(f"O ano {year} registrou {number(count)} documentos, o maior volume observado." + detail),
         )
-    if any(data["counts"].values()):
-        counts = data["counts"]
+    scope = data["scope"]
+    allowed = scoped_items(scope, scope["undated"], use="gemini").filter(category__in=scope["sources"])
+    if scope["topics"]:
+        allowed = allowed.filter(topic_matches__topic__in=scope["topics"])
+    counts = dict.fromkeys(CATEGORIES, 0)
+    counts.update(dict(allowed.order_by().values_list("category").annotate(total=Count("id", distinct=True))))
+    if any(counts.values()):
         available["catalog"] = (
             counts,
             block(
                 f"O acervo do recorte contém {number(counts['jurisprudence'])} itens de jurisprudência, "
                 f"{number(counts['precedent'])} referências a precedentes e "
-                f"{number(counts['doctrine'])} itens de doutrina. O total pode incluir itens pendentes."
+                f"{number(counts['doctrine'])} itens de doutrina autorizados para esta análise."
             ),
         )
+    source_ids = [int(doc["id"][1:]) for doc in data["sources"] if re.fullmatch(r"F[0-9]+", doc["id"])]
+    permitted = {f"F{pk}" for pk in allowed.filter(pk__in=source_ids).values_list("pk", flat=True)}
     for doc in data["sources"]:
-        # Only approved references with a resolvable link enter the model's selection pool.
-        if doc.get("review_status") == "approved" and doc["url"]:
+        if doc["id"] in permitted and doc["url"]:
             available[doc["id"]] = (
                 {"category": doc["kind"]},
                 block("Fonte revisada recuperada no recorte. Consulte o trecho e a publicação original.", [doc["id"]]),

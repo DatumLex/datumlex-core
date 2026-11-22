@@ -81,7 +81,8 @@ def chat(request):
     except (ValueError, UnicodeError):
         return error("Envie uma pergunta de até 1.200 caracteres.", 400)
     try:
-        data = research.context(research.question_scope(request.GET, question, previous), question, previous)
+        params = research.question_scope(request.GET, question, previous)
+        data = research.context(params, question, previous)
     except InvalidQuery as exc:
         return error(str(exc), 400)
     except DatabaseError:
@@ -96,9 +97,16 @@ def chat(request):
             try:
                 research_ai.claim_request(request.user.pk)
                 paragraphs = research_ai.generate(available, data["scope"], question)
+                if research_ai.findings(data) != available:
+                    raise research_ai.AnalysisUnavailable("As permissões das fontes mudaram durante a consulta.")
                 mode = "gemini"
             except research_ai.AnalysisUnavailable as exc:
+                paragraphs = None
                 notice = f"{exc} Veja a consulta direta ao acervo abaixo."
+                try:
+                    data = research.context(params, question, previous)
+                except DatabaseError:
+                    return error("O banco está indisponível para esta consulta.", 503)
             except DatabaseError:
                 return error("O banco está indisponível para esta consulta.", 503)
     elif use_gemini:

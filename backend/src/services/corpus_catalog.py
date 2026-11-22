@@ -4,8 +4,9 @@ import json
 from datetime import date
 from urllib.parse import urlparse
 from django.db.models import Count, F, Max, Q
-from src.db.models import LegalCorpusItem, LegalCorpusTopicMatch
+from src.db.models import LegalCorpusTopicMatch
 from src.services.statistics_service import InvalidQuery, filtered_processes
+from src.services.corpus_publication import published_items
 from src.nlp.topics import TOPICS, classify, folded
 
 VERSION = 'lexical_candidate_v1'
@@ -26,8 +27,8 @@ def parse_date(value):
 def fingerprint(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False,default=str).encode()).hexdigest()
 
-def scoped_items(scope, include_undated=True):
-    base = LegalCorpusItem.objects.filter(Q(category='doctrine') | Q(court__in=scope['court'].split(',')))
+def scoped_items(scope, include_undated=True, *, use="display"):
+    base = published_items(use).filter(Q(category='doctrine') | Q(court__in=scope['court'].split(',')))
     period = Q(date__range=[scope['start'], scope['end']])
     if include_undated:
         period |= Q(date__isnull=True)
@@ -91,7 +92,7 @@ def inventory(params):
     return {'scope':scope,'topics':topics,'counts':counts,'items':page_rows,
             'pagination':{'page':page,'page_size':size,'total':total,'has_next':page*size<total},
             'classification':{'method':VERSION,'review_status':'pending','note':'Candidatos por termos no texto; nao comprovam vinculo juridico entre fontes.'},
-            'coverage':{'undated':undated,'indexed_at':LegalCorpusItem.objects.aggregate(value=Max('indexed_at'))['value'],
+            'coverage':{'undated':undated,'indexed_at':base.aggregate(value=Max('indexed_at'))['value'],
                         'counting_unit':'unique_source_document','topics_overlap':True,
                         'doctrine_scope':'Bibliografia compartilhada, sem atribuicao a tribunal',
                         'topic_selection':'Dez temas iniciais; nao e ranking nacional de frequencia'}}

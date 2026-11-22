@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from pypdf import PdfReader
 
-from src.db.models import NlpDocument, NlpTextVersion
+from src.db.models import LegalCorpusItem, NlpDocument, NlpSourceObservation, NlpTextVersion
 from src.nlp.contracts import bytes_hash
 from src.services.precedent_usage import extract, summarize
 from tests.access_helpers import authorize_data
@@ -24,9 +24,19 @@ class PrecedentUsageTests(TestCase):
         previous = NlpTextVersion.objects.filter(document=document).order_by('-created_at').first()
         timestamp = max(timezone.now(), previous.created_at + timedelta(microseconds=1)) if previous else timezone.now()
         with patch('django.utils.timezone.now', return_value=timestamp):
-            return NlpTextVersion.objects.create(document=document, text=text,
+            version = NlpTextVersion.objects.create(document=document, text=text,
                 sha256=bytes_hash(text.encode()), fingerprint=bytes_hash((text + str(metadata)).encode()),
                 source=source, representation={})
+        self.publish_fixture(version)
+        NlpSourceObservation.objects.create(document=document, text_version=version,
+            sequence=document.nlpsourceobservation_set.count() + 1, state="available")
+        return version
+
+    def publish_fixture(self, version):
+        LegalCorpusItem.objects.create(origin_key=f"synthetic:{version.pk}", title="Synthetic",
+            category="jurisprudence", court=version.document.court, review_status="approved", fingerprint=version.sha256,
+            provenance={"text_version": str(version.pk), "sha256": version.sha256,
+                        "permissions": {"display": "allowed", "nlp": "allowed"}})
 
     def ementa(self, value):
         return 'EMENTA\n' + value + '\nACÓRDÃO\nRELATÓRIO\nO apelante alega aplicação da Súmula 7/STJ.'
@@ -103,8 +113,9 @@ class PrecedentUsageTests(TestCase):
     def test_tampered_text_and_fixture_sources_are_excluded(self):
         version = self.version(self.ementa('Aplica-se a Súmula 54/STJ.'))
         with patch('django.utils.timezone.now', return_value=version.created_at):
-            NlpTextVersion.objects.create(document=version.document, text=version.text + ' altered',
+            tampered = NlpTextVersion.objects.create(document=version.document, text=version.text + ' altered',
                 sha256=version.sha256, fingerprint='0' * 64, source=version.source, representation={})
+        self.publish_fixture(tampered)
         result = summarize(self.scope)
         self.assertEqual(result['denominator'], 0)
         self.assertEqual(result['coverage']['integrity_failed'], 1)

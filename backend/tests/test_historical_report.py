@@ -112,8 +112,8 @@ class HistoricalReportTests(TestCase):
             source_name="Pangea BNP — pesquisa pública STJ",
             source_url="https://pangeabnp.pdpj.jus.br/pesquisa",
             last_import_run=run,
-            approval_reference="Pendente",
-            approved=False,
+            approval_reference="Fixture sintética",
+            approved=True, source_metadata={"permissions": {"display": "allowed"}},
         )
         LegalReference.objects.create(
             identifier="undated", title="Precedente sem data", source_updated_at="2026-01-01", **defaults
@@ -128,6 +128,8 @@ class HistoricalReportTests(TestCase):
         LegalReference.objects.create(
             identifier="outside", title="Fora do período", published_at="2010-01-01", **defaults
         )
+        LegalReference.objects.create(identifier="pending", title="Minuta restrita",
+                                      **(defaults | {"approved": False}))
         selected = {"court": "STJ", "start": "2016-01-01", "end": "2016-12-31", "subject": 10433}
         section = report_references(selected)
         self.assertEqual(section["dated_count"], 1)
@@ -140,7 +142,7 @@ class HistoricalReportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(response.content)).pages)
         self.assertIn("Precedente sem data", text)
-        self.assertIn("pendente de aprovação jurídica", text)
+        self.assertNotIn("Minuta restrita", text)
         self.assertIn("período não confirmado", text)
         self.assertNotIn("Fora do período", text)
 

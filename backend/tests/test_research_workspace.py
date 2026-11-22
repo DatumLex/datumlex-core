@@ -5,11 +5,13 @@ from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 from zipfile import ZipFile
 
+from pypdf import PdfReader
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 
 from src.accounts.models import Court
-from src.db.models import ExtractionRun, LegalCorpusItem, LegalCorpusTopicMatch
+from src.db.models import ExtractionRun, LegalCorpusItem, LegalCorpusTopicMatch, LegalReference
 from src.etl.loader import load_record
 from src.etl.transformer import normalize
 from tests.test_pipeline import SCOPE, hit
@@ -41,6 +43,7 @@ class ResearchWorkspaceTests(TestCase):
                 excerpt="Trecho indexado " + key,
                 fingerprint=key,
                 source_url="https://example.org/" + key,
+                review_status="approved", provenance={"permissions": {"display": "allowed", "gemini": "allowed"}},
             )
             LegalCorpusTopicMatch.objects.create(item=item, topic=topic)
             cls.refs[key] = f"F{item.pk}"
@@ -128,6 +131,95 @@ class ResearchWorkspaceTests(TestCase):
             self.assertIsNone(z.testzip())
             self.assertIn(b"book", z.read("xl/worksheets/sheet3.xml"))
             self.assertNotIn(b"other_book", z.read("xl/worksheets/sheet3.xml"))
+
+    def test_publication_gate_on_all_categories_and_direct_detail(self):
+        for category in ("jurisprudence", "precedent", "doctrine"):
+            for status, permissions in (
+                ("pending", {"display": "allowed", "gemini": "allowed"}),
+                ("rejected", {"display": "allowed"}),
+                ("unknown", {"display": "allowed"}),
+                ("approved", {}),
+            ):
+                item = LegalCorpusItem.objects.create(origin_key=f"{category}-{status}", category=category,
+                    court="" if category == "doctrine" else "TJDFT", title=f"Hidden {category} {status}",
+                    date=date(2024, 2, 1), source_url="https://example.test/hidden",
+                    review_status=status, provenance={"permissions": permissions}, fingerprint="private")
+                LegalCorpusTopicMatch.objects.create(item=item, topic="negativacao")
+                self.assertEqual(self.client.get(f"/api/corpus/{item.pk}/").status_code, 404)
+                self.assertFalse(self.ask(f"F{item.pk}").json()["sources"])
+        public = LegalCorpusItem.objects.get(origin_key="dec")
+        self.assertEqual(self.client.get(f"/api/corpus/{public.pk}/").json()["id"], self.refs["dec"])
+        other = LegalCorpusItem.objects.get(origin_key="other")
+        self.assertEqual(self.client.get(f"/api/corpus/{other.pk}/").status_code, 404)
+        self.assertEqual(self.client.get("/api/research/" + self.query).json()["counts"],
+                         {"jurisprudence": 1, "precedent": 1, "doctrine": 1})
+        self.assertEqual(self.client.get("/api/research/sources/" + self.query).json()["total"], 3)
+        self.assertEqual(self.client.get("/api/corpus/review/").status_code, 403)
+
+    def test_review_access_is_limited_by_role_and_court(self):
+        own = LegalCorpusItem.objects.get(origin_key="dec")
+        other = LegalCorpusItem.objects.get(origin_key="other")
+        LegalCorpusItem.objects.filter(pk__in=[own.pk, other.pk]).update(review_status="pending")
+        admin = get_user_model().objects.create_user(username="legal-review", approved=True, role="Admin")
+        admin.courts.add(Court.objects.get(pk="TJDFT"))
+        self.client.force_login(admin)
+        self.assertEqual([row["id"] for row in self.client.get("/api/corpus/review/").json()["items"]], [own.pk])
+        self.assertEqual(self.client.get(f"/api/corpus/review/{own.pk}/").json()["review_status"], "pending")
+        self.assertEqual(self.client.get(f"/api/corpus/review/{other.pk}/").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/corpus/{own.pk}/").status_code, 404)
+
+    def test_linked_reference_revocation_hides_public_catalog_item(self):
+        item = LegalCorpusItem.objects.get(origin_key="precedent")
+        reference = LegalReference.objects.create(reference_type="precedent", source_institution="TJDFT",
+            identifier="synthetic-precedent", source_name="Test", title=item.title, source_url=item.source_url,
+            approved=True, source_metadata={"permissions": {"display": "allowed"}})
+        item.provenance["reference_id"] = reference.pk
+        item.save(update_fields=["provenance"])
+        url = f"/api/corpus/{item.pk}/"
+        self.assertEqual(self.client.get(url).status_code, 200)
+        reference.approved = False
+        reference.save(update_fields=["approved"])
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_pending_never_enters_exports_even_if_grants_are_present(self):
+        LegalCorpusItem.objects.filter(origin_key="dec").update(review_status="pending", title="Private draft title")
+        export = "/api/research/export/" + self.query
+        pdf = self.client.get(export + "&format=pdf")
+        self.assertEqual(pdf.status_code, 200)
+        pdf_text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(pdf.content)).pages)
+        self.assertNotIn("Private draft title", pdf_text)
+        self.assertIn("Trecho indexado book", pdf_text)
+        xlsx = self.client.get(export + "&format=xlsx")
+        self.assertEqual(xlsx.status_code, 200)
+        with ZipFile(io.BytesIO(xlsx.content)) as sheets:
+            rows = sheets.read("xl/worksheets/sheet3.xml")
+            self.assertNotIn(b"Private draft title", rows)
+            self.assertIn(b"book", rows)
+
+    @override_settings(RESEARCH_GEMINI_ENABLED=True, GEMINI_API_KEY="test")
+    def test_pending_and_display_only_sources_never_reach_provider(self):
+        LegalCorpusItem.objects.filter(origin_key="dec").update(review_status="pending")
+        LegalCorpusItem.objects.filter(origin_key="precedent").update(provenance={"permissions": {"display": "allowed"}})
+        with patch("src.services.research_ai.urlopen") as provider:
+            provider.return_value = self.gemini_response({"findings": [self.refs["book"]]})
+            answer = self.ask("Há fontes sobre negativação?", use_gemini=True).json()
+            self.assertEqual(answer["mode"], "gemini")
+            request = json.loads(provider.call_args.args[0].data)
+            findings = json.loads(request["contents"][0]["parts"][0]["text"])["findings"]
+            self.assertEqual(set(findings), {"catalog", self.refs["book"]})
+            self.assertEqual(findings["catalog"], {"jurisprudence": 0, "precedent": 0, "doctrine": 1})
+
+    @override_settings(RESEARCH_GEMINI_ENABLED=True, GEMINI_API_KEY="test")
+    def test_revocation_during_provider_request_suppresses_the_source(self):
+        def revoke(_request, timeout):
+            LegalCorpusItem.objects.filter(origin_key="book").update(review_status="rejected")
+            return self.gemini_response({"findings": [self.refs["book"]]})
+
+        with patch("src.services.research_ai.urlopen", side_effect=revoke):
+            answer = self.ask("Quais fontes de doutrina?", use_gemini=True).json()
+        self.assertEqual(answer["mode"], "local")
+        self.assertIn("permissões", answer["notice"])
+        self.assertNotIn(self.refs["book"], {item["id"] for item in answer["sources"]})
 
     @staticmethod
     def gemini_response(output, finish="STOP"):

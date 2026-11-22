@@ -16,6 +16,7 @@ from django.utils import timezone
 from src.db.models import LegalNarrativeDraft
 from src.nlp.contracts import fingerprint
 from src.services import nlp_dashboard as snapshots
+from src.services.corpus_publication import current_evidence
 
 CONTRACT = 'legal-narrative/1.0'
 PROMPT_VERSION = 'grounded-legal-pt/1.0'
@@ -36,10 +37,11 @@ class ChatUnavailable(Exception):
 
 def sources(record, question):
     items = record.payload.get('items', [])
+    permitted = current_evidence(items, use="gemini")
     words = set(re.findall(r'\w{3,}', question.casefold()))
     candidates = []
     for item in items:
-        if item.get('review_status') != 'approved' or item.get('source_state') in ('restricted', 'removed'):
+        if item['id'] not in permitted or item.get('source_state') != 'available':
             continue
         passages = [s['text'] for s in item['effective']['segments'] if s.get('text')]
         if not passages:
@@ -149,7 +151,11 @@ def generate(actor, snapshot_id, question, consent, parent_id=None):
     output, usage, model = invoke(record.payload['context'], question.strip(), retrieved)
     checked = validate(output, retrieved)
     # Access and quality can be revoked while the provider is responding.
-    snapshots.read(actor, snapshot_id)
+    current = snapshots.read(actor, snapshot_id)
+    selected_ids = {item["id"] for item in retrieved}
+    if set(current_evidence([item for item in current.payload["items"] if item["id"] in selected_ids],
+                            use="gemini")) != selected_ids:
+        raise PermissionError("gemini_permission_revoked")
     payload = {'contract_version': CONTRACT, 'prompt_version': PROMPT_VERSION,
         'generation_id': str(uuid4()), 'snapshot_sha256': record.sha256,
         'context': record.payload['context'], 'sources': retrieved, **checked,
