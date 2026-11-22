@@ -451,3 +451,18 @@ class LegalNarrativeDraft(models.Model):
     user_conclusions = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     approved_at = models.DateTimeField(null=True)
+
+
+class AutomationConfiguration(models.Model):
+    """One installation-wide schedule, durable across web-service restarts."""
+    config = models.JSONField(default=dict)
+    enabled = models.BooleanField(default=False)
+    requested = models.BooleanField(default=False)
+    next_run_at = models.DateTimeField(null=True, blank=True)
+    runner_seen_at = models.DateTimeField(null=True, blank=True)
+    last_run = models.JSONField(default=dict)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(id=1), name='automation_single_configuration')]
