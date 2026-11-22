@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { getData } from './api'
+import { loadNotebook, notebookKey, saveNotebook } from './notebookStorage'
 import App from './App'
 import './research.css'
 
@@ -338,11 +339,13 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
 }
 
 export default function ResearchWorkspace({ session }) {
+  const savedKey = notebookKey(session.id, session.courts)
   const [page, setPage] = useState('search'),
     [filters, setFilters] = useState(() => defaults(session.courts))
   const [drawer, setDrawer] = useState(null),
-    [saved, setSaved] = useState({}),
+    [notebook, setNotebook] = useState(() => loadNotebook(savedKey)),
     [threads, setThreads] = useState({})
+  const saved = notebook.items
   const [request, setRequest] = useState({}),
     [retry, setRetry] = useState(0),
     [subjects, setSubjects] = useState({})
@@ -409,6 +412,12 @@ export default function ResearchWorkspace({ session }) {
   }
   function open(doc) {
     setDrawer({ doc })
+  }
+  function toggleSaved(doc) {
+    const items = { ...saved }
+    if (items[doc.id]) delete items[doc.id]
+    else items[doc.id] = doc
+    setNotebook({ items, error: saveNotebook(savedKey, items) })
   }
   async function ask(raw) {
     const q = raw.trim()
@@ -535,7 +544,9 @@ export default function ResearchWorkspace({ session }) {
           </>
         ) : page === 'notebook' ? (
           <section className="rw-card">
-            <h2>Fontes guardadas nesta sessão</h2>
+            <h2>Fontes guardadas no caderno</h2>
+            <p className="rw-note">As fontes ficam salvas neste navegador para sua conta, mesmo após recarregar a página.</p>
+            {notebook.error && <p role="alert">{notebook.error}</p>}
             {Object.values(saved).length ? (
               Object.values(saved).map((d) => <SourceRow key={d.id} doc={d} onOpen={open} />)
             ) : (
@@ -717,18 +728,12 @@ export default function ResearchWorkspace({ session }) {
                 )}
                 <button
                   className="secondary-button"
-                  onClick={() =>
-                    setSaved((current) => {
-                      const next = { ...current }
-                      if (next[selected.id]) delete next[selected.id]
-                      else next[selected.id] = selected
-                      return next
-                    })
-                  }
+                  onClick={() => toggleSaved(selected)}
                 >
                   {saved[selected.id] ? 'Retirar do caderno' : 'Guardar no caderno'}
                 </button>
               </div>
+              {notebook.error && <p role="alert">{notebook.error}</p>}
             </>
           ) : drawer.type === 'filter' ? (
             <Filters
