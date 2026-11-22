@@ -72,10 +72,17 @@ class PangeaImportScopeTests(TestCase):
         self.assertFalse(reference.approved)
         self.assertIn('orgao=tjdf', reference.source_url)
         self.assertIn('url', reference.related_decisions[0])
-        report = report_references({'court':'TJSP','subject':None,
-                                   'start':'2016-01-01','end':'2026-12-31'})
+        scope = {'court':'TJSP','subject':None,'start':'2016-01-01','end':'2026-12-31'}
+        # Imported references remain excluded from public reports until explicitly approved for display.
+        self.assertIsNone(report_references(scope))
+        tjsp_ref = LegalReference.objects.get(identifier='sao-paulo')
+        tjsp_ref.approved = True
+        tjsp_ref.source_metadata = {**tjsp_ref.source_metadata, 'permissions': {'display': 'allowed'}}
+        tjsp_ref.save(update_fields=['approved', 'source_metadata'])
+        report = report_references(scope)
         self.assertEqual(report['inventory_count'], 1)
         self.assertTrue(report['items'][0]['title'].startswith('TJSP'))
+        self.assertIsNone(report_references({**scope, 'court': 'TJDFT'}))
 
     @patch('src.db.management.commands.sync_pangea.PangeaPublicSearchClient')
     def test_start_page_and_next_page_are_explicit(self, mock):
