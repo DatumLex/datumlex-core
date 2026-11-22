@@ -6,6 +6,7 @@ from src.routes import research
 
 urlpatterns = [
     path("api/research/", research.panel),
+    path("api/research/overview/", research.overview),
     path("api/research/sources/", research.sources),
     path("api/research/chat/", research.chat),
     path("api/research/export/", research.export),

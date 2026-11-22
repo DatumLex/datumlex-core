@@ -24,6 +24,14 @@ def panel(request):
 
 
 @endpoint
+def overview(request):
+    # Listing the corpus and opening the dashboard must not scan full NLP texts.
+    # The complete analysis remains on panel, chat, and export.
+    data = research.context(request.GET, include_usage=False)
+    return {**data, "summary": research.local_answer(data)}
+
+
+@endpoint
 def sources(request):
     params = request.GET.copy()
 
