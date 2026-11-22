@@ -1,0 +1,16 @@
+.automation-panel { max-width: 1180px; }
+.automation-status, .automation-form fieldset { background: #fff; border: 1px solid #dcd8cc; border-radius: 8px; padding: 22px; margin: 18px 0; }
+.automation-status p, .automation-form p { color: #5b6670; font-size: 14px; line-height: 1.6; }
+.automation-form legend { color: #16364a; font-size: 18px; font-weight: 700; padding: 0 8px; }
+.automation-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.automation-options label, .automation-subjects label { display: flex; align-items: flex-start; gap: 8px; }
+.automation-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; }
+.automation-fields label { display: flex; flex-direction: column; gap: 8px; color: #16364a; }
+.automation-fields input { border: 1px solid #ccc; border-radius: 5px; padding: 10px; font: inherit; }
+.automation-subjects { max-height: 240px; overflow: auto; display: grid; gap: 10px; margin-top: 12px; }
+.automation-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
+.automation-form input[type=checkbox] { accent-color: #1f4e5f; }
+.automation-options small { display: block; font-size: 12px; color: #5b6670; margin-top: 5px; }
+.automation-advanced { background: #fff; border: 1px solid #dcd8cc; border-radius: 8px; padding: 20px; margin: 18px 0; }
+.automation-advanced summary { color: #16364a; cursor: pointer; font-weight: 700; margin-bottom: 14px; }
+.automation-summary { border-left: 3px solid #bba13f; padding: 12px 18px; margin-bottom: 18px; background: #f3f5f2; }

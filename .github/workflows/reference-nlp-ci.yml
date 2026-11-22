@@ -27,6 +27,8 @@ jobs:
             tests: tests.test_reference_nlp tests.test_nlp_computation_cache
           - check: Test 3 - NLP evidence integrity
             tests: tests.test_nlp_evidence tests.test_ci_evidence_integrity tests.test_legal_chat
+          - check: Server automation
+            tests: tests.test_server_automation
     services:
       postgres:
         image: postgres:17-alpine
