@@ -3,6 +3,7 @@ import json
 from itertools import chain
 from xml.sax.saxutils import escape
 
+from django.conf import settings
 from django.db import DatabaseError
 from django.db.models import F, Q
 from django.http import HttpResponse, JsonResponse
@@ -269,6 +270,8 @@ def export(request):
         buffer = io.BytesIO()
         styles = getSampleStyleSheet()
         story = [Paragraph("DatumLex · Síntese da pesquisa", styles["Title"])]
+        if settings.SYNTHETIC_PREVIEW:
+            story.append(Paragraph("Dados sintéticos. Os indicadores não representam estatísticas reais.", styles["Heading2"]))
         for row in scope_rows + metrics_rows + summary:
             story.extend([Paragraph(escape(" · ".join(row)), styles["BodyText"]), Spacer(1, 5)])
         for ref_id, title, origin, day, excerpt, url, review in refs:

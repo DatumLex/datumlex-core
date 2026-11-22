@@ -5,6 +5,8 @@ import uuid
 from datetime import timedelta
 from functools import wraps
 
+from django.conf import settings
+
 from django.contrib.auth import login as session_login
 from django.contrib.auth import logout as session_logout
 from django.contrib.auth import update_session_auth_hash
@@ -139,6 +141,8 @@ def csrf(request):
 
 @api(["POST"])
 def register(request):
+    if settings.SYNTHETIC_PREVIEW:
+        raise PermissionError("O cadastro está fechado nesta demonstração.")
     throttle(request, "register", maximum=20)
     if set(request.payload) - {"name", "email", "cpf", "password"}:
         raise ValueError("O cadastro público aceita somente nome, CPF, e-mail e senha.")

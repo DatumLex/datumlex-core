@@ -67,7 +67,12 @@ def health(request):
         cursor.execute("SELECT 1")
     # Verify that migrations have actually been applied too.
     FactProcess.objects.exists()
-    return {"status": "ok", "service": "datumlex-backend", "database": connection.vendor}
+    health = {"status": "ok", "service": "datumlex-backend", "database": connection.vendor}
+    if settings.SYNTHETIC_PREVIEW:
+        from src.db.sampling_models import CivilSamplingCohort
+        proof = CivilSamplingCohort.objects.get(name=settings.RESEARCH_CIVIL_COHORT).definition["rehearsal"]
+        health.update(synthetic=True, revision=settings.PREVIEW_REVISION, rehearsal=proof)
+    return health
 
 
 @endpoint

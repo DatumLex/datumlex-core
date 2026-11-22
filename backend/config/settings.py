@@ -81,6 +81,21 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS)).split(",")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
 RESEARCH_CIVIL_COHORT = os.environ.get("RESEARCH_CIVIL_COHORT", "").strip()
+SYNTHETIC_PREVIEW = os.environ.get("DATUMLEX_SYNTHETIC_PREVIEW") == "true"
+PREVIEW_REVISION = os.environ.get("DATUMLEX_PREVIEW_REVISION", "")
+if SYNTHETIC_PREVIEW:
+    if (
+        DEBUG
+        or os.environ.get("RAILWAY_ENVIRONMENT_NAME") != "recovery-preview"
+        or os.environ.get("RAILWAY_SERVICE_NAME") != "datumlex-api-preview"
+        or not database_url
+        or DATABASES["default"]["HOST"] != "postgres.railway.internal"
+        or DATABASES["default"]["NAME"] != "datumlex_preview_4f_synthetic"
+        or RESEARCH_CIVIL_COHORT != "civil-synthetic-4f"
+        or os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() != "false"
+    ):
+        raise ValueError("Invalid isolated synthetic preview configuration")
 RESEARCH_GEMINI_ENABLED = os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() == "true"
 RESEARCH_GEMINI_MODEL = os.environ.get("RESEARCH_GEMINI_MODEL", "gemini-3.5-flash-lite")
 PANGEA_SEARCH_BASE_URL = os.environ.get(

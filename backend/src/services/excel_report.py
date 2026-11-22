@@ -5,6 +5,8 @@ import re
 from xml.sax.saxutils import escape, quoteattr
 from zipfile import ZipFile, ZIP_DEFLATED
 
+from django.conf import settings
+
 NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 INVALID_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -13,6 +15,8 @@ XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 def xml_bytes(content):
     return (XML_HEADER + content).encode("utf-8")
 MAX_ROWS = 1_048_576
+
+
 
 
 def column_name(index):
@@ -33,6 +37,10 @@ def cell(value, reference):
 
 
 def workbook(sheets):
+    if settings.SYNTHETIC_PREVIEW:
+        sheets = [*sheets, ("Demonstração", [
+            ["Natureza dos dados"], ["Dados sintéticos. Os indicadores não representam estatísticas reais."],
+        ])]
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
         overrides = []
