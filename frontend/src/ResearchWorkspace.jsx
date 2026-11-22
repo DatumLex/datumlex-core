@@ -351,8 +351,10 @@ export default function ResearchWorkspace({ session }) {
   const live = useRef(new Map())
   const params = pack(filters),
     key = new URLSearchParams(params).toString()
-  const data = request.key === key ? request.data : null,
-    error = request.key === key ? request.error : ''
+  const resource = page === 'precedents' ? 'research' : 'research/overview'
+  const requestKey = resource + '?' + key
+  const data = request.key === requestKey ? request.data : null,
+    error = request.key === requestKey ? request.error : ''
   const thread = threads[key] || emptyThread
   const navRef = useRef(null)
   useEffect(() => {
@@ -364,15 +366,22 @@ export default function ResearchWorkspace({ session }) {
   }, [])
   useEffect(() => {
     const controller = new AbortController()
-    getData('research', Object.fromEntries(new URLSearchParams(key)), controller.signal)
+    getData(resource, Object.fromEntries(new URLSearchParams(key)), controller.signal)
+      .catch((err) => {
+        // Frontend and API roll out independently; support the previous API
+        // during the short window before the new endpoint becomes available.
+        if (resource === 'research/overview' && err.status === 404)
+          return getData('research', Object.fromEntries(new URLSearchParams(key)), controller.signal)
+        throw err
+      })
       .then((data) => {
-        if (!controller.signal.aborted) setRequest({ key, data })
+        if (!controller.signal.aborted) setRequest({ key: requestKey, data })
       })
       .catch((err) => {
-        if (!controller.signal.aborted) setRequest({ key, error: err.message })
+        if (!controller.signal.aborted) setRequest({ key: requestKey, error: err.message })
       })
     return () => controller.abort()
-  }, [key, retry])
+  }, [key, resource, requestKey, retry])
   const courtParam = params.court
   useEffect(() => {
     const c = new AbortController()
@@ -533,7 +542,7 @@ export default function ResearchWorkspace({ session }) {
               <p>Abra uma fonte e escolha “Guardar no caderno”.</p>
             )}
           </section>
-        ) : !data ? (
+        ) : !data && page !== 'corpus' ? (
           <div className="rw-card" role={error ? 'alert' : 'status'}>
             {error || 'Consultando a base do DatumLex…'}{' '}
             {error && (
