@@ -10,6 +10,7 @@ from src.db.civil_subjects import branch_codes
 from src.db.court_catalog import ACTIVE_COURTS
 from src.db.models import ExtractionRun, FactProcessSubject, LegalCorpusTopicMatch
 from src.db.sampling_models import CivilSampleMember, CivilSamplingCohort
+from src.etl.cross_source_matching import normalize_cnj_identifier
 from src.nlp.topics import TOPICS, classify, folded
 from src.services.analytical_context import OUTCOMES
 from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
@@ -62,7 +63,7 @@ def options(params, name, choices, default=()):
 
 
 def selection(params):
-    allowed = {"court", "start", "end", "subject", "topics", "sources", "outcomes", "degree", "undated"}
+    allowed = {"court", "start", "end", "subject", "topics", "sources", "outcomes", "degree", "undated", "cnj"}
     if set(params) - allowed or any(len(params.getlist(k)) != 1 for k in params):
         raise InvalidQuery("Filtro de pesquisa desconhecido ou repetido.")
     process_filters = params.copy()
@@ -72,11 +73,18 @@ def selection(params):
     subjects = list(dict.fromkeys(filter(None, params.get("subject", "").split(","))))
     if len(subjects) > 50 or any(not re.fullmatch(r"[1-9][0-9]{0,8}", code) for code in subjects):
         raise InvalidQuery("Assunto CNJ inválido.")
-    subjects = sorted(set().union(*(branch_codes(int(code)) for code in subjects)))
+    selected_subjects = sorted(map(int, subjects))
+    subjects = sorted(set().union(*(branch_codes(code) for code in selected_subjects)))
     if subjects:
         query = query.filter(
             Exists(FactProcessSubject.objects.filter(process_id=OuterRef("pk"), subject__code__in=subjects))
         )
+    cnj = params.get("cnj", "").strip()
+    if cnj:
+        if not re.fullmatch(r"[0-9]{20}|[0-9]{7}-[0-9]{2}\.[0-9]{4}\.[0-9]\.[0-9]{2}\.[0-9]{4}", cnj):
+            raise InvalidQuery("Informe os 20 dígitos do número CNJ.")
+        cnj = normalize_cnj_identifier(cnj)
+        query = query.filter(process_dimension__number_process=cnj)
     degrees = options(params, "degree", DEGREES)
     if degrees:
         query = query.filter(degree_dimension__code__in=degrees)
@@ -97,7 +105,8 @@ def selection(params):
             result__name__in=[v if v != "outside_appellate_degree" else "outside_degree" for v in outcomes]
         )
     scope.update(
-        subject_codes=subjects, topics=topics, sources=sources, outcomes=outcomes, degree=degrees, undated=undated == "true",
+        selected_subject_codes=selected_subjects, subject_codes=subjects, cnj=cnj,
+        topics=topics, sources=sources, outcomes=outcomes, degree=degrees, undated=undated == "true",
         cohort=cohort or None
     )
     indexed = scoped_items(scope, scope["undated"]).filter(category__in=sources)
@@ -165,7 +174,7 @@ def context(params, question="", previous=()):
         "scope": scope,
         "metrics": values,
         "merit_baseline": summarize(merit_query) if set(scope["outcomes"]) != set(OUTCOMES) else {
-            key: values[key] for key in ("binary_denominator", "granted", "denied", "grant_rate", "denial_rate")
+            key: values[key] for key in ("binary_denominator", "granted", "denied", "grant_rate", "denial_rate", "excluded")
         },
         "history": instance_series(query),
         "counts": counts,

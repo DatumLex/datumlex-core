@@ -1,5 +1,6 @@
 import io
 import json
+from itertools import chain
 from xml.sax.saxutils import escape
 
 from django.db import DatabaseError
@@ -27,6 +28,13 @@ def coverage(request):
     return {"coverage": research.coverage(scope)}
 
 
+def process_rows(query):
+    return query.order_by("time__date", "pk").values_list(
+        "pk", "process_dimension__number_process", "court", "time__date", "degree_dimension__code",
+        "result__name", "organization__name", "process_class__name",
+    )
+
+
 @endpoint
 def processes(request):
     params = request.GET.copy()
@@ -38,10 +46,7 @@ def processes(request):
         raise InvalidQuery("Página inválida.")
     query, _, _, _ = research.selection(params)
     offset = (page - 1) * 12
-    rows = query.order_by("time__date", "pk").values_list(
-        "pk", "process_dimension__number_process", "court", "time__date", "degree_dimension__code",
-        "result__name", "organization__name", "process_class__name",
-    )[offset:offset + 12]
+    rows = process_rows(query)[offset:offset + 12]
     return {"total": query.count(), "items": [
         {"id": pk, "number": number, "court": court, "filing": filing, "degree": degree,
          "outcome": "outside_appellate_degree" if outcome == "outside_degree" else outcome,
@@ -152,13 +157,62 @@ def chat(request):
     )
 
 
+SOURCE_LABELS = {
+    "datajud": "DataJud", "jurisprudence": "Jurisprudência", "precedent": "Precedentes", "doctrine": "Doutrina",
+}
+OUTCOME_LABELS = {
+    "granted": "Provido", "denied": "Desprovido", "partial": "Parcial",
+    "not_admitted": "Não admitido", "partial_knowledge": "Conhecido em parte",
+    "ambiguous": "Ambíguo", "unknown": "Sem resultado", "outside_appellate_degree": "Fora do grau recursal",
+    "outside_degree": "Fora do grau recursal",
+}
+
+
+def export_scope(scope):
+    return [
+        ["Tribunais", scope["court"]],
+        ["Período", f"{scope['start']} a {scope['end']}"],
+        ["Datas", "DataJud por ajuizamento. Acervo por julgamento ou publicação."],
+        ["Assuntos CNJ selecionados", ", ".join(map(str, scope["selected_subject_codes"])) or "Todos"],
+        ["Assuntos CNJ", ", ".join(map(str, scope["subject_codes"])) or "Todos"],
+        ["Regra TPU", "Descendentes incluídos. União dos ramos sem duplicar o documento."],
+        ["Graus DataJud", ", ".join(scope["degree"]) or "Todos"],
+        ["Temas do acervo e ementas", ", ".join(research.TOPIC_LABELS[k] for k in scope["topics"]) or "Todos"],
+        ["Fontes", ", ".join(SOURCE_LABELS[k] for k in scope["sources"])],
+        ["Resultados DataJud", ", ".join(OUTCOME_LABELS[k] for k in scope["outcomes"])],
+        ["Amostra DataJud", scope["cohort"] or "Base carregada"],
+        ["Cobertura", "Parcial. Descreve o lote disponível."],
+        ["Referências sem data", "Incluídas" if scope["undated"] else "Excluídas"],
+        ["Número CNJ exato", scope["cnj"] or "Todos"],
+    ]
+
+
 @require_GET
 def export(request):
     params = request.GET.copy()
     formats = params.pop("format", [])
     if formats not in (["pdf"], ["xlsx"]):
         return error("Formato inválido.", 400)
+    content = params.pop("content", ["summary"])
+    if content not in (["summary"], ["records"]) or (content == ["records"] and formats != ["xlsx"]):
+        return error("Conteúdo inválido para este formato.", 400)
     try:
+        if content == ["records"]:
+            query, scope, _, _ = research.selection(params)
+            header = ["Número CNJ", "Tribunal", "Classe", "Grau", "Órgão", "Ajuizamento", "Resultado"]
+            rows = (
+                [number, court, cls, degree, org, str(day), OUTCOME_LABELS.get(outcome, outcome)]
+                for _, number, court, day, degree, outcome, org, cls in process_rows(query).iterator()
+            )
+            try:
+                book = workbook([("Processos", chain([header], rows)), ("Recorte", export_scope(scope))])
+            except ValueError as exc:
+                return error(str(exc), 400)
+            response = HttpResponse(
+                book, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = 'attachment; filename="datumlex-registros-datajud.xlsx"'
+            return response
         data = research.context(params)
         paragraphs = research.local_answer(data)
     except InvalidQuery as exc:
@@ -166,21 +220,16 @@ def export(request):
     except DatabaseError:
         return error("O banco está indisponível para exportação.", 503)
     scope = data["scope"]
-    scope_rows = [
-        ["Tribunais", scope["court"]],
-        ["Período", f"{scope['start']} a {scope['end']}"],
-        ["Assuntos CNJ", ", ".join(map(str, scope["subject_codes"])) or "Todos"],
-        ["Graus DataJud", ", ".join(scope["degree"]) or "Todos"],
-        ["Temas", ", ".join(data["topics"][k] for k in scope["topics"]) or "Todos"],
-        ["Fontes", ", ".join(scope["sources"])],
-        ["Resultados DataJud", ", ".join(scope["outcomes"])],
-        ["Amostra DataJud", scope["cohort"] or "Base carregada (cobertura parcial)"],
-        ["Referências sem data", "Incluídas" if scope["undated"] else "Excluídas"],
-    ]
+    scope_rows = export_scope(scope)
+    baseline = data["merit_baseline"]
     metrics_rows = [
         ["Registros DataJud", str(data["metrics"]["process_records"])],
         ["Números CNJ distintos", str(data["metrics"]["distinct_process_numbers"])],
-        ["Resultados integrais antes do filtro de resultado", str(data["merit_baseline"]["binary_denominator"])],
+        ["Resultados integrais antes do filtro de resultado", str(baseline["binary_denominator"])],
+        ["Providos na base elegível", str(baseline["granted"])],
+        ["Desprovidos na base elegível", str(baseline["denied"])],
+        *[[f"Excluídos da base binária ({OUTCOME_LABELS[k]})", str(n)] for k, n in baseline["excluded"].items() if n],
+        ["Interpretação", "A proporção descreve os documentos elegíveis da amostra e não estima a chance de êxito judicial."],
         ["Jurisprudência no índice do recorte", str(data["counts"]["jurisprudence"])],
         ["Precedentes no índice do recorte", str(data["counts"]["precedent"])],
         ["Doutrina no índice do recorte", str(data["counts"]["doctrine"])],

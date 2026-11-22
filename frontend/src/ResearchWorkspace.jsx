@@ -21,7 +21,7 @@ import './research.css'
 
 const api = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 const pages = {
-  search: ['Pesquisa', 'Painel de pesquisa', Search],
+  search: ['Pesquisa', 'Pesquisa processual', Search],
   chat: ['Chat da pesquisa', 'Chat da pesquisa', MessageSquare],
   corpus: ['Acervo por assunto', 'Acervo por assunto', BookOpen],
   precedents: ['Precedentes e teses', 'Precedentes e teses', Scale],
@@ -31,7 +31,7 @@ const pages = {
 }
 const sourceLabels = {
   datajud: 'DataJud',
-  jurisprudence: 'Decisões',
+  jurisprudence: 'Jurisprudência',
   precedent: 'Precedentes',
   doctrine: 'Doutrina',
 }
@@ -67,6 +67,7 @@ const today = () =>
   }).format(new Date())
 const defaults = (courts) => ({
   court: [...courts].sort(),
+  cnj: '',
   topics: [],
   subject: ['10431'],
   sources: Object.keys(sourceLabels),
@@ -91,7 +92,7 @@ const emptyThread = { turns: [], draft: '', busy: false, error: '' }
 
 function Choice({ name, title, options, draft, setDraft }) {
   return (
-    <fieldset>
+    <fieldset className={name === 'subject' ? 'rw-subject-options' : undefined}>
       <legend>{title}</legend>
       <div className="rw-choices">
         {Object.entries(options).map(([v, label]) => (
@@ -116,6 +117,11 @@ function Choice({ name, title, options, draft, setDraft }) {
 function Filters({ applied, courts, topics, subjects, onApply, onClose }) {
   const [draft, setDraft] = useState(applied)
   const [error, setError] = useState('')
+  const [tpuSearch, setTpuSearch] = useState('')
+  const normalize = (value) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  const subjectOptions = Object.fromEntries(Object.entries(subjects).filter(([code, name]) =>
+    draft.subject.includes(code) || normalize(name).includes(normalize(tpuSearch.trim()))
+  ))
   function submit(e) {
     e.preventDefault()
     if (
@@ -156,16 +162,27 @@ function Filters({ applied, courts, topics, subjects, onApply, onClose }) {
           </label>
         ))}
       </div>
-      <Choice name="topics" title="Temas do acervo e das ementas" options={topics} {...{ draft, setDraft }} />
-      <Choice
-        name="subject"
-        title="Responsabilidade civil e subassuntos CNJ dos indicadores"
-        options={subjects}
-        {...{ draft, setDraft }}
-      />
-      <Choice name="sources" title="Fontes" options={sourceLabels} {...{ draft, setDraft }} />
       <Choice name="degree" title="Grau DataJud (sem seleção: todos)" options={degrees} {...{ draft, setDraft }} />
-      <Choice name="outcomes" title="Resultados do DataJud" options={results} {...{ draft, setDraft }} />
+      <label className="rw-tpu-search">
+        Localizar assunto TPU
+        <input type="search" value={tpuSearch} onChange={(e) => setTpuSearch(e.target.value)} placeholder="Nome ou código" />
+      </label>
+      <p className="rw-note">O assunto-pai abrange os descendentes. Os ramos selecionados entram por união, contando cada documento uma vez.</p>
+      {draft.subject.includes('10431') && draft.subject.length > 1 && (
+        <p className="rw-note">Para restringir a consulta aos subassuntos escolhidos, desmarque o assunto-pai 10431.</p>
+      )}
+      <Choice name="subject" title="Assuntos CNJ dos processos (TPU)" options={subjectOptions} {...{ draft, setDraft }} />
+      {Object.keys(subjects).length > 0 && Object.keys(subjectOptions).length === 0 && <p>Nenhum assunto encontrado.</p>}
+      <details>
+        <summary>Resultados do DataJud</summary>
+        <Choice name="outcomes" title="Classificação do resultado" options={results} {...{ draft, setDraft }} />
+        <p className="rw-note">A seleção muda os documentos exibidos. A base da taxa é calculada antes deste filtro.</p>
+      </details>
+      <Choice name="topics" title="Temas do acervo e das ementas" options={topics} {...{ draft, setDraft }} />
+      <p className="rw-note">Os temas editoriais filtram fontes e vínculos em ementas. Para restringir processos DataJud, use os assuntos CNJ.</p>
+      {draft.topics.includes('transito') && <p className="rw-note">Trânsito na TPU · 10435 (dano moral) e 10441 (dano material).</p>}
+      {draft.topics.includes('saude') && <p className="rw-note">Serviços de saúde na TPU · 10434 (dano moral) e 10440 (dano material). Erro Médico (40) é um assunto distinto, disponível na Análise detalhada.</p>}
+      <Choice name="sources" title="Coleções na pesquisa" options={sourceLabels} {...{ draft, setDraft }} />
       <label>
         <input
           type="checkbox"
@@ -175,11 +192,11 @@ function Filters({ applied, courts, topics, subjects, onApply, onClose }) {
         Incluir fontes do acervo sem data
       </label>
       {error && <p role="alert">{error}</p>}
-      <div className="rw-actions">
+      <div className="rw-actions rw-filter-actions">
         <button type="submit" className="apply-button">
           Aplicar filtros
         </button>
-        <button type="button" className="secondary-button" onClick={() => setDraft(defaults(courts))}>
+        <button type="button" className="secondary-button" onClick={() => setDraft({ ...defaults(courts), cnj: applied.cnj })}>
           Restaurar filtros
         </button>
       </div>
@@ -360,6 +377,7 @@ export default function ResearchWorkspace({ session }) {
     [retry, setRetry] = useState(0),
     [subjects, setSubjects] = useState({})
   const [catalogCategory, setCatalogCategory] = useState(''),
+    [cnjDraft, setCnjDraft] = useState(''),
     [exportError, setExportError] = useState('')
   const live = useRef(new Map())
   const params = pack(filters),
@@ -458,10 +476,10 @@ export default function ResearchWorkspace({ session }) {
       live.current.delete(key)
     }
   }
-  async function exportReport(format) {
+  async function exportReport(format, content = 'summary') {
     setExportError('')
     try {
-      const r = await fetch(api + '/research/export/?' + key + '&format=' + format, {
+      const r = await fetch(api + '/research/export/?' + key + '&format=' + format + '&content=' + content, {
         credentials: 'include',
       })
       if (r.status === 401) window.dispatchEvent(new Event('datumlex:session-ended'))
@@ -469,7 +487,7 @@ export default function ResearchWorkspace({ session }) {
       const url = URL.createObjectURL(await r.blob()),
         a = document.createElement('a')
       a.href = url
-      a.download = 'datumlex-pesquisa-' + filters.end + '.' + format
+      a.download = 'datumlex-' + (content === 'records' ? 'registros-datajud' : 'sintese') + '-' + filters.end + '.' + format
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 10000)
       setDrawer(null)
@@ -486,6 +504,12 @@ export default function ResearchWorkspace({ session }) {
     <div className="rw-shell">
       <aside className="rw-rail">
         <div className="rw-rail-title">Pesquisa jurídica</div>
+        <div className="rw-mobile-nav">
+          <label htmlFor="rw-section">Seção</label>
+          <select id="rw-section" value={page} onChange={(e) => navigate(e.target.value)}>
+            {railItems.map(([id, [label]]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </div>
         <nav aria-label="Seções da pesquisa">
           {railItems.map(([id, [label, , Icon]]) => (
             <button key={id} aria-current={id === page ? 'page' : undefined} onClick={() => navigate(id)}>
@@ -514,6 +538,24 @@ export default function ResearchWorkspace({ session }) {
             </button>
           )}
         </div>
+        {page === 'search' && (
+          <form className="rw-actions rw-query" onSubmit={(event) => {
+            event.preventDefault()
+            setFilters({ ...filters, cnj: cnjDraft.trim().replace(/[.-]/g, '') })
+          }}>
+            <label>
+              Número CNJ exato
+              <input type="search" inputMode="numeric" maxLength={25} value={cnjDraft}
+                pattern="[0-9]{20}|[0-9]{7}-[0-9]{2}[.][0-9]{4}[.][0-9][.][0-9]{2}[.][0-9]{4}"
+                placeholder="Com ou sem pontuação" onChange={(event) => setCnjDraft(event.target.value)} />
+            </label>
+            <button className="secondary-button">Consultar processo</button>
+            {filters.cnj && <button type="button" className="rw-link" onClick={() => {
+              setCnjDraft('')
+              setFilters({ ...filters, cnj: '' })
+            }}>Limpar número CNJ</button>}
+          </form>
+        )}
         {showFilters && (
           <div className="rw-filterbar">
             <span>
@@ -521,14 +563,21 @@ export default function ResearchWorkspace({ session }) {
               {filters.court.length > 3 ? filters.court.length + ' tribunais' : filters.court.join(' + ')}
             </span>
             <span>
-              <small>Temas do acervo</small>
+              <small>Temas do acervo e ementas</small>
               {filters.topics.map((k) => data?.topics?.[k] || k).join(', ') || 'Todos os temas'}
             </span>
             <span>
-              <small>Período</small>
+              <small>{page === 'corpus' ? 'Julgamento ou publicação' : 'Período solicitado'}</small>
               {date(filters.start)} – {date(filters.end)}
             </span>
-            {filters.degree.length > 0 && <span><small>Grau DataJud</small>{filters.degree.map((key) => degrees[key]).join(', ')}</span>}
+            {page !== 'corpus' && <span>
+              <small>Assuntos CNJ ativos (TPU)</small>
+              <strong>{[...filters.subject].sort().join(', ') || 'Todos no lote'}</strong>
+            </span>}
+            {page !== 'corpus' && filters.cnj && <span><small>CNJ consultado</small>{formatProcessIdentifier(filters.cnj)}</span>}
+            {page !== 'corpus' && filters.outcomes.length !== Object.keys(results).length &&
+              <span><small>Resultados DataJud exibidos</small>{filters.outcomes.map((key) => results[key]).join(', ')}</span>}
+            {filters.degree.length > 0 && page !== 'corpus' && <span><small>Grau DataJud</small>{filters.degree.map((key) => degrees[key]).join(', ')}</span>}
             <button className="secondary-button" onClick={() => setDrawer({ type: 'filter' })}>
               <SlidersHorizontal size={16} /> Filtros
             </button>
@@ -537,7 +586,11 @@ export default function ResearchWorkspace({ session }) {
         {page === 'legacy' ? (
           <>
             <p className="rw-note">
-              Análise detalhada com filtros próprios, exportações completas e revisão das teses.
+              A Análise detalhada usa seu próprio recorte e agrega os tribunais selecionados.
+              Um assunto CNJ corresponde ao código escolhido e aos códigos de mesmo nome.
+              Na Pesquisa, selecionar 10431 inclui toda a hierarquia de Responsabilidade Civil.
+              Ao abrir a análise, são trazidos tribunais, período e, se houver, um único código TPU.
+              Busca por CNJ, grau, múltiplos códigos e resultado ficam na Pesquisa.
             </p>
             <App courts={session.courts} court={filters.court[0]} initialSelection={filters} />
           </>
@@ -567,6 +620,16 @@ export default function ResearchWorkspace({ session }) {
           </div>
         ) : page === 'search' ? (
           <>
+            <section className="rw-card rw-results" aria-labelledby="rw-process-title">
+              <div className="rw-heading">
+                <h2 id="rw-process-title">Resultados processuais</h2>
+                <button className="rw-link" onClick={() => navigate('coverage')}>Ver cobertura do lote</button>
+              </div>
+              <p><strong>{number(m.process_records)} documentos DataJud</strong> · {number(m.distinct_process_numbers)} números CNJ distintos.</p>
+              <p className="rw-note">Processos por data de ajuizamento. O assunto-pai inclui descendentes e a união dos códigos conta cada documento uma vez.</p>
+              <p className="rw-note">Temas editoriais atuam no acervo e nas ementas. A lista processual mantém o recorte TPU aplicado.</p>
+              {data.scope.sources.includes('datajud') ? <CaseBrowser key={key} scopeKey={key} /> : <p>DataJud desmarcado nos filtros.</p>}
+            </section>
             <div className="rw-grid">
               <article className="rw-card rw-synthesis">
                 <div className="rw-heading">
@@ -592,38 +655,20 @@ export default function ResearchWorkspace({ session }) {
               <aside className="rw-card">
                 <div className="rw-heading">
                   <h2>Fontes da pesquisa</h2>
-                  <button className="rw-link" onClick={() => navigate('corpus')}>
-                    Ver acervo
-                  </button>
+
                 </div>
-                {['precedent', 'doctrine', 'jurisprudence'].map((k) => {
-                  const d = docs.find((s) => s.kind === k)
-                  return d ? (
-                    <SourceRow key={k} doc={d} onOpen={open} />
-                  ) : (
-                    <p className="rw-note" key={k}>
-                    {kinds[k]} · sem fonte aprovada neste recorte.
-                    </p>
-                  )
-                })}
+                {['jurisprudence', 'precedent', 'doctrine'].map((kind) => (
+                  <div className="rw-catalog-shortcut" key={kind}>
+                    <button className="rw-link" onClick={() => {
+                      setCatalogCategory(kind)
+                      navigate('corpus')
+                    }}>{sourceLabels[kind]}</button>
+                    <span>{data.scope.sources.includes(kind) ? `${number(data.counts[kind])} fontes aprovadas` : 'Fora do recorte'}</span>
+                  </div>
+                ))}
               </aside>
             </div>
-            <div className="rw-metrics">
-              {[
-                ['Registros DataJud', number(m.process_records)],
-                ['Elegíveis antes do filtro de resultado', number(data.merit_baseline.binary_denominator)],
-                ['Taxa no recorte antes do filtro de resultado', rate(data.merit_baseline.grant_rate)],
-              ].map(([l, v]) => (
-                <article className="rw-card" key={l}>
-                  <small>{l}</small>
-                  <strong>{v}</strong>
-                </article>
-              ))}
-            </div>
-            {data.scope.cohort && <p className="rw-note">Indicadores DataJud da amostra {data.scope.cohort}.</p>}
-            <button className="secondary-button" disabled={!m.process_records} onClick={() => setDrawer({ type: 'processes' })}>
-              Consultar processos do recorte
-            </button>
+            {data.scope.sources.includes('datajud') && <ResearchIndicators data={data} />}
             <History series={data.history} />
           </>
         ) : page === 'chat' ? (
@@ -635,7 +680,9 @@ export default function ResearchWorkspace({ session }) {
           />
         ) : page === 'corpus' ? (
           <section className="rw-card">
-            <h2>Fontes do recorte</h2>
+            <h2>Fontes aprovadas do recorte</h2>
+            <p>Tribunal, julgamento ou publicação, tema editorial e tipo de fonte definem este acervo.
+              A doutrina é compartilhada. Grau e número CNJ da Pesquisa filtram a lista processual.</p>
             <div className="rw-actions">
               {['', ...Object.keys(kinds).filter((k) => k !== 'link')].map((k) => (
                 <button
@@ -657,12 +704,20 @@ export default function ResearchWorkspace({ session }) {
           </section>
         ) : page === 'precedents' ? (
           <section className="rw-card">
-            <h2>Uso de precedentes nas ementas</h2>
+            <h2>Precedentes aprovados</h2>
+            <button className="rw-link" onClick={() => {
+              setCatalogCategory('precedent')
+              navigate('corpus')
+            }}>Consultar precedentes no acervo</button>
+            {!docs.some((d) => ['link', 'precedent'].includes(d.kind)) && (
+              <p>Sem precedentes ou vínculos disponíveis no recorte.</p>
+            )}
+            <h3>Uso de precedentes nas ementas</h3>
             <p className="rw-note">
               O NLP distingue aplicação, afastamento, menção e linguagem ambígua nas ementas verificadas. A
               bibliografia do acervo é agrupada por tema.
             </p>
-            {data.usage ? (
+            {data.usage && Object.values(data.usage).some(Boolean) ? (
               <div className="rw-metrics">
                 {Object.entries({
                   applied: 'Aplicações',
@@ -676,17 +731,12 @@ export default function ResearchWorkspace({ session }) {
                   </div>
                 ))}
               </div>
-            ) : (
-              <p>Selecione decisões e precedentes nos filtros para analisar os vínculos.</p>
-            )}
+            ) : !data.usage && <p>Selecione jurisprudência e precedentes nos filtros para analisar os vínculos.</p>}
             {docs
               .filter((d) => ['link', 'precedent'].includes(d.kind))
               .map((d) => (
                 <SourceRow key={d.id} doc={d} onOpen={open} />
               ))}
-            {!docs.some((d) => ['link', 'precedent'].includes(d.kind)) && (
-              <p>Sem precedentes ou vínculos disponíveis no recorte.</p>
-            )}
           </section>
         ) : (
           <section className="rw-card">
@@ -702,14 +752,14 @@ export default function ResearchWorkspace({ session }) {
               acervo usa os temas e a data de julgamento ou publicação. A doutrina é compartilhada entre os
               tribunais. Os vínculos em ementas usam tribunal, período, temas e assuntos CNJ confirmados.
             </p>
-            <p>As taxas descrevem apenas os documentos carregados na base.</p>
+            <p>A taxa usa somente os resultados binários elegíveis da base anterior ao filtro de resultado.</p>
           </section>
         )}
       </main>
       {drawer && (
         <Drawer
           title={
-            selected?.title || { filter: 'Filtros da pesquisa', export: 'Exportar pesquisa', processes: 'Processos do recorte' }[drawer.type]
+            selected?.title || { filter: 'Filtros da pesquisa', export: 'Exportar pesquisa' }[drawer.type]
           }
           onClose={() => setDrawer(null)}
         >
@@ -754,24 +804,52 @@ export default function ResearchWorkspace({ session }) {
               onApply={setFilters}
               onClose={() => setDrawer(null)}
             />
-          ) : drawer.type === 'processes' ? (
-            <CaseBrowser scopeKey={key} />
           ) : (
             <>
-              <p>Baixe a síntese, o recorte aplicado e os trechos usados na pesquisa.</p>
+              <p>Síntese com filtros, indicadores e fontes citadas.</p>
               <div className="rw-actions">
                 {['pdf', 'xlsx'].map((f) => (
                   <button className="secondary-button" key={f} onClick={() => exportReport(f)}>
-                    {f === 'pdf' ? 'Baixar PDF' : 'Baixar Excel'}
+                    {f === 'pdf' ? 'Síntese em PDF' : 'Síntese em Excel'}
                   </button>
                 ))}
               </div>
+              {data?.scope.sources.includes('datajud') && <>
+                <p>Planilha com cada documento DataJud encontrado e os filtros da lista processual.</p>
+                <button className="secondary-button" onClick={() => exportReport('xlsx', 'records')}>
+                  Registros DataJud em Excel
+                </button>
+              </>}
               {exportError && <p role="alert">{exportError}</p>}
             </>
           )}
         </Drawer>
       )}
     </div>
+  )
+}
+
+function ResearchIndicators({ data }) {
+  const base = data.merit_baseline
+  const exclusions = Object.entries(base.excluded).filter(([, count]) => count > 0)
+  const excluded = exclusions.reduce((total, [, count]) => total + count, 0)
+  const hasOutcomeFilter = data.scope.outcomes.length !== Object.keys(results).length
+  return (
+    <section className="rw-card rw-indicators" aria-labelledby="rw-indicators-title">
+      <h2 id="rw-indicators-title">Indicadores do recorte</h2>
+      {base.binary_denominator > 0 ? (
+        <p><strong>{number(base.granted)} de {number(base.binary_denominator)} providos ({rate(base.grant_rate)})</strong>
+          {' · '}{number(base.denied)} desprovidos.</p>
+      ) : <p><strong>Sem documentos elegíveis para calcular a taxa.</strong></p>}
+      <p>{number(base.binary_denominator)} documentos elegíveis para a taxa e {number(excluded)} excluídos da base binária.</p>
+      {hasOutcomeFilter && <p>O filtro de resultado mostra {number(data.metrics.process_records)} documentos de {number(base.binary_denominator + excluded)}.
+        O cálculo acima usa a base anterior a esse filtro.</p>}
+      {exclusions.length > 0 && <details>
+        <summary>Ver exclusões da base</summary>
+        <ul>{exclusions.map(([key, count]) => <li key={key}>{results[key]} · {number(count)}</li>)}</ul>
+      </details>}
+      <p className="rw-note">Cobertura parcial. A regra de resultado recursal foi validada para TJDFT (2ª instância e turmas recursais) e STJ (grau superior). A taxa descreve a amostra e não estima a chance de êxito judicial.</p>
+    </section>
   )
 }
 
@@ -827,20 +905,27 @@ function CaseBrowser({ scopeKey }) {
   const [page, setPage] = useState(1)
   const { data, error } = useScopedResult('research/processes', scopeKey + '&page=' + page)
   if (!data) return <p role={error ? 'alert' : 'status'}>{error || 'Consultando processos…'}</p>
+  if (!data.total) return <p>Nenhum documento DataJud corresponde aos filtros.</p>
   return (
     <>
-      <p>{number(data.total)} documentos DataJud no recorte.</p>
       {data.items.map((item) => (
-        <details key={item.id}>
-          <summary>{item.court} · {formatProcessIdentifier(item.number)}</summary>
-          <p>{item.class_name} · {item.organization}</p>
-          <p>Ajuizamento {date(item.filing)} · {degrees[item.degree] || item.degree} · {results[item.outcome] || item.outcome}</p>
+        <details className="rw-process-row" key={item.id}>
+          <summary>
+            <span>{formatProcessIdentifier(item.number)}</span>
+            <small>{item.court} · {degrees[item.degree] || item.degree} · {results[item.outcome] || item.outcome}</small>
+          </summary>
+          <dl>
+            <div><dt>Classe</dt><dd>{item.class_name || 'Não informada'}</dd></div>
+            <div><dt>Órgão julgador</dt><dd>{item.organization || 'Não informado'}</dd></div>
+            <div><dt>Ajuizamento</dt><dd>{date(item.filing)}</dd></div>
+          </dl>
+          <p className="rw-note">Origem DataJud/CNJ · resultado classificado a partir dos movimentos mapeados.</p>
         </details>
       ))}
       <div className="rw-actions">
-        <button disabled={page === 1} onClick={() => setPage(page - 1)}>Anterior</button>
+        <button className="secondary-button" disabled={page === 1} onClick={() => setPage(page - 1)}>Anterior</button>
         <span>Página {page}</span>
-        <button disabled={page * 12 >= data.total} onClick={() => setPage(page + 1)}>Próxima</button>
+        <button className="secondary-button" disabled={page * 12 >= data.total} onClick={() => setPage(page + 1)}>Próxima</button>
       </div>
     </>
   )

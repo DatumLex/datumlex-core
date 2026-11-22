@@ -190,7 +190,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
     }
   }
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('corpus')
+  const [activeTab, setActiveTab] = useState(initialSelection ? 'overview' : 'corpus')
   const [topic, setTopic] = useState(initialSelection?.topics.length === 1 ? initialSelection.topics[0] : '')
   const [topicOptions, setTopicOptions] = useState([])
   const initialFilters = initialSelection && { start: initialSelection.start, end: initialSelection.end, subject: initialSelection.subject.length === 1 ? initialSelection.subject[0] : '' }
@@ -326,7 +326,9 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
   const empty = data?.statistics.status === 'empty'
   const loadTitle = loading ? 'Carregando dados…' : error ? 'Dados indisponíveis' : 'Nenhum registro no período'
   const unavailableNote = loading ? 'Consultando a base local.' : error ? 'A consulta falhou. Tente novamente.' : 'Sem documentos com resultado binário identificável neste período.'
-  const rateNote = metrics?.binary_denominator ? `Base: ${formatNumber(metrics.binary_denominator)} documentos com resultado mais recente identificado. Indicador por documento, não por recurso individual.` : unavailableNote
+  const rateNote = metrics?.binary_denominator
+    ? `${formatNumber(metrics.granted)} providos e ${formatNumber(metrics.denied)} desprovidos em ${formatNumber(metrics.binary_denominator)} documentos elegíveis. ${formatNumber(metrics.process_records - metrics.binary_denominator)} excluídos. A taxa descreve a amostra e não estima a chance de êxito judicial.`
+    : unavailableNote
   const refreshed = metadata?.last_record_refresh
   const subjectOptions = [...Object.values(data?.courtScopes || {}).flatMap((scope) => scope.subject_groups || scope.subjects || []).reduce((subjects, subject) => {
     subject = { ...subject, name: subject.name?.trim() || `Assunto CNJ ${subject.code} (nome não informado)` }
@@ -336,20 +338,20 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
       : { ...subject })
     return subjects
   }, new Map()).values()].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
-  const selectedSubjectName = subjectOptions.find((subject) => String(subject.code) === String(applied?.subject || draft.subject))?.name
+  const selectedSubjectName = subjectOptions.find((subject) => String(subject.code) === String(applied?.subject || ''))?.name
   const chatContext = JSON.stringify({ courts, start: applied?.start || bounds.start, end: applied?.end || bounds.end, ...(applied?.subject ? { subject_codes: [Number(applied.subject)] } : {}) })
 
   return <div className="app-shell"><div className="top-rule" />
     <header className="site-header"><a className="brand" href="#main-content" aria-label="DatumLex, ir ao conteúdo"><span className="brand-mark"><img src="/assets/datumlex-logo.jpeg" alt="" /></span><span>DatumLex</span></a><span className="header-context">Análise de Recursos</span></header>
     <main id="main-content" className="dashboard">
       <section className="hero" aria-labelledby="page-title"><span className="eyebrow">Inteligência jurídica · {selectedSubjectName || 'Todos os assuntos'}</span>
-        <div className="hero-title-row"><h1 id="page-title">{selectedSubjectName ? `${selectedSubjectName} — ` : ''}{courts.length > 2 ? `${courts.length} tribunais selecionados` : courts.join(' × ')}</h1>
+        <div className="hero-title-row"><h1 id="page-title">{selectedSubjectName ? `${selectedSubjectName} — ` : ''}{courts.length > 2 ? `${courts.length} tribunais selecionados` : courts.join(' + ')}</h1>
           <div className="methodology-trigger"><button className="info-button" type="button" aria-label="Ver metodologia de cálculo" aria-expanded={isMethodologyOpen} aria-controls="methodology-popover" onClick={() => setIsMethodologyOpen(!isMethodologyOpen)}><Info aria-hidden="true" size={21} /></button>
             {isMethodologyOpen && <aside id="methodology-popover" className="methodology-popover" onKeyDown={(event) => { if (event.key === 'Escape') setIsMethodologyOpen(false) }}><div className="popover-heading"><strong>Como interpretar os dados</strong><button type="button" aria-label="Fechar metodologia" onClick={() => setIsMethodologyOpen(false)}><X aria-hidden="true" size={18} /></button></div>
               <p>Os valores contam documentos do DataJud por data de ajuizamento. Um processo pode aparecer em mais de uma instância. Ter vários assuntos não multiplica a contagem.</p><p>Provimento = providos ÷ (providos + desprovidos). Desprovimento usa a mesma base. No TJDFT, são usados resultados TPU mapeados em G2/TR; no STJ, em SUP, incluindo movimentos específicos de recurso especial com resultado expresso. Resultados parciais, de admissibilidade, não conhecidos e sem evidência datada ficam fora da base binária. Em empate de data e horário, usamos o maior ID do movimento no banco (desempate técnico). Cada documento conta uma vez. Não representa recursos individuais nem a taxa geral do tribunal.</p>
             </aside>}
           </div>
-        </div><p>{'Pesquise jurisprudência, precedentes e doutrina nos tribunais selecionados, com evidências, cobertura e limitações da base.'}</p>
+        </div><p>{'Análise agregada dos tribunais selecionados, com dados de ajuizamento e indicadores da amostra.'}</p>
       </section>
       <form className="filter-panel" aria-label="Filtros do dashboard" onSubmit={apply}>
         <div className="filter-grid">
@@ -359,9 +361,9 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
           <label className="filter-field"><span>Data inicial</span><input type="date" required value={draft.start} min='2010-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, start: event.target.value })} disabled={!bounds?.start} /></label>
           <label className="filter-field"><span>Data final</span><input type="date" required value={draft.end} min='2010-01-01' max={bounds?.end || undefined} onChange={(event) => setDraft({ ...draft, end: event.target.value })} disabled={!bounds?.end} /></label>
         </div>
-        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start || !courts.length}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || !!exporting} onClick={() => exportFile('xlsx')}>{exporting === 'xlsx' ? 'Gerando Excel…' : 'Exportar Excel'}</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={() => exportFile('pdf')}>{exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar resumo em PDF'}</button>}</div>
+        <div className="filter-actions"><button className="apply-button" type="submit" disabled={!bounds?.start || !courts.length}>Aplicar filtros</button><button type="button" className="secondary-button" onClick={reset}>Limpar filtros</button><button type="button" className="secondary-button" disabled={loading || !data || !!exporting} onClick={() => exportFile('xlsx')}>{exporting === 'xlsx' ? 'Gerando Excel…' : 'Exportar registros da análise (Excel)'}</button>{activeTab !== 'corpus' && <button type="button" className="secondary-button" disabled={loading || !data || exporting} onClick={() => exportFile('pdf')}>{exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar síntese da análise (PDF)'}</button>}</div>
         {exportError && <p role="alert">{exportError}</p>}
-        <p className="filter-help">{activeTab === 'corpus' ? 'Selecione abaixo um dos dez temas de Responsabilidade Civil. O acervo usa a data de julgamento ou publicação, quando informada, e permite pesquisar desde 2016. A disponibilidade depende dos documentos carregados e dos tribunais autorizados.' : 'O assunto CNJ filtra os metadados da visão geral por data de ajuizamento. Os dez temas de Responsabilidade Civil são selecionados na aba Acervo por assunto.'}</p>
+        <p className="filter-help">{activeTab === 'corpus' ? 'Selecione abaixo um dos dez temas de Responsabilidade Civil. O acervo usa a data de julgamento ou publicação, quando informada, e permite pesquisar desde 2016. A disponibilidade depende dos documentos carregados e dos tribunais autorizados.' : 'A visão geral usa a data de ajuizamento. O filtro CNJ usa o código selecionado e os códigos de mesmo nome, sem expandir a hierarquia TPU.'}</p>
         {validation && <p className="validation-error" role="alert">{validation}</p>}
       </form>
       <nav className="dashboard-tabs" role="tablist" aria-label="Seções do painel">
@@ -372,7 +374,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
         <button id="tab-chat" type="button" role="tab" aria-selected={activeTab === 'chat'} aria-controls="panel-chat" className={activeTab === 'chat' ? 'is-active' : ''} onClick={() => setActiveTab('chat')}>Chat de análise · IA</button>
       </nav>
       <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
-        {!courts.length ? 'Selecione pelo menos um tribunal para pesquisar.' : activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. Não representa todos os processos do tribunal.</>}
+        {!courts.length ? 'Selecione pelo menos um tribunal para pesquisar.' : activeTab === 'corpus' ? 'Acervo de fontes jurídicas locais. As contagens abaixo são separadas dos metadados de processos da visão geral.' : loading ? `Consultando os dados do ${court}…` : error ? <>{error} <button className="secondary-button" onClick={() => { setLoading(true); setError(''); setRetry((value) => value + 1) }}>Tentar novamente</button></> : empty ? 'Nenhum registro carregado corresponde ao período selecionado.' : <>Amostra parcial: <strong>{formatNumber(metrics?.process_records)} registros</strong> no período de {formatDate(metadata?.scope.start)} a {formatDate(metadata?.scope.end)}. {metadata?.scope.subject && `Assunto CNJ ativo ${metadata.scope.subject}. `} Não representa todos os processos do tribunal.</>}
       </div>
       {activeTab === 'overview' && <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
       <section className="indicator-grid" aria-label="Indicadores do recorte selecionado" aria-busy={loading}>
@@ -381,7 +383,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
         <IndicatorCard label="Taxa de desprovimento" value={formatRate(metrics?.denial_rate)} accent="gold" note={rateNote} />
       </section>
       <section className="chart-grid" aria-label="Gráficos do recorte selecionado" aria-busy={loading}>
-        <ChartCard title="Registros por trimestre" description={`Volume por instância e data de ajuizamento — ${court}`}>{data?.instances.series.length ? <InstanceChart series={data.instances.series} /> : <ChartState title={loadTitle}>{loading ? 'Buscando a distribuição por instância.' : error ? 'A distribuição será exibida quando a conexão for restabelecida.' : 'Experimente outro período ou limpe os filtros.'}</ChartState>}</ChartCard>
+        <ChartCard title="Registros por trimestre" description="Volume agregado dos tribunais selecionados, por instância e trimestre de ajuizamento.">{data?.instances.series.length ? <InstanceChart series={data.instances.series} /> : <ChartState title={loadTitle}>{loading ? 'Buscando a distribuição por instância.' : error ? 'A distribuição será exibida quando a conexão for restabelecida.' : 'Experimente outro período ou limpe os filtros.'}</ChartState>}</ChartCard>
         <ChartCard title={court === 'STJ' ? 'Resultado de mérito' : 'Proporção geral'} description="Providos × Desprovidos no recorte selecionado">
           {data?.distribution.series.some((row) => row.count > 0) ? <>
             <OutcomeChart series={data.distribution.series} />

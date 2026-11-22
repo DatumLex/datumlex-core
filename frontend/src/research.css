@@ -18,6 +18,9 @@
   font-weight: 700;
   padding: 4px 11px 15px;
 }
+.rw-mobile-nav {
+  display: none;
+}
 .rw-rail nav {
   display: grid;
   gap: 4px;
@@ -107,7 +110,7 @@
 }
 .rw-filterbar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   align-items: center;
   gap: 15px;
   padding: 12px 17px;
@@ -153,26 +156,67 @@
   line-height: 1.55;
 }
 .rw-synthesis {
-  background: var(--deep-navy);
-  color: #fff;
-  border-top: 3px solid var(--gold);
-}
-.rw-synthesis p {
-  color: #edf1f2;
+  border-top: 2px solid var(--gold);
 }
 .rw-synthesis > .rw-heading svg {
-  color: #f0d789;
+  color: var(--teal);
 }
 .rw-synthesis > button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   margin: 7px 5px 0 0;
-  border: 1px solid #b4cbce;
+  color: var(--teal);
+  background: #edf2ef;
+  border: 1px solid var(--border);
   border-radius: 5px;
-  background: transparent;
-  color: #fff;
   padding: 8px 12px;
+}
+.rw-query {
+  align-items: end;
+}
+.rw-query input,
+.rw-tpu-search input {
+  display: block;
+  margin-top: 4px;
+}
+.rw-results,
+.rw-indicators {
+  margin: 0 0 16px;
+}
+.rw-results + .rw-grid {
+  margin-bottom: 16px;
+}
+.rw-process-row {
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+}
+.rw-process-row summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.rw-process-row small {
+  display: inline-block;
+  margin-inline-start: 12px;
+}
+.rw-process-row dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.rw-process-row dt {
+  font-weight: 600;
+}
+.rw-process-row dd {
+  margin: 0;
+}
+.rw-catalog-shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
 }
 .rw-cite {
   font-size: 0.81rem;
@@ -182,11 +226,6 @@
   border-radius: 4px;
   padding: 1px 6px;
   margin-left: 5px;
-}
-.rw-synthesis .rw-cite {
-  color: #f5df9c;
-  background: #234457;
-  border-color: #728779;
 }
 .rw-link {
   background: none;
@@ -277,6 +316,8 @@
   font: inherit;
 }
 .rw-actions input,
+.rw-tpu-search input,
+.rw-mobile-nav select,
 .rw-dates input,
 .rw-compose textarea {
   padding: 8px;
@@ -396,6 +437,23 @@
 .rw-dates input {
   display: block;
 }
+.rw-filter-actions {
+  position: sticky;
+  bottom: -21px;
+  z-index: 1;
+  margin: 14px -21px -21px;
+  padding: 12px 21px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+.rw-tpu-search {
+  display: block;
+  margin-top: 16px;
+}
+.rw-filter-form .rw-subject-options .rw-choices {
+  max-height: 15rem;
+  overflow-y: auto;
+}
 .rw-main .app-shell .dashboard {
   width: 100%;
   padding-top: 10px;
@@ -424,13 +482,24 @@
     display: none;
   }
   .rw-rail nav {
-    display: flex;
-    overflow-x: auto;
+    display: none;
   }
-  .rw-rail button {
-    flex: none;
-    border-left: 0;
-    border-bottom: 2px solid transparent;
+  .rw-mobile-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .rw-mobile-nav select {
+    font: inherit;
+    flex: 1;
+    min-width: 0;
+  }
+  .workspace-header:has(+ .consultation-wrap) {
+    padding-block: 8px;
+    row-gap: 6px;
+  }
+  .workspace-header:has(+ .consultation-wrap) .access-logo {
+    width: min(145px, 100%);
   }
   .rw-main {
     padding: 12px 14px 30px;
@@ -439,7 +508,14 @@
     align-items: flex-start;
   }
   .rw-crumb {
-    margin-bottom: 16px;
+    display: none;
+  }
+  .rw-main h1 {
+    font-size: 1.9rem;
+  }
+  .rw-process-row small {
+    display: block;
+    margin: 3px 0 0 16px;
   }
   .rw-card {
     padding: 15px;
@@ -447,6 +523,9 @@
   .rw-filterbar {
     gap: 8px;
     padding: 10px;
+  }
+  .rw-query label {
+    min-width: 0;
   }
   .rw-dates > label {
     min-width: 0;

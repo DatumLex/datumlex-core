@@ -102,10 +102,51 @@ class ResearchWorkspaceTests(TestCase):
         denied = self.client.get("/api/research/" + combined + "&outcomes=denied").json()
         self.assertEqual(denied["metrics"]["process_records"], 0)
         self.assertEqual(denied["counts"], data["counts"])
+        self.assertEqual(denied["merit_baseline"], data["merit_baseline"])
+        self.assertEqual(denied["merit_baseline"]["binary_denominator"], 1)
+        self.assertIn("excluded", denied["merit_baseline"])
         self.assertEqual(self.ask("Qual a taxa no STJ?", query=self.query).status_code, 400)
         answer = self.ask("Qual a taxa no STJ?", query=combined).json()
         self.assertIn("0 registros", answer["paragraphs"][0]["text"])
         self.assertIn("(STJ)", answer["paragraphs"][0]["text"])
+
+    def test_editorial_topics_and_exact_case_are_independent(self):
+        run = ExtractionRun.objects.create(scope=SCOPE)
+        source = hit()
+        load_record(normalize(source, SCOPE), run)
+        query = self.query + "&subject=10431,10433"
+        data = self.client.get("/api/research/" + query).json()
+        alternate = self.client.get("/api/research/" + query.replace("negativacao", "saude")).json()
+        self.assertEqual(data["scope"]["selected_subject_codes"], [10431, 10433])
+        self.assertIn(10440, data["scope"]["subject_codes"])
+        self.assertEqual(data["metrics"], alternate["metrics"])
+        self.assertNotEqual(data["counts"], alternate["counts"])
+        self.assertEqual(data["metrics"]["process_records"], 1)
+        match = self.client.get("/api/research/processes/" + query + "&cnj=0000000-00.2023.8.07.0001")
+        self.assertEqual(match.json()["total"], 1)
+        no_match = self.client.get("/api/research/" + query + "&cnj=00000000020238070002").json()
+        self.assertEqual(no_match["metrics"]["process_records"], 0)
+        self.assertEqual(no_match["counts"], data["counts"])
+        self.assertEqual(self.client.get("/api/research/" + query + "&cnj=abc").status_code, 400)
+
+    def test_record_export_matches_search_and_excludes_other_records(self):
+        run = ExtractionRun.objects.create(scope=SCOPE)
+        first = hit()
+        second = hit("other")
+        second["_source"]["numeroProcesso"] = "00000000020238070002"
+        for source in (first, second):
+            load_record(normalize(source, SCOPE), run)
+        query = self.query + "&cnj=00000000020238070001"
+        response = self.client.get("/api/research/export/" + query + "&format=xlsx&content=records")
+        self.assertEqual(response.status_code, 200)
+        with ZipFile(io.BytesIO(response.content)) as sheets:
+            records = sheets.read("xl/worksheets/sheet1.xml")
+            self.assertEqual(records.count(b"<row "), 2)
+            self.assertIn(b"00000000020238070001", records)
+            self.assertNotIn(b"00000000020238070002", records)
+        self.assertEqual(
+            self.client.get("/api/research/export/" + query + "&format=pdf&content=records").status_code, 400,
+        )
 
     def test_permissions_scope_validation_and_csrf(self):
         for path in ["research", "research/sources", "research/chat", "research/export"]:
