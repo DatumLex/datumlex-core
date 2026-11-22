@@ -32,10 +32,11 @@ HTTPS pública do Django, apenas hostname e porta se houver. Deixe
 `VITE_API_BASE_URL` ausente ou igual a `/api`. A função
 `frontend/api/gateway.js` encaminha chamadas ao host configurado e preserva
 Origin, token CSRF, cookies e cabeçalhos de download, com cache desabilitado.
-O navegador continua usando o domínio da Vercel. Uma alternativa operacional
-é substituir a função por um rewrite externo nativo depois de fixar o domínio
-Railway e validar os mesmos passos. Exportações acima do limite de resposta
-da função (4,5 MB) exigem rewrite nativo ou estratégia de arquivo dedicada.
+O navegador continua usando o domínio da Vercel. A prévia autorizada tem
+rewrite externo nativo vinculado exclusivamente ao seu hostname. A função
+configurável permanece para outros escopos. Exportações acima do limite de
+resposta da função (4,5 MB) exigem rewrite nativo ou estratégia de arquivo dedicada.
+O destino da prévia não deve ser usado em produção.
 
 ## Publicação, banco e reversão
 
