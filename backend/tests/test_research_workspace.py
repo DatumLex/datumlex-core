@@ -776,3 +776,19 @@ class ResearchWorkspaceTests(TestCase):
         self.assertIn("Tema 1111 do STJ", pdf_text)
         self.assertNotIn("Enunciado retido sem grant text", pdf_text)
         self.assertNotIn("Texto retido sem permissão", pdf_text)
+
+    def test_lexical_nlp_metadata_analysis_in_panel_and_chat(self):
+        run = ExtractionRun.objects.create(scope=SCOPE)
+        load_record(normalize(hit(), SCOPE), run)
+        panel = self.client.get("/api/research/" + self.query).json()
+        self.assertEqual(panel["nlp"]["method"], "lexical_metadata_nlp")
+        self.assertIn("textos integrais", panel["nlp"]["limitation"].lower())
+        topic_ids = {row["id"] for row in panel["nlp"]["scope_metadata_topics"]}
+        self.assertIn("dano-moral", topic_ids)
+
+        chat = self.ask("Qual a taxa de provimento em dano moral e negativação indevida?").json()
+        self.assertEqual(chat["nlp"]["method"], "lexical_metadata_nlp")
+        self.assertEqual(chat["nlp"]["intent"], "outcomes")
+        q_ids = {row["id"] for row in chat["nlp"]["query_topics"]}
+        self.assertIn("dano-moral", q_ids)
+        self.assertIn("negativacao", q_ids)

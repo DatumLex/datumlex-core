@@ -151,12 +151,19 @@ def chat(request):
         notice = "Gemini não está configurado. Veja a consulta direta ao acervo abaixo."
     paragraphs = paragraphs or research.local_answer(data, question, previous)
     cited = {ref for para in paragraphs for ref in para["refs"]}
+    intent_id = research_ai.intent(question)
+    nlp_summary = {
+        **(data.get("nlp") or {}),
+        "intent": intent_id,
+        "intent_label": research.INTENT_LABELS.get(intent_id, research.INTENT_LABELS["overview"]),
+    }
     return JsonResponse(
         {
             "mode": mode,
             "notice": notice,
             "paragraphs": paragraphs,
             "sources": [s for s in data["sources"] if s["id"] in cited],
+            "nlp": nlp_summary,
         }
     )
 

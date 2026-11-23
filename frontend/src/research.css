@@ -158,6 +158,21 @@
 .rw-synthesis {
   border-top: 2px solid var(--gold);
 }
+.rw-nlp-meta {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--teal, #1f4e5f);
+  background: var(--cream, #faf9f5);
+  font-size: 0.88rem;
+}
+.rw-nlp-meta p {
+  margin: 4px 0;
+}
+.rw-nlp-meta small {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.82;
+}
 .rw-synthesis > .rw-heading svg {
   color: var(--teal);
 }

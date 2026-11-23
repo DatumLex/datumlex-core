@@ -22,6 +22,12 @@ from src.services.outcomes import summarize
 
 
 TOPIC_LABELS = {key: label for key, label, _ in TOPICS}
+INTENT_LABELS = {
+    "overview": "Visão geral do recorte",
+    "outcomes": "Análise de mérito e taxa de provimento",
+    "history": "Evolução temporal e volume",
+    "sources": "Fontes jurídicas do recorte",
+}
 SOURCES = ("datajud", *CATEGORIES)
 DEGREES = ("G1", "G2", "JE", "TR", "SUP")
 TYPES = {"jurisprudence": "Decisão", "precedent": "Precedente", "doctrine": "Doutrina"}
@@ -146,6 +152,58 @@ def coverage(scope):
     return {"target_per_cell": target, "by_court": by_court, "cells": cells}
 
 
+def lexical_nlp_analysis(query, *, question="", intent_id="overview"):
+    """Lexical NLP over user query and real DataJud TPU subject metadata (not full-text thesis extraction)."""
+    query_matches = classify(question) if question else {}
+    query_topics = [
+        {"id": key, "label": TOPIC_LABELS[key], "matched_terms": terms}
+        for key, terms in query_matches.items()
+    ]
+    subject_names = dict(
+        FactProcessSubject.objects.filter(process__in=query)
+        .values_list("subject_id", "subject__name")
+        .distinct()
+    )
+    topic_subjects = {}
+    topic_terms = {}
+    for sid, name in subject_names.items():
+        for key, terms in classify(name or "").items():
+            topic_subjects.setdefault(key, set()).add(sid)
+            topic_terms.setdefault(key, set()).update(terms)
+    scope_topics = []
+    for key, label, _ in TOPICS:
+        sids = topic_subjects.get(key)
+        if not sids:
+            continue
+        docs = (
+            FactProcessSubject.objects.filter(process__in=query, subject_id__in=sids)
+            .values("process_id")
+            .distinct()
+            .count()
+        )
+        if docs:
+            scope_topics.append(
+                {
+                    "id": key,
+                    "label": label,
+                    "documents": docs,
+                    "matched_terms": sorted(topic_terms[key]),
+                }
+            )
+    scope_topics.sort(key=lambda item: (-item["documents"], item["id"]))
+    return {
+        "method": "lexical_metadata_nlp",
+        "intent": intent_id if intent_id in INTENT_LABELS else "overview",
+        "intent_label": INTENT_LABELS.get(intent_id, INTENT_LABELS["overview"]),
+        "query_topics": query_topics,
+        "scope_metadata_topics": scope_topics,
+        "limitation": (
+            "NLP léxico aplicado à pergunta e aos metadados oficiais DataJud (assuntos TPU). "
+            "Não constitui extração de teses a partir de textos integrais de acórdãos."
+        ),
+    }
+
+
 def context(params, question="", previous=()):
     query, scope, indexed, merit_query = selection(params)
     counts = {key: 0 for key in CATEGORIES}
@@ -183,6 +241,7 @@ def context(params, question="", previous=()):
         "sources": docs,
         "usage": usage["counts"] if usage else None,
         "topics": TOPIC_LABELS,
+        "nlp": lexical_nlp_analysis(query, question=question),
         "provider": "gemini" if ai_ready() else "local",
     }
 

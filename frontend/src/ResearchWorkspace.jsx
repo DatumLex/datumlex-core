@@ -301,7 +301,35 @@ function History({ series }) {
     </details>
   )
 }
-function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
+function LexicalNlpBox({ nlp, showQuery = false }) {
+  if (!nlp) return null
+  const queryTopics = nlp.query_topics || []
+  const scopeTopics = (nlp.scope_metadata_topics || []).slice(0, 6)
+  return (
+    <div className="rw-nlp-meta" data-testid={showQuery ? 'chat-nlp-result' : 'scope-nlp-summary'}>
+      <p>
+        <strong>NLP léxico (metadados DataJud)</strong>
+        {showQuery && nlp.intent_label ? ` · Intenção: ${nlp.intent_label}` : ''}
+      </p>
+      {showQuery && (
+        <p>
+          <strong>Tópicos detectados na pergunta:</strong>{' '}
+          {queryTopics.length
+            ? queryTopics.map((item) => `${item.label} (${item.matched_terms.join(', ')})`).join(' · ')
+            : 'Nenhum tópico específico nos termos da pergunta.'}
+        </p>
+      )}
+      {scopeTopics.length > 0 && (
+        <p>
+          <strong>Tópicos nos assuntos TPU do recorte:</strong>{' '}
+          {scopeTopics.map((item) => `${item.label}: ${number(item.documents)}`).join(' · ')}
+        </p>
+      )}
+      <small>{nlp.limitation}</small>
+    </div>
+  )
+}
+function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
   const [useGemini, setUseGemini] = useState(false)
   const tail = useRef(null)
   useEffect(() => {
@@ -316,6 +344,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
       <p className="rw-note">
         A conversa acompanha os filtros aplicados. Abra as referências para conferir o texto original.
       </p>
+      <LexicalNlpBox nlp={nlp} />
       {!thread.turns.length && (
         <div className="rw-prompts">
           {prompts.map((q) => (
@@ -334,6 +363,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider }) {
           <small>{t.mode === 'gemini' ? 'DatumLex · Seleção de achados com Gemini' : 'DatumLex · Consulta ao acervo'}</small>
           {t.notice && <p>{t.notice}</p>}
           <Paragraphs blocks={t.paragraphs} docs={t.sources} onOpen={onOpen} />
+          <LexicalNlpBox nlp={t.nlp} showQuery />
         </article>
       ))}
       <div ref={tail} />
@@ -689,7 +719,7 @@ export default function ResearchWorkspace({ session }) {
           </>
         ) : page === 'chat' ? (
           <Chat
-            {...{ thread, provider: data.provider }}
+            {...{ thread, provider: data.provider, nlp: data.nlp }}
             onOpen={open}
             onDraft={(draft) => updateThread((t) => ({ ...t, draft }))}
             onAsk={ask}
