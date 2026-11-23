@@ -80,13 +80,86 @@ print(json.dumps({
         self.assertEqual(result.returncode, 0, result.stderr)
         for mismatch in (
             {"DATABASE_URL": VALID["DATABASE_URL"]},
+            {"DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_real_civil_2026_11")},
             {"RESEARCH_CIVIL_COHORT": "civil-synthetic-4f"},
+            {"RESEARCH_CIVIL_COHORT": "civil-2010-sgt-2026-11"},
             {"DATUMLEX_PRODUCTION_DEMO": "false"},
+            {"RAILWAY_SERVICE_NAME": "datumlex-api-real"},
         ):
             with self.subTest(mismatch=mismatch):
                 result = self.run_production(script, demo | mismatch)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("ImproperlyConfigured", result.stderr)
+
+        # Original non-demo service must also never point to the real database or real cohort.
+        for cross_wire in (
+            {"DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_real_civil_2026_11")},
+            {"RESEARCH_CIVIL_COHORT": "civil-2010-sgt-2026-11"},
+            {
+                "DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_real_civil_2026_11"),
+                "RESEARCH_CIVIL_COHORT": "civil-2010-sgt-2026-11",
+            },
+        ):
+            with self.subTest(cross_wire=cross_wire):
+                result = self.run_production("from django.conf import settings; print(settings.DEBUG)", cross_wire)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ImproperlyConfigured", result.stderr)
+
+    def test_real_production_api_requires_dedicated_database_cohort_and_safeguards(self):
+        real = {
+            "RAILWAY_SERVICE_NAME": "datumlex-api-real",
+            "DATUMLEX_PRODUCTION_API_HOST": "datumlex-api-real-production.up.railway.app",
+            "DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_real_civil_2026_11"),
+            "RESEARCH_CIVIL_COHORT": "civil-2010-sgt-2026-11",
+        }
+        script = """
+import json
+from django.conf import settings
+print(json.dumps({
+    "synthetic": settings.SYNTHETIC_PREVIEW,
+    "demo": settings.PRODUCTION_DEMO,
+    "cohort": settings.RESEARCH_CIVIL_COHORT,
+    "db_name": settings.DATABASES["default"]["NAME"],
+    "ssl": settings.DATABASES["default"]["OPTIONS"]["sslmode"],
+    "public_courts": list(settings.PUBLIC_REGISTRATION_COURTS),
+    "gemini": settings.RESEARCH_GEMINI_ENABLED,
+    "hosts": settings.ALLOWED_HOSTS,
+}))
+"""
+        result = self.run_production(script, real)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {
+            "synthetic": False,
+            "demo": False,
+            "cohort": "civil-2010-sgt-2026-11",
+            "db_name": "datumlex_release_real_civil_2026_11",
+            "ssl": "require",
+            "public_courts": [],
+            "gemini": False,
+            "hosts": ["datumlex-api-real-production.up.railway.app", "healthcheck.railway.app"],
+        })
+
+        for mismatch in (
+            {"DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_synthetic")},
+            {"DATABASE_URL": VALID["DATABASE_URL"]},
+            {"RESEARCH_CIVIL_COHORT": "civil-synthetic-production"},
+            {"RESEARCH_CIVIL_COHORT": ""},
+            {"DATUMLEX_PRODUCTION_DEMO": "true"},
+            {"DATUMLEX_SYNTHETIC_PREVIEW": "true"},
+            {"DATUMLEX_PUBLIC_REGISTRATION_COURTS": "STJ"},
+            {"RESEARCH_GEMINI_ENABLED": "true"},
+            {"GEMINI_API_KEY": "fixture-key"},
+            {"DATAJUD_API_KEY": "fixture-key"},
+            {"DJANGO_DEBUG": "true"},
+            {"RAILWAY_ENVIRONMENT_NAME": "recovery-preview"},
+        ):
+            with self.subTest(mismatch=mismatch):
+                result = self.run_production("from django.conf import settings; print(settings.DEBUG)", real | mismatch)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(
+                    "ImproperlyConfigured" in result.stderr or "ValueError" in result.stderr,
+                    result.stderr,
+                )
 
     def test_http_rejects_missing_session_csrf_and_foreign_origins(self):
         script = """
