@@ -371,6 +371,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
         <button id="tab-overview" type="button" role="tab" aria-selected={activeTab === 'overview'} aria-controls="panel-overview" className={activeTab === 'overview' ? 'is-active' : ''} onClick={() => setActiveTab('overview')}>Visão geral</button>
         {courts.includes('TJDFT') && <button id="tab-precedents" type="button" role="tab" aria-selected={activeTab === 'precedents'} aria-controls="panel-precedents" className={activeTab === 'precedents' ? 'is-active' : ''} onClick={() => setActiveTab('precedents')}>Precedentes e teses</button>}
         <button id="tab-sources" type="button" role="tab" aria-selected={activeTab === 'sources'} aria-controls="panel-sources" className={activeTab === 'sources' ? 'is-active' : ''} onClick={() => setActiveTab('sources')}>Fontes e cobertura</button>
+        <button id="tab-nlp" type="button" role="tab" aria-selected={activeTab === 'nlp'} aria-controls="panel-nlp" className={activeTab === 'nlp' ? 'is-active' : ''} onClick={() => setActiveTab('nlp')}>NLP v2 · Teses e fundamentos</button>
         <button id="tab-chat" type="button" role="tab" aria-selected={activeTab === 'chat'} aria-controls="panel-chat" className={activeTab === 'chat' ? 'is-active' : ''} onClick={() => setActiveTab('chat')}>Chat de análise · IA</button>
       </nav>
       <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
@@ -458,6 +459,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
           })()}
         </>}
       </section>}
+      {activeTab === 'nlp' && courts.length > 0 && <section id="panel-nlp" role="tabpanel" aria-labelledby="tab-nlp"><NlpPanel key={chatContext} contextKey={chatContext} /></section>}
       {activeTab === 'chat' && courts.length > 0 && <section id="panel-chat" role="tabpanel" aria-labelledby="tab-chat"><NlpPanel key={chatContext} contextKey={chatContext} chatOnly /></section>}
       {activeTab === 'sources' && <section id="panel-sources" className="tab-content" role="tabpanel" aria-labelledby="tab-sources">
         <div className="alignment-heading"><span className="eyebrow">Rastreabilidade</span><h2>Fontes, cobertura e limitações</h2><p>Consulte origem, período disponível e situação de cada extração. As contagens abaixo refletem os dados carregados localmente, não a cobertura total dos tribunais.</p></div>

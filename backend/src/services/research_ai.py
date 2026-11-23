@@ -258,6 +258,8 @@ def generate(available, scope, question, previous=()):
         "1. NUNCA altere, arredonde indevidamente ou invente números que não estejam em 'metrics'.\n"
         "2. NUNCA invente acórdãos, temas repetitivos, súmulas, autores, artigos ou números CNJ.\n"
         "3. Liste em 'cited_source_ids' apenas os IDs (formato F<número>) presentes em 'sources' que você efetivamente usou.\n"
+        "4. Use sempre a terminologia processual brasileira correta: 'grant_rate' é taxa de provimento e "
+        "'denial_rate' é taxa de desprovimento (jamais escreva 'imprudência').\n"
         "4. Quando uma fonte tiver 'text_scope' = 'metadata_only', utilize apenas título, autoria, ano e origem, sem presumir conteúdo interno.\n"
         "5. Se não houver base suficiente no recorte para responder parte da pergunta, declare isso explicitamente.\n"
         "6. Em 'limitations', inclua uma frase curta sobre limitações metodológicas aplicáveis (ex.: cobertura parcial da amostra ou vínculo temático não equivale a aplicação judicial), sem repetir números já ditos."

@@ -131,4 +131,4 @@ BNP_TOKEN_URL = os.environ.get(
 BNP_API_CLIENT_ID = os.environ.get("BNP_API_CLIENT_ID", "")
 BNP_API_CLIENT_SECRET = os.environ.get("BNP_API_CLIENT_SECRET", "")
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL') or RESEARCH_GEMINI_MODEL

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { getData } from './api'
 import App from './App'
+import NlpPanel from './NlpPanel'
 import { formatProcessIdentifier } from './processIdentifier'
 import {
   bibliographyLine,
@@ -33,6 +34,7 @@ const pages = {
   chat: ['Chat da pesquisa', 'Chat da pesquisa', MessageSquare],
   corpus: ['Acervo por assunto', 'Acervo por assunto', BookOpen],
   precedents: ['Precedentes e teses', 'Precedentes e teses', Scale],
+  nlp: ['NLP v2 · Teses', 'Análise NLP v2 — Teses e fundamentos', Sparkles],
   notebook: ['Caderno', 'Caderno de pesquisa', Bookmark],
   coverage: ['Fontes e cobertura', 'Fontes e cobertura', Database],
   legacy: ['Análise detalhada', 'Análise detalhada', FolderSearch],
@@ -81,7 +83,7 @@ const defaults = (courts) => ({
   court: [...courts].sort(),
   cnj: '',
   topics: [],
-  subject: ['10431'],
+  subject: [],
   sources: Object.keys(sourceLabels),
   outcomes: Object.keys(results),
   degree: [],
@@ -613,7 +615,13 @@ export default function ResearchWorkspace({ session }) {
   const selected = drawer?.doc,
     docs = data?.sources || [],
     m = data?.metrics
-  const showFilters = page !== 'notebook' && page !== 'legacy'
+  const showFilters = page !== 'notebook' && page !== 'legacy' && page !== 'nlp'
+  const nlpContext = JSON.stringify({
+    courts: filters.court,
+    start: filters.start,
+    end: filters.end,
+    ...(filters.subject.length ? { subject_codes: filters.subject.map(Number).filter(Boolean) } : {}),
+  })
   const railItems = Object.entries(pages)
   return (
     <div className="rw-shell">
@@ -640,7 +648,13 @@ export default function ResearchWorkspace({ session }) {
         </div>
         <div className="rw-heading">
           <div>
-            <div className="eyebrow">Responsabilidade civil</div>
+            <div className="eyebrow">
+              {filters.subject.length === 1 && filters.subject[0] === '10431'
+                ? 'Responsabilidade civil'
+                : filters.subject.length
+                  ? `Assunto CNJ · ${filters.subject.join(', ')}`
+                  : 'Base processual · 9 tribunais'}
+            </div>
             <h1>{pages[page][1]}</h1>
           </div>
           {showFilters && (
@@ -713,6 +727,10 @@ export default function ResearchWorkspace({ session }) {
             </p>
             <App courts={session.courts} court={filters.court[0]} initialSelection={filters} />
           </>
+        ) : page === 'nlp' ? (
+          <section className="rw-card">
+            <NlpPanel key={nlpContext} contextKey={nlpContext} />
+          </section>
         ) : page === 'notebook' ? (
           <section className="rw-card">
             <h2>Fontes guardadas nesta sessão</h2>
