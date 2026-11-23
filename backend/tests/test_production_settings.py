@@ -139,6 +139,16 @@ print(json.dumps({
             "hosts": ["datumlex-api-real-production.up.railway.app", "healthcheck.railway.app"],
         })
 
+        # Real production API allows opt-in Gemini only with key and valid model (collection stays closed).
+        gemini_enabled = real | {
+            "RESEARCH_GEMINI_ENABLED": "true",
+            "GEMINI_API_KEY": "fixture-gemini-key",
+            "RESEARCH_GEMINI_MODEL": "gemini-3.5-flash-lite",
+        }
+        result_ai = self.run_production(script, gemini_enabled)
+        self.assertEqual(result_ai.returncode, 0, result_ai.stderr)
+        self.assertEqual(json.loads(result_ai.stdout)["gemini"], True)
+
         for mismatch in (
             {"DATABASE_URL": VALID["DATABASE_URL"].replace("datumlex_release_fixture", "datumlex_release_synthetic")},
             {"DATABASE_URL": VALID["DATABASE_URL"]},
@@ -149,6 +159,7 @@ print(json.dumps({
             {"DATUMLEX_PUBLIC_REGISTRATION_COURTS": "STJ"},
             {"RESEARCH_GEMINI_ENABLED": "true"},
             {"GEMINI_API_KEY": "fixture-key"},
+            {"RESEARCH_GEMINI_ENABLED": "true", "GEMINI_API_KEY": "fixture-key", "RESEARCH_GEMINI_MODEL": "bad model!"},
             {"DATAJUD_API_KEY": "fixture-key"},
             {"DJANGO_DEBUG": "true"},
             {"RAILWAY_ENVIRONMENT_NAME": "recovery-preview"},

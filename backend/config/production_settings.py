@@ -37,8 +37,17 @@ if PUBLIC_REGISTRATION_COURTS:  # noqa: F405
     raise ImproperlyConfigured("Public registration is closed in production.")
 if not RESEARCH_CIVIL_COHORT:  # noqa: F405
     raise ImproperlyConfigured("Select the exact research cohort approved for this release.")
-if RESEARCH_GEMINI_ENABLED or GEMINI_API_KEY or DATAJUD_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("DATAJUD_API_KEY"):  # noqa: F405
-    raise ImproperlyConfigured("Production research starts with Gemini and collection disabled.")
+if DATAJUD_API_KEY or os.environ.get("DATAJUD_API_KEY"):  # noqa: F405
+    raise ImproperlyConfigured("Production research starts with DataJud collection disabled.")
+
+has_gemini_key = bool(GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY"))  # noqa: F405
+if RAILWAY_SERVICE == REAL_API_SERVICE and RESEARCH_GEMINI_ENABLED:  # noqa: F405
+    if not has_gemini_key:
+        raise ImproperlyConfigured("Enable Gemini on datumlex-api-real only with GEMINI_API_KEY configured.")
+    if not re.fullmatch(r"gemini-[a-z0-9.-]{1,70}", RESEARCH_GEMINI_MODEL):  # noqa: F405
+        raise ImproperlyConfigured("Configure a valid RESEARCH_GEMINI_MODEL for datumlex-api-real.")
+elif RESEARCH_GEMINI_ENABLED or has_gemini_key:  # noqa: F405
+    raise ImproperlyConfigured("Production research requires explicit Gemini enablement on datumlex-api-real only.")
 
 api_host = required_host("DATUMLEX_PRODUCTION_API_HOST")
 frontend_host = required_host("DATUMLEX_PRODUCTION_FRONTEND_HOST")
