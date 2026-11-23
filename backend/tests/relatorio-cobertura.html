@@ -1,0 +1,1397 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DatumLex · Painel de Testes Automatizados, Cobertura e SonarQube</title>
+<style>
+      :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; color: #14293c; background: #f3f6f8; line-height: 1.55; }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      header { background: linear-gradient(135deg, #102a3f 0%, #14334a 55%, #0c4d45 100%); color: #fff; }
+      .wrap, main { max-width: 1180px; margin: auto; padding-inline: clamp(16px,4vw,52px); }
+      header .wrap { padding-block: 40px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; }
+      h1 { margin: 4px 0 8px; font-size: clamp(1.9rem,4.5vw,3rem); line-height: 1.1; letter-spacing: -.03em; }
+      .brand { margin: 0; color: #b7ebd9; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: .85rem; }
+      header p:last-child { margin: 0; color: #dce9f1; }
+      .gate-badge { padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: .92rem; letter-spacing: .03em; border: 1px solid rgba(255,255,255,.28); }
+      .gate-badge--good { background: rgba(16,185,129,.22); color: #d1fae5; }
+      .gate-badge--low { background: rgba(239,68,68,.26); color: #fee2e2; }
+      nav { padding-block: 18px 8px; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+      nav a { color: #07594e; font-weight: 650; text-underline-offset: 3px; font-size: .94rem; }
+      section { margin: 18px 0; padding: clamp(16px,3vw,28px); background: #fff; border: 1px solid #d9e3e9; border-radius: 12px; scroll-margin-top: 12px; box-shadow: 0 1px 2px rgba(16,42,63,.04); }
+      h2 { font-size: clamp(1.2rem,2.6vw,1.55rem); margin: 0 0 4px; line-height: 1.3; }
+      h3 { margin: 0; font-size: 1rem; color: #14293c; }
+      .muted { overflow-wrap: anywhere; color: #405a6d; margin: 0; font-size: .94rem; }
+      .alert { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 8px; }
+      .metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 10px; margin: 18px 0 8px; }
+      .metric { padding: 12px 13px; border: 1px solid #d9e8e5; background: #f4faf8; border-radius: 10px; }
+      .metric--good { border-color: #bbf7d0; background: #f0fdf4; }
+      .metric--warn { border-color: #fde68a; background: #fffbeb; }
+      .metric--low { border-color: #fecaca; background: #fef2f2; }
+      dt { font-size: .82rem; color: #304d56; font-weight: 600; }
+      dd { margin: 2px 0 0; color: #07594e; font-weight: 750; font-size: 1.35rem; }
+      .metric--warn dd { color: #92400e; }
+      .metric--low dd { color: #991b1b; }
+      small { display: block; font-size: .78rem; font-weight: 500; color: #405a6d; }
+      dd, td { font-variant-numeric: tabular-nums; }
+      .layer-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(270px,1fr)); gap: 12px; margin-top: 16px; }
+      .layer-card { border: 1px solid #dce6ec; border-radius: 10px; padding: 14px; background: #fbfdfe; }
+      .layer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+      .layer-sub { margin: 2px 0 0; font-size: .82rem; color: #4b6476; }
+      .progress { height: 9px; background: #e2ecf1; border-radius: 999px; overflow: hidden; margin-bottom: 10px; }
+      .progress-fill { display: block; height: 100%; border-radius: 999px; }
+      .progress-fill--good { background: #0f766e; }
+      .progress-fill--warn { background: #d97706; }
+      .progress-fill--low { background: #dc2626; }
+      .layer-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: .8rem; color: #405a6d; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .8rem; font-weight: 700; white-space: nowrap; }
+      .pill--good { background: #dcfce7; color: #166534; }
+      .pill--warn { background: #fef3c7; color: #92400e; }
+      .pill--low { background: #fee2e2; color: #991b1b; }
+      .bar-cell { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+      summary { cursor: pointer; color: #07594e; font-weight: 650; }
+      summary span { color: #405a6d; }
+      .filter-box { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: .88rem; color: #304d56; }
+      .filter-box input { padding: 6px 10px; border: 1px solid #cbd8e0; border-radius: 6px; min-width: 240px; font: inherit; }
+      .table-scroll { margin-top: 10px; overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; text-align: left; font-size: .88rem; }
+      th, td { padding: 9px 10px; border-bottom: 1px solid #e1e9ee; vertical-align: top; }
+      thead { background: #e9f1f5; }
+      tbody th { font-weight: 500; overflow-wrap: anywhere; width: 52%; }
+      tbody tr:nth-child(even) { background: #f8fbfc; }
+      .lines p { margin: 4px 0; overflow-wrap: anywhere; }
+      code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .88em; background: #eef4f7; padding: 1px 4px; border-radius: 4px; }
+      #metodo { margin-bottom: 36px; }
+      #metodo p { margin: 8px 0; }
+      @media (max-width: 560px) {
+        table { min-width: 510px; }
+        header .wrap { padding-block: 28px 24px; }
+      }
+    </style>
+</head>
+<body>
+<header><div class="wrap">
+  <div>
+    <p class="brand">DatumLex · Engenharia de Qualidade</p>
+    <h1>Testes Automatizados e Cobertura</h1>
+    <p>Gerado em <time datetime="2026-11-23T10:19:16.141108-03:00">23/11/2026 às 10:19:16 -0300</time> · Execução concluída com 100% de aprovação</p>
+  </div>
+  <div class="gate-badge gate-badge--good">
+    Quality Gate · APROVADO
+  </div>
+</div></header>
+<main>
+  <nav aria-label="Seções do relatório">
+    <a href="#resumo">Resumo / Quality Gate</a>
+    <a href="#camadas">Cobertura por serviço</a>
+    <a href="#sonar">Análise estática & SonarQube</a>
+    <a href="#unitarios-backend">Backend unitário</a>
+    <a href="#unitarios-frontend">Frontend unitário</a>
+    <a href="#ferramentas">Ferramentas NLP</a>
+    <a href="#backend">Backend completo</a>
+    <a href="#metodo">Metodologia</a>
+  </nav>
+  <section id="resumo" aria-labelledby="resumo-title">
+      <h2 id="resumo-title">Resumo Executivo · Quality Gate</h2>
+      <p class="muted">Visão consolidada da automação de testes do DatumLex (Backend Django + Frontend React + Ferramentas NLP) com saída pronta para SonarQube.</p>
+      <dl class="metrics"><div class="metric metric--good"><dt>Quality Gate</dt><dd>APROVADO<small>Zero falhas e zero erros críticos</small></dd></div><div class="metric metric--good"><dt>Testes Automatizados</dt><dd>398/404<small>0 falha(s) · 6 pulado(s)</small></dd></div><div class="metric metric--good"><dt>Cobertura Backend (src)</dt><dd>81,43%<small>5.503/6.758</small></dd></div><div class="metric metric--good"><dt>Cobertura Frontend (unit)</dt><dd>99,38%<small>4 módulos testados de 18</small></dd></div><div class="metric metric--good"><dt>Ruff + ESLint (Críticos)</dt><dd>0<small>Erros críticos Python + JS/JSX</small></dd></div><div class="metric metric--good"><dt>SonarQube Ready</dt><dd>6/6<small>Artefatos XML/LCOV e workflow prontos</small></dd></div></dl>
+    </section><section id="camadas" aria-labelledby="camadas-title">
+      <h2 id="camadas-title">Cobertura por camada e serviço</h2>
+      <p class="muted">Agrupamento direto da execução medida sobre os serviços de domínio, APIs, motor NLP v2, ETL, segurança e frontend.</p>
+      <div class="layer-grid"><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Serviços de Domínio e IA</h3>
+              <p class="layer-sub">Pesquisa jurídica, Gemini AI, NLP v2, métricas e catálogo</p>
+            </div>
+            <span class="pill pill--good">89,34%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="89.3" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--good" style="width:89.3%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/services/</code></span>
+            <span>27 arquivo(s)</span>
+            <span>Linhas: 2.573/2.880</span>
+            <span>Ramificações: 80,14%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Rotas REST / API</h3>
+              <p class="layer-sub">Endpoints HTTP de pesquisa, estatísticas, NLP v2, chat e exportação</p>
+            </div>
+            <span class="pill pill--good">91,76%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="91.8" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--good" style="width:91.8%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/routes/</code></span>
+            <span>9 arquivo(s)</span>
+            <span>Linhas: 601/655</span>
+            <span>Ramificações: 80,26%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Motor NLP v2 e Contratos</h3>
+              <p class="layer-sub">Extração, validação de contratos, tópicos e evidências literais</p>
+            </div>
+            <span class="pill pill--warn">72,95%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="72.9" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--warn" style="width:72.9%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/nlp/</code></span>
+            <span>12 arquivo(s)</span>
+            <span>Linhas: 364/499</span>
+            <span>Ramificações: 66,97%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Pipeline ETL</h3>
+              <p class="layer-sub">Transformação, classificação de desfechos TPU, amostragem e carga</p>
+            </div>
+            <span class="pill pill--good">93,69%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="93.7" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--good" style="width:93.7%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/etl/</code></span>
+            <span>6 arquivo(s)</span>
+            <span>Linhas: 193/206</span>
+            <span>Ramificações: 82,43%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Clientes Externos</h3>
+              <p class="layer-sub">Integrações oficiais DataJud/CNJ, Pangea BNP e fontes jurídicas</p>
+            </div>
+            <span class="pill pill--warn">70,44%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="70.4" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--warn" style="width:70.4%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/api/</code></span>
+            <span>4 arquivo(s)</span>
+            <span>Linhas: 143/203</span>
+            <span>Ramificações: 53,23%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Segurança e Contas</h3>
+              <p class="layer-sub">Autenticação, controle de acesso por tribunal, sessões e auditoria</p>
+            </div>
+            <span class="pill pill--good">94,35%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="94.4" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--good" style="width:94.4%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/accounts/</code></span>
+            <span>9 arquivo(s)</span>
+            <span>Linhas: 351/372</span>
+            <span>Ramificações: 89,83%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Modelos e Persistência</h3>
+              <p class="layer-sub">Esquema relacional, coortes e comandos operacionais Django</p>
+            </div>
+            <span class="pill pill--warn">65,77%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="65.8" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--warn" style="width:65.8%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>backend/src/db/</code></span>
+            <span>33 arquivo(s)</span>
+            <span>Linhas: 1.278/1.943</span>
+            <span>Ramificações: 49,56%</span>
+          </div>
+        </article><article class="layer-card">
+          <div class="layer-head">
+            <div>
+              <h3>Frontend React / Vite</h3>
+              <p class="layer-sub">Utilitários de UI, API gateway, rotas de deploy e apresentação</p>
+            </div>
+            <span class="pill pill--good">99,38%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="99.4" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill progress-fill--good" style="width:99.4%"></span>
+          </div>
+          <div class="layer-meta">
+            <span><code>frontend/src/</code></span>
+            <span>4 arquivo(s)</span>
+            <span>Linhas: 161/162</span>
+            <span>Ramificações: 78,02%</span>
+          </div>
+        </article></div>
+    </section><section id="sonar" aria-labelledby="sonar-title">
+      <h2 id="sonar-title">Qualidade estática e integração SonarQube</h2>
+      <p class="muted">Análise estática executada nesta rodada (Ruff + ESLint) combinada com a configuração oficial do projeto SonarQube (<code>br.edu.fatec:datumlex</code>) para Python e JavaScript.</p>
+      <dl class="metrics"><div class="metric metric--good"><dt>Ruff · Erros críticos (F/E9)</dt><dd>0<small>Bugs, nomes indefinidos e imports mortos</small></dd></div><div class="metric metric--warn"><dt>Ruff · Avisos de estilo</dt><dd>114<small>Code smells de formatação em backend/src</small></dd></div><div class="metric metric--good"><dt>ESLint · Erros Frontend</dt><dd>0<small>42 arquivos JS/JSX verificados</small></dd></div><div class="metric metric--good"><dt>ESLint · Avisos Frontend</dt><dd>0<small>Regras React Hooks e qualidade JS</small></dd></div></dl>
+      <p class='muted' style='margin-top:10px'>Regras Ruff mais frequentes (estilo): <code>E701</code> (39) · <code>I001</code> (38) · <code>E702</code> (37)</p>
+      <div class="table-scroll">
+        <table aria-label="Artefatos de integração SonarQube">
+          <thead><tr><th scope="col">Artefato / Configuração</th><th scope="col">Finalidade no SonarQube</th><th scope="col">Status</th></tr></thead>
+          <tbody><tr><td><code>sonar-project.properties</code></td><td>Configuração unificada SonarQube (Python + JS/JSX, sem segredos hardcoded)</td><td><span class='pill pill--good'>Gerado / Pronto</span></td></tr><tr><td><code>.github/workflows/sonar.yml</code></td><td>Pipeline CI de cobertura, lint e envio ao SonarQube/SonarCloud</td><td><span class='pill pill--good'>Gerado / Pronto</span></td></tr><tr><td><code>docker-compose.sonar.yml</code></td><td>Stack local reproduzível SonarQube Community + sonar-scanner</td><td><span class='pill pill--good'>Gerado / Pronto</span></td></tr><tr><td><code>output/coverage/backend-coverage.xml</code></td><td>Relatório Cobertura XML importado por sonar.python.coverage.reportPaths</td><td><span class='pill pill--good'>Gerado / Pronto</span></td></tr><tr><td><code>output/coverage/backend-junit.xml</code></td><td>Relatório JUnit XML importado por sonar.python.xunit.reportPath</td><td><span class='pill pill--good'>Gerado / Pronto</span></td></tr><tr><td><code>output/coverage/frontend-lcov.info</code></td><td>Relatório LCOV importado por sonar.javascript.lcov.reportPaths</td><td><span class='pill pill--good'>Gerado / Pronto</span></td></tr></tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin-top:12px">
+        Execução local com Docker: <code>docker compose -f docker-compose.sonar.yml up -d sonarqube</code> e
+        <code>SONAR_TOKEN=&lt;token&gt; docker compose -f docker-compose.sonar.yml run --rm sonar-scanner</code>.
+        No GitHub Actions, o workflow <code>.github/workflows/sonar.yml</code> consome automaticamente os segredos <code>SONAR_TOKEN</code> e <code>SONAR_HOST_URL</code>.
+      </p>
+    </section><section id="unitarios-backend" aria-labelledby="unitarios-backend-title">
+      <h2 id="unitarios-backend-title">Backend · testes unitários (recorte rápido)</h2>
+      <p class="muted">Contexto analítico, data local e contrato de anotações, com casos em <code>backend/tests/test_analytical_context.py</code>, <code>backend/tests/test_period.py</code> e <code>backend/tests/test_annotation_contract.py</code>.</p>
+      <dl class="metrics"><div class="metric metric--good"><dt>Testes aprovados</dt><dd>23/23</dd></div><div class="metric metric--good"><dt>Falhas</dt><dd>0</dd></div><div class="metric"><dt>Pulados</dt><dd>0</dd></div><div class="metric"><dt>Duração</dt><dd>0,08 s</dd></div><div class="metric metric--warn"><dt>Linhas cobertas</dt><dd>78,91%<small>101/128</small></dd></div><div class="metric"><dt>Ramificações cobertas</dt><dd>72,22%<small>52/72</small></dd></div><div class="metric"><dt>Arquivos medidos</dt><dd>3</dd></div><div class="metric"><dt>Linhas a cobrir</dt><dd>27</dd></div></dl><details class="files" open>
+      <summary>Cobertura por arquivo <span>(3)</span></summary>
+      
+      <div class="table-scroll">
+        <table aria-label="Cobertura por arquivo — Backend · testes unitários (recorte rápido)">
+          <thead><tr><th scope="col">Arquivo</th><th scope="col">Linhas</th><th scope="col">Ramificações</th><th scope="col">Linhas a cobrir</th></tr></thead>
+          <tbody id="unitarios-backend-tbody"><tr data-file="backend/src/nlp/contracts.py">
+          <th scope="row"><code>backend/src/nlp/contracts.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">54,24%</span>
+              <small>32/59</small>
+            </div>
+          </td>
+          <td>41,18%<small>14/34</small></td>
+          <td><details class="lines"><summary>27 linhas</summary><p>23, 48–63, 68–69, 71–77, 79</p></details></td>
+        </tr><tr data-file="backend/src/services/analytical_context.py">
+          <th scope="row"><code>backend/src/services/analytical_context.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>62/62</small>
+            </div>
+          </td>
+          <td>100,00%<small>38/38</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/period.py">
+          <th scope="row"><code>backend/src/services/period.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>7/7</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr></tbody>
+        </table>
+      </div>
+    </details>
+    </section><section id="unitarios-frontend" aria-labelledby="unitarios-frontend-title">
+      <h2 id="unitarios-frontend-title">Frontend · testes unitários (Node.js)</h2>
+      <p class="muted">4 de 18 arquivos JavaScript/JSX em <code>frontend/src</code> foram medidos. O Node.js mede os módulos carregados pelos testes em <code>frontend/tests/unit/</code>.</p>
+      <dl class="metrics"><div class="metric metric--good"><dt>Testes aprovados</dt><dd>20/20</dd></div><div class="metric metric--good"><dt>Falhas</dt><dd>0</dd></div><div class="metric"><dt>Pulados</dt><dd>0</dd></div><div class="metric"><dt>Duração</dt><dd>0,20 s</dd></div><div class="metric metric--good"><dt>Linhas cobertas</dt><dd>99,38%<small>161/162</small></dd></div><div class="metric"><dt>Ramificações cobertas</dt><dd>78,02%<small>71/91</small></dd></div><div class="metric"><dt>Arquivos medidos</dt><dd>4</dd></div><div class="metric"><dt>Linhas a cobrir</dt><dd>1</dd></div><div class="metric"><dt>Funções cobertas</dt><dd>91,67%<small>11/12</small></dd></div></dl><details class="files" open>
+      <summary>Cobertura por arquivo <span>(4)</span></summary>
+      
+      <div class="table-scroll">
+        <table aria-label="Cobertura por arquivo — Frontend · testes unitários (Node.js)">
+          <thead><tr><th scope="col">Arquivo</th><th scope="col">Linhas</th><th scope="col">Ramificações</th><th scope="col">Linhas a cobrir</th></tr></thead>
+          <tbody id="unitarios-frontend-tbody"><tr data-file="frontend/src/sourcepresentation.js">
+          <th scope="row"><code>frontend/src/sourcePresentation.js</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">99,07%</span>
+              <small>106/107</small>
+            </div>
+          </td>
+          <td>66,67%<small>32/48</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>38</p></details></td>
+        </tr><tr data-file="frontend/src/authapi.js">
+          <th scope="row"><code>frontend/src/authApi.js</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>23/23</small>
+            </div>
+          </td>
+          <td>73,33%<small>11/15</small></td>
+          <td>—</td>
+        </tr><tr data-file="frontend/src/processidentifier.js">
+          <th scope="row"><code>frontend/src/processIdentifier.js</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>6/6</small>
+            </div>
+          </td>
+          <td>100,00%<small>5/5</small></td>
+          <td>—</td>
+        </tr><tr data-file="frontend/src/thesispresentation.js">
+          <th scope="row"><code>frontend/src/thesisPresentation.js</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>26/26</small>
+            </div>
+          </td>
+          <td>100,00%<small>23/23</small></td>
+          <td>—</td>
+        </tr></tbody>
+        </table>
+      </div>
+    </details>
+    </section><section id="ferramentas" aria-labelledby="ferramentas-title">
+      <h2 id="ferramentas-title">Ferramentas · validação NLP e coletores</h2>
+      <p class="muted">Testes automatizados em <code>tools/doctrine/</code> e <code>tools/nlp_validation/</code> garantindo contratos de coleta e cobertura.</p>
+      <dl class="metrics"><div class="metric metric--good"><dt>Testes aprovados</dt><dd>24/24</dd></div><div class="metric metric--good"><dt>Falhas</dt><dd>0</dd></div><div class="metric"><dt>Pulados</dt><dd>0</dd></div><div class="metric"><dt>Duração</dt><dd>0,20 s</dd></div></dl>
+    </section><section id="backend" aria-labelledby="backend-title">
+      <h2 id="backend-title">Backend · suíte completa (unitários + integração)</h2>
+      <p class="muted">47 arquivos de teste exercitando APIs REST, serviços de domínio, Chat Gemini, NLP v2, ETL DataJud/Pangea, segurança e settings de produção. Cobertura de <code>backend/src</code> sem migrações.</p>
+      <dl class="metrics"><div class="metric metric--good"><dt>Testes aprovados</dt><dd>354/360</dd></div><div class="metric metric--good"><dt>Falhas</dt><dd>0</dd></div><div class="metric"><dt>Pulados</dt><dd>6</dd></div><div class="metric"><dt>Duração</dt><dd>22,04 s</dd></div><div class="metric metric--good"><dt>Linhas cobertas</dt><dd>81,43%<small>5.503/6.758</small></dd></div><div class="metric"><dt>Ramificações cobertas</dt><dd>72,39%<small>1.607/2.220</small></dd></div><div class="metric"><dt>Arquivos medidos</dt><dd>101</dd></div><div class="metric"><dt>Linhas a cobrir</dt><dd>1.255</dd></div></dl><details><summary>Testes pulados ou com falha (6)</summary><ul><li>Pulado: tests.test_nlp_evidence.EvidenceTests.test_database_blocks_truncate (PostgreSQL trigger)</li><li>Pulado: tests.test_nlp_evidence.EvidenceTests.test_database_rejects_invalid_revision_chain (PostgreSQL trigger)</li><li>Pulado: tests.test_nlp_evidence.EvidenceTests.test_real_pipeline_outputs_reconcile (Optional local #109 outputs)</li><li>Pulado: tests.test_nlp_evidence.ConcurrentReviewTests.test_two_reviewers_cannot_overwrite_same_revision (Requires actual PostgreSQL row locks)</li><li>Pulado: tests.test_extraction_automation.SchedulePlanTests.test_a_custom_task_owned_by_another_clone_is_rejected (Windows PowerShell required)</li><li>Pulado: tests.test_extraction_automation.SchedulePlanTests.test_different_clones_get_distinct_bounded_schedule_plans (Windows PowerShell required)</li></ul></details><details class="files">
+      <summary>Cobertura por arquivo <span>(101)</span></summary>
+      <label class="filter-box">Filtrar arquivo: <input type="search" placeholder="Ex.: research, nlp, legal_chat..." oninput="filterTable(this, 'backend-tbody')"></label>
+      <div class="table-scroll">
+        <table aria-label="Cobertura por arquivo — Backend · suíte completa (unitários + integração)">
+          <thead><tr><th scope="col">Arquivo</th><th scope="col">Linhas</th><th scope="col">Ramificações</th><th scope="col">Linhas a cobrir</th></tr></thead>
+          <tbody id="backend-tbody"><tr data-file="backend/src/db/management/commands/provision_synthetic_preview.py">
+          <th scope="row"><code>backend/src/db/management/commands/provision_synthetic_preview.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/128</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/34</small></td>
+          <td><details class="lines"><summary>128 linhas</summary><p>3–10, 12–13, 15–19, 21–27, 29–35, 39–45, 54–59, 61–62, 64–70, 75, 82, 85–87, 90–100, 103–104, 107–108, 110–114, 116–143, 145–162, 164–166, 168–170</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/materialize_civil_pilot.py">
+          <th scope="row"><code>backend/src/db/management/commands/materialize_civil_pilot.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/118</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/36</small></td>
+          <td><details class="lines"><summary>118 linhas</summary><p>3–6, 8–9, 11–14, 19, 21–22, 25–33, 35–42, 44–46, 49–51, 53–59, 61–67, 69–77, 80–84, 86–91, 93–96, 98–100, 102, 104–113, 115, 121–122, 124–138, 141–142, 144–147, 149–153, 155</p></details></td>
+        </tr><tr data-file="backend/src/nlp/__main__.py">
+          <th scope="row"><code>backend/src/nlp/__main__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/88</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/28</small></td>
+          <td><details class="lines"><summary>88 linhas</summary><p>3–9, 11–15, 18–22, 24–27, 30–56, 70–91, 93–101, 103–106, 114–116, 119–120</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/stage_legal_collection.py">
+          <th scope="row"><code>backend/src/db/management/commands/stage_legal_collection.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/68</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/22</small></td>
+          <td><details class="lines"><summary>68 linhas</summary><p>3–6, 8–9, 11–15, 17–19, 22–28, 32–34, 41–42, 45–47, 49–51, 53–54, 56–68, 71–78, 90, 92–96, 104, 106–109, 112–113</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/import_alignment_corpus.py">
+          <th scope="row"><code>backend/src/db/management/commands/import_alignment_corpus.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/64</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/16</small></td>
+          <td><details class="lines"><summary>64 linhas</summary><p>1–4, 6–8, 10, 13–14, 16–17, 19–27, 29–41, 51–56, 73–75, 77–81, 84–92, 97–98, 109, 112–113, 116, 118</p></details></td>
+        </tr><tr data-file="backend/src/api/pangea_client.py">
+          <th scope="row"><code>backend/src/api/pangea_client.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">48,11%</span>
+              <small>51/106</small>
+            </div>
+          </td>
+          <td>18,75%<small>6/32</small></td>
+          <td><details class="lines"><summary>55 linhas</summary><p>19–26, 35–41, 49–50, 53–56, 59–61, 71–76, 79–82, 90–93, 106, 110, 113–123, 127, 129, 165, 175</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/validate_civil_publication.py">
+          <th scope="row"><code>backend/src/db/management/commands/validate_civil_publication.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">39,29%</span>
+              <small>33/84</small>
+            </div>
+          </td>
+          <td>23,08%<small>6/26</small></td>
+          <td><details class="lines"><summary>51 linhas</summary><p>23–31, 38–40, 43, 46, 49–50, 54, 56, 62–63, 65–76, 78–83, 85–87, 89–93, 97–101</p></details></td>
+        </tr><tr data-file="backend/src/services/publication_manifest.py">
+          <th scope="row"><code>backend/src/services/publication_manifest.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">85,53%</span>
+              <small>272/318</small>
+            </div>
+          </td>
+          <td>78,36%<small>105/134</small></td>
+          <td><details class="lines"><summary>46 linhas</summary><p>33, 51–53, 57–59, 63–64, 68–71, 73–74, 82–88, 91–92, 107, 154, 172, 191–192, 196, 214, 257–258, 274, 309, 322, 324, 376–377, 379–380, 435, 442, 444, 446, 490</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/prepare_real_staging.py">
+          <th scope="row"><code>backend/src/db/management/commands/prepare_real_staging.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/44</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/10</small></td>
+          <td><details class="lines"><summary>44 linhas</summary><p>3, 5–8, 10–11, 13, 22–27, 46–48, 50–55, 57–62, 64–65, 67–71, 77–82, 84, 86</p></details></td>
+        </tr><tr data-file="backend/src/services/real_staging_prep.py">
+          <th scope="row"><code>backend/src/services/real_staging_prep.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--warn">77,95%</span>
+              <small>152/195</small>
+            </div>
+          </td>
+          <td>62,50%<small>45/72</small></td>
+          <td><details class="lines"><summary>43 linhas</summary><p>136, 155, 170, 187, 203–209, 290–291, 296, 300, 304, 309, 316, 347–351, 355, 377, 448–451, 454, 467, 477, 510–520</p></details></td>
+        </tr><tr data-file="backend/src/services/legal_display_approval.py">
+          <th scope="row"><code>backend/src/services/legal_display_approval.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">88,01%</span>
+              <small>301/342</small>
+            </div>
+          </td>
+          <td>80,00%<small>120/150</small></td>
+          <td><details class="lines"><summary>41 linhas</summary><p>87, 144–145, 147, 149, 158, 171, 212–213, 236, 238, 244, 251, 257, 261, 263, 283, 316, 318, 320, 322, 329, 331, 345–351, 353–357, 420, 522, 546–547, 553, 567</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/provision_synthetic_production.py">
+          <th scope="row"><code>backend/src/db/management/commands/provision_synthetic_production.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/30</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/6</small></td>
+          <td><details class="lines"><summary>30 linhas</summary><p>3–7, 9–10, 12–14, 17–18, 20–21, 26–41</p></details></td>
+        </tr><tr data-file="backend/src/services/pdf_layout.py">
+          <th scope="row"><code>backend/src/services/pdf_layout.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">89,11%</span>
+              <small>221/248</small>
+            </div>
+          </td>
+          <td>70,00%<small>28/40</small></td>
+          <td><details class="lines"><summary>27 linhas</summary><p>61, 88–90, 100, 137, 252–257, 271–274, 300–310</p></details></td>
+        </tr><tr data-file="backend/src/services/research.py">
+          <th scope="row"><code>backend/src/services/research.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">91,75%</span>
+              <small>267/291</small>
+            </div>
+          </td>
+          <td>85,71%<small>108/126</small></td>
+          <td><details class="lines"><summary>24 linhas</summary><p>88–89, 96, 139, 164, 250, 261, 293–294, 324–325, 337–340, 342, 455, 466–467, 478, 496–499</p></details></td>
+        </tr><tr data-file="backend/src/services/nlp_evidence.py">
+          <th scope="row"><code>backend/src/services/nlp_evidence.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">86,14%</span>
+              <small>143/166</small>
+            </div>
+          </td>
+          <td>73,17%<small>60/82</small></td>
+          <td><details class="lines"><summary>23 linhas</summary><p>31, 34, 42, 67, 69, 71, 73, 75, 79, 86, 97, 107, 129, 153, 155, 174, 181, 184, 188, 238, 241, 245, 259</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/import_nlp_result.py">
+          <th scope="row"><code>backend/src/db/management/commands/import_nlp_result.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/23</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/2</small></td>
+          <td><details class="lines"><summary>23 linhas</summary><p>2–3, 5, 7–8, 11–12, 14–19, 21–27, 29–31</p></details></td>
+        </tr><tr data-file="backend/src/services/legal_chat.py">
+          <th scope="row"><code>backend/src/services/legal_chat.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">85,53%</span>
+              <small>130/152</small>
+            </div>
+          </td>
+          <td>70,97%<small>44/62</small></td>
+          <td><details class="lines"><summary>22 linhas</summary><p>45, 48, 59, 62, 72, 83, 87, 93–98, 107, 113, 115, 119, 130, 143, 165, 183, 203</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/extract_datajud.py">
+          <th scope="row"><code>backend/src/db/management/commands/extract_datajud.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">84,17%</span>
+              <small>117/139</small>
+            </div>
+          </td>
+          <td>68,75%<small>33/48</small></td>
+          <td><details class="lines"><summary>22 linhas</summary><p>41, 43, 50–52, 60, 70, 75, 78–81, 111–114, 117–121, 131</p></details></td>
+        </tr><tr data-file="backend/src/nlp/adapters.py">
+          <th scope="row"><code>backend/src/nlp/adapters.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--warn">77,53%</span>
+              <small>69/89</small>
+            </div>
+          </td>
+          <td>68,75%<small>44/64</small></td>
+          <td><details class="lines"><summary>20 linhas</summary><p>25, 33, 37, 39, 46, 59–61, 64, 70, 73, 76, 84, 86, 89, 93, 95, 97, 99, 101</p></details></td>
+        </tr><tr data-file="backend/src/services/nlp_dashboard.py">
+          <th scope="row"><code>backend/src/services/nlp_dashboard.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">90,70%</span>
+              <small>195/215</small>
+            </div>
+          </td>
+          <td>82,00%<small>82/100</small></td>
+          <td><details class="lines"><summary>20 linhas</summary><p>41, 43, 45, 48, 53, 72, 86, 95–96, 98–99, 117, 196–197, 209, 214, 223, 245, 248, 259</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/sync_pangea.py">
+          <th scope="row"><code>backend/src/db/management/commands/sync_pangea.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">87,73%</span>
+              <small>143/163</small>
+            </div>
+          </td>
+          <td>73,08%<small>38/52</small></td>
+          <td><details class="lines"><summary>20 linhas</summary><p>45–46, 55, 58, 68, 79, 81, 84, 86, 88, 94, 152, 185–186, 189, 194, 196, 222–224</p></details></td>
+        </tr><tr data-file="backend/src/routes/research.py">
+          <th scope="row"><code>backend/src/routes/research.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">88,24%</span>
+              <small>150/170</small>
+            </div>
+          </td>
+          <td>78,57%<small>33/42</small></td>
+          <td><details class="lines"><summary>20 linhas</summary><p>44, 47, 66, 103, 106, 126–127, 147–150, 152, 210, 224–225, 233–236, 285</p></details></td>
+        </tr><tr data-file="backend/src/services/research_ai.py">
+          <th scope="row"><code>backend/src/services/research_ai.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">88,27%</span>
+              <small>143/162</small>
+            </div>
+          </td>
+          <td>75,00%<small>45/60</small></td>
+          <td><details class="lines"><summary>19 linhas</summary><p>55, 69–71, 90–93, 108, 110–113, 155, 196, 216, 287, 301, 312</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/sync_datajud.py">
+          <th scope="row"><code>backend/src/db/management/commands/sync_datajud.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--warn">73,33%</span>
+              <small>44/60</small>
+            </div>
+          </td>
+          <td>56,25%<small>9/16</small></td>
+          <td><details class="lines"><summary>16 linhas</summary><p>29–31, 33, 52, 55, 57–61, 63, 85, 89, 95–96</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/sample_civil_datajud.py">
+          <th scope="row"><code>backend/src/db/management/commands/sample_civil_datajud.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">90,37%</span>
+              <small>122/135</small>
+            </div>
+          </td>
+          <td>83,33%<small>35/42</small></td>
+          <td><details class="lines"><summary>13 linhas</summary><p>46, 48, 50, 54, 56, 60, 134–136, 147–149, 179</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/load_stj_responsabilidade_civil.py">
+          <th scope="row"><code>backend/src/db/management/commands/load_stj_responsabilidade_civil.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/13</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/2</small></td>
+          <td><details class="lines"><summary>13 linhas</summary><p>1–2, 4, 6, 11, 13, 54–55, 57–60, 78</p></details></td>
+        </tr><tr data-file="backend/src/nlp/contracts.py">
+          <th scope="row"><code>backend/src/nlp/contracts.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">81,36%</span>
+              <small>48/59</small>
+            </div>
+          </td>
+          <td>76,47%<small>26/34</small></td>
+          <td><details class="lines"><summary>11 linhas</summary><p>49, 51, 58, 61, 63, 73–77, 79</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/refresh_legal_corpus.py">
+          <th scope="row"><code>backend/src/db/management/commands/refresh_legal_corpus.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">88,76%</span>
+              <small>79/89</small>
+            </div>
+          </td>
+          <td>67,65%<small>23/34</small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>31–37, 47, 61, 94</p></details></td>
+        </tr><tr data-file="backend/src/services/deterministic_mapping.py">
+          <th scope="row"><code>backend/src/services/deterministic_mapping.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">81,13%</span>
+              <small>43/53</small>
+            </div>
+          </td>
+          <td>70,59%<small>24/34</small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>17, 21, 24, 27, 30, 32, 40, 42, 57, 59</p></details></td>
+        </tr><tr data-file="backend/src/routes/statistics.py">
+          <th scope="row"><code>backend/src/routes/statistics.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">94,38%</span>
+              <small>168/178</small>
+            </div>
+          </td>
+          <td>85,42%<small>41/48</small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>50–51, 72–74, 94, 215, 229, 514, 521</p></details></td>
+        </tr><tr data-file="backend/src/services/precedent_usage.py">
+          <th scope="row"><code>backend/src/services/precedent_usage.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">92,75%</span>
+              <small>128/138</small>
+            </div>
+          </td>
+          <td>87,50%<small>42/48</small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>51–52, 133, 158–159, 161–162, 165–166, 172</p></details></td>
+        </tr><tr data-file="backend/src/routes/nlp_dashboard.py">
+          <th scope="row"><code>backend/src/routes/nlp_dashboard.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">88,51%</span>
+              <small>77/87</small>
+            </div>
+          </td>
+          <td>72,22%<small>13/18</small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>28, 32, 36–37, 78–80, 86, 93, 123</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/register_courts.py">
+          <th scope="row"><code>backend/src/db/management/commands/register_courts.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/10</small>
+            </div>
+          </td>
+          <td>0,00%<small>0/2</small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>1, 3–4, 7–8, 10–14</p></details></td>
+        </tr><tr data-file="backend/src/accounts/management/commands/bootstrap_support.py">
+          <th scope="row"><code>backend/src/accounts/management/commands/bootstrap_support.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--low">0,00%</span>
+              <small>0/10</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td><details class="lines"><summary>10 linhas</summary><p>1, 3, 6–7, 9–14</p></details></td>
+        </tr><tr data-file="backend/src/etl/transformer.py">
+          <th scope="row"><code>backend/src/etl/transformer.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">87,84%</span>
+              <small>65/74</small>
+            </div>
+          </td>
+          <td>75,00%<small>24/32</small></td>
+          <td><details class="lines"><summary>9 linhas</summary><p>21–23, 48, 52, 54–55, 61, 70</p></details></td>
+        </tr><tr data-file="backend/src/accounts/views.py">
+          <th scope="row"><code>backend/src/accounts/views.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">96,95%</span>
+              <small>254/262</small>
+            </div>
+          </td>
+          <td>91,11%<small>82/90</small></td>
+          <td><details class="lines"><summary>8 linhas</summary><p>45, 67, 136, 151, 212, 256, 288, 395</p></details></td>
+        </tr><tr data-file="backend/src/routes/nlp_evidence.py">
+          <th scope="row"><code>backend/src/routes/nlp_evidence.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">92,31%</span>
+              <small>96/104</small>
+            </div>
+          </td>
+          <td>73,08%<small>19/26</small></td>
+          <td><details class="lines"><summary>8 linhas</summary><p>27, 37, 57, 82, 85–87, 120</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/refresh_datajud.py">
+          <th scope="row"><code>backend/src/db/management/commands/refresh_datajud.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">82,50%</span>
+              <small>33/40</small>
+            </div>
+          </td>
+          <td>70,00%<small>7/10</small></td>
+          <td><details class="lines"><summary>7 linhas</summary><p>26, 30–32, 46–48</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/backfill_stj_lineage.py">
+          <th scope="row"><code>backend/src/db/management/commands/backfill_stj_lineage.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--warn">78,79%</span>
+              <small>26/33</small>
+            </div>
+          </td>
+          <td>66,67%<small>4/6</small></td>
+          <td><details class="lines"><summary>7 linhas</summary><p>32–33, 39–40, 57–59</p></details></td>
+        </tr><tr data-file="backend/src/nlp/thesis_display.py">
+          <th scope="row"><code>backend/src/nlp/thesis_display.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--warn">76,92%</span>
+              <small>20/26</small>
+            </div>
+          </td>
+          <td>60,00%<small>6/10</small></td>
+          <td><details class="lines"><summary>6 linhas</summary><p>22–24, 30–32</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/index_jurisprudence_queues.py">
+          <th scope="row"><code>backend/src/db/management/commands/index_jurisprudence_queues.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">88,64%</span>
+              <small>39/44</small>
+            </div>
+          </td>
+          <td>72,22%<small>13/18</small></td>
+          <td><details class="lines"><summary>5 linhas</summary><p>18, 33, 35, 37–38</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/report_stj_ingestion.py">
+          <th scope="row"><code>backend/src/db/management/commands/report_stj_ingestion.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">87,18%</span>
+              <small>34/39</small>
+            </div>
+          </td>
+          <td>64,29%<small>9/14</small></td>
+          <td><details class="lines"><summary>5 linhas</summary><p>31, 33, 114–116</p></details></td>
+        </tr><tr data-file="backend/src/nlp/reference_sources.py">
+          <th scope="row"><code>backend/src/nlp/reference_sources.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">89,36%</span>
+              <small>42/47</small>
+            </div>
+          </td>
+          <td>79,17%<small>19/24</small></td>
+          <td><details class="lines"><summary>5 linhas</summary><p>23, 26, 32, 39–40</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/import_pangea_raw.py">
+          <th scope="row"><code>backend/src/db/management/commands/import_pangea_raw.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">94,12%</span>
+              <small>64/68</small>
+            </div>
+          </td>
+          <td>80,00%<small>16/20</small></td>
+          <td><details class="lines"><summary>4 linhas</summary><p>28, 45, 61–62</p></details></td>
+        </tr><tr data-file="backend/src/nlp/pipeline.py">
+          <th scope="row"><code>backend/src/nlp/pipeline.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">93,55%</span>
+              <small>58/62</small>
+            </div>
+          </td>
+          <td>81,82%<small>18/22</small></td>
+          <td><details class="lines"><summary>4 linhas</summary><p>51–52, 59, 62</p></details></td>
+        </tr><tr data-file="backend/src/services/corpus_publication.py">
+          <th scope="row"><code>backend/src/services/corpus_publication.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">94,03%</span>
+              <small>63/67</small>
+            </div>
+          </td>
+          <td>85,71%<small>24/28</small></td>
+          <td><details class="lines"><summary>4 linhas</summary><p>24, 40, 63–64</p></details></td>
+        </tr><tr data-file="backend/src/services/report_nlp.py">
+          <th scope="row"><code>backend/src/services/report_nlp.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">92,00%</span>
+              <small>46/50</small>
+            </div>
+          </td>
+          <td>86,36%<small>19/22</small></td>
+          <td><details class="lines"><summary>4 linhas</summary><p>28, 36–37, 50</p></details></td>
+        </tr><tr data-file="backend/src/services/source_metadata.py">
+          <th scope="row"><code>backend/src/services/source_metadata.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">97,22%</span>
+              <small>105/108</small>
+            </div>
+          </td>
+          <td>90,38%<small>47/52</small></td>
+          <td><details class="lines"><summary>3 linhas</summary><p>49, 64, 101</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/match_stj_citations.py">
+          <th scope="row"><code>backend/src/db/management/commands/match_stj_citations.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">93,62%</span>
+              <small>44/47</small>
+            </div>
+          </td>
+          <td>77,78%<small>14/18</small></td>
+          <td><details class="lines"><summary>3 linhas</summary><p>16, 41, 45</p></details></td>
+        </tr><tr data-file="backend/src/etl/stj_ingestion.py">
+          <th scope="row"><code>backend/src/etl/stj_ingestion.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">93,62%</span>
+              <small>44/47</small>
+            </div>
+          </td>
+          <td>83,33%<small>15/18</small></td>
+          <td><details class="lines"><summary>3 linhas</summary><p>18, 36, 59</p></details></td>
+        </tr><tr data-file="backend/src/services/corpus_catalog.py">
+          <th scope="row"><code>backend/src/services/corpus_catalog.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">96,67%</span>
+              <small>87/90</small>
+            </div>
+          </td>
+          <td>93,33%<small>28/30</small></td>
+          <td><details class="lines"><summary>3 linhas</summary><p>22, 26, 44</p></details></td>
+        </tr><tr data-file="backend/src/api/pangea_scope.py">
+          <th scope="row"><code>backend/src/api/pangea_scope.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">90,00%</span>
+              <small>27/30</small>
+            </div>
+          </td>
+          <td>87,50%<small>7/8</small></td>
+          <td><details class="lines"><summary>3 linhas</summary><p>30, 36–37</p></details></td>
+        </tr><tr data-file="backend/src/accounts/provisioning.py">
+          <th scope="row"><code>backend/src/accounts/provisioning.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">91,30%</span>
+              <small>21/23</small>
+            </div>
+          </td>
+          <td>66,67%<small>4/6</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>20, 34</p></details></td>
+        </tr><tr data-file="backend/src/api/datajud_client.py">
+          <th scope="row"><code>backend/src/api/datajud_client.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">97,01%</span>
+              <small>65/67</small>
+            </div>
+          </td>
+          <td>90,91%<small>20/22</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>113, 129</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/manage_legal_display_approval.py">
+          <th scope="row"><code>backend/src/db/management/commands/manage_legal_display_approval.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">94,74%</span>
+              <small>36/38</small>
+            </div>
+          </td>
+          <td>85,71%<small>12/14</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>50, 73</p></details></td>
+        </tr><tr data-file="backend/src/routes/legal_chat.py">
+          <th scope="row"><code>backend/src/routes/legal_chat.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">94,12%</span>
+              <small>32/34</small>
+            </div>
+          </td>
+          <td>75,00%<small>6/8</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>13, 27</p></details></td>
+        </tr><tr data-file="backend/src/services/excel_report.py">
+          <th scope="row"><code>backend/src/services/excel_report.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">96,61%</span>
+              <small>57/59</small>
+            </div>
+          </td>
+          <td>87,50%<small>14/16</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>41, 57</p></details></td>
+        </tr><tr data-file="backend/src/services/statistics_service.py">
+          <th scope="row"><code>backend/src/services/statistics_service.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">96,08%</span>
+              <small>49/51</small>
+            </div>
+          </td>
+          <td>87,50%<small>14/16</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>25, 35</p></details></td>
+        </tr><tr data-file="backend/src/services/report_transaction.py">
+          <th scope="row"><code>backend/src/services/report_transaction.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">80,00%</span>
+              <small>8/10</small>
+            </div>
+          </td>
+          <td>50,00%<small>1/2</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>13–14</p></details></td>
+        </tr><tr data-file="backend/src/routes/excel_report.py">
+          <th scope="row"><code>backend/src/routes/excel_report.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">93,55%</span>
+              <small>29/31</small>
+            </div>
+          </td>
+          <td>100,00%<small>6/6</small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>40–41</p></details></td>
+        </tr><tr data-file="backend/src/routes/pdf_report.py">
+          <th scope="row"><code>backend/src/routes/pdf_report.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">91,30%</span>
+              <small>21/23</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td><details class="lines"><summary>2 linhas</summary><p>41–42</p></details></td>
+        </tr><tr data-file="backend/src/accounts/models.py">
+          <th scope="row"><code>backend/src/accounts/models.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">97,50%</span>
+              <small>39/40</small>
+            </div>
+          </td>
+          <td>83,33%<small>5/6</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>46</p></details></td>
+        </tr><tr data-file="backend/src/db/court_catalog.py">
+          <th scope="row"><code>backend/src/db/court_catalog.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">94,74%</span>
+              <small>18/19</small>
+            </div>
+          </td>
+          <td>75,00%<small>3/4</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>24</p></details></td>
+        </tr><tr data-file="backend/src/db/management/commands/map_records.py">
+          <th scope="row"><code>backend/src/db/management/commands/map_records.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">96,00%</span>
+              <small>24/25</small>
+            </div>
+          </td>
+          <td>50,00%<small>1/2</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>26</p></details></td>
+        </tr><tr data-file="backend/src/etl/cross_source_matching.py">
+          <th scope="row"><code>backend/src/etl/cross_source_matching.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">90,91%</span>
+              <small>10/11</small>
+            </div>
+          </td>
+          <td>50,00%<small>1/2</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>11</p></details></td>
+        </tr><tr data-file="backend/src/nlp/journal.py">
+          <th scope="row"><code>backend/src/nlp/journal.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">95,65%</span>
+              <small>22/23</small>
+            </div>
+          </td>
+          <td>75,00%<small>3/4</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>29</p></details></td>
+        </tr><tr data-file="backend/src/services/outcomes.py">
+          <th scope="row"><code>backend/src/services/outcomes.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">97,50%</span>
+              <small>39/40</small>
+            </div>
+          </td>
+          <td>92,86%<small>13/14</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>64</p></details></td>
+        </tr><tr data-file="backend/src/services/subject_groups.py">
+          <th scope="row"><code>backend/src/services/subject_groups.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">96,15%</span>
+              <small>25/26</small>
+            </div>
+          </td>
+          <td>83,33%<small>5/6</small></td>
+          <td><details class="lines"><summary>1 linhas</summary><p>20</p></details></td>
+        </tr><tr data-file="backend/src/nlp/extraction.py">
+          <th scope="row"><code>backend/src/nlp/extraction.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>58/58</small>
+            </div>
+          </td>
+          <td>91,67%<small>22/24</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/accounts/middleware.py">
+          <th scope="row"><code>backend/src/accounts/middleware.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>30/30</small>
+            </div>
+          </td>
+          <td>93,75%<small>15/16</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/etl/civil_sampling.py">
+          <th scope="row"><code>backend/src/etl/civil_sampling.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>47/47</small>
+            </div>
+          </td>
+          <td>94,44%<small>17/18</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/__init__.py">
+          <th scope="row"><code>backend/src/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/accounts/__init__.py">
+          <th scope="row"><code>backend/src/accounts/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/accounts/apps.py">
+          <th scope="row"><code>backend/src/accounts/apps.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>7/7</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/accounts/management/__init__.py">
+          <th scope="row"><code>backend/src/accounts/management/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/accounts/management/commands/__init__.py">
+          <th scope="row"><code>backend/src/accounts/management/commands/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/api/__init__.py">
+          <th scope="row"><code>backend/src/api/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/__init__.py">
+          <th scope="row"><code>backend/src/db/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/apps.py">
+          <th scope="row"><code>backend/src/db/apps.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>4/4</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/civil_subjects.py">
+          <th scope="row"><code>backend/src/db/civil_subjects.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>15/15</small>
+            </div>
+          </td>
+          <td>100,00%<small>4/4</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/evidence_models.py">
+          <th scope="row"><code>backend/src/db/evidence_models.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>64/64</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/management/__init__.py">
+          <th scope="row"><code>backend/src/db/management/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/management/commands/__init__.py">
+          <th scope="row"><code>backend/src/db/management/commands/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/models.py">
+          <th scope="row"><code>backend/src/db/models.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>321/321</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/sampling_models.py">
+          <th scope="row"><code>backend/src/db/sampling_models.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>16/16</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/db/subject_catalog.py">
+          <th scope="row"><code>backend/src/db/subject_catalog.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>2/2</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/etl/__init__.py">
+          <th scope="row"><code>backend/src/etl/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/etl/loader.py">
+          <th scope="row"><code>backend/src/etl/loader.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>27/27</small>
+            </div>
+          </td>
+          <td>100,00%<small>4/4</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/nlp/__init__.py">
+          <th scope="row"><code>backend/src/nlp/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/nlp/cache.py">
+          <th scope="row"><code>backend/src/nlp/cache.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>28/28</small>
+            </div>
+          </td>
+          <td>100,00%<small>8/8</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/nlp/evaluation.py">
+          <th scope="row"><code>backend/src/nlp/evaluation.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>9/9</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/nlp/topics.py">
+          <th scope="row"><code>backend/src/nlp/topics.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>10/10</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/routes/__init__.py">
+          <th scope="row"><code>backend/src/routes/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/routes/corpus.py">
+          <th scope="row"><code>backend/src/routes/corpus.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>28/28</small>
+            </div>
+          </td>
+          <td>100,00%<small>4/4</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/__init__.py">
+          <th scope="row"><code>backend/src/services/__init__.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">—</span>
+              <small></small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/analytical_context.py">
+          <th scope="row"><code>backend/src/services/analytical_context.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>62/62</small>
+            </div>
+          </td>
+          <td>100,00%<small>38/38</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/pangea_report.py">
+          <th scope="row"><code>backend/src/services/pangea_report.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>12/12</small>
+            </div>
+          </td>
+          <td>100,00%<small>4/4</small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/pdf_report.py">
+          <th scope="row"><code>backend/src/services/pdf_report.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>1/1</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/period.py">
+          <th scope="row"><code>backend/src/services/period.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>7/7</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/report_cases.py">
+          <th scope="row"><code>backend/src/services/report_cases.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>4/4</small>
+            </div>
+          </td>
+          <td>—<small></small></td>
+          <td>—</td>
+        </tr><tr data-file="backend/src/services/report_context.py">
+          <th scope="row"><code>backend/src/services/report_context.py</code></th>
+          <td>
+            <div class="bar-cell">
+              <span class="pill pill--good">100,00%</span>
+              <small>13/13</small>
+            </div>
+          </td>
+          <td>100,00%<small>2/2</small></td>
+          <td>—</td>
+        </tr></tbody>
+        </table>
+      </div>
+    </details>
+    </section>
+  <section id="metodo" aria-labelledby="metodo-title">
+    <h2 id="metodo-title">Metodologia de medição</h2>
+    <p>O backend foi medido com <code>pytest</code> + <code>Coverage.py --branch</code> em SQLite em memória (sem depender de rede externa nem credenciais de produção). O frontend foi medido com <code>node:test</code> e cobertura nativa V8/LCOV. As ferramentas de validação NLP e coletores foram medidas com <code>pytest tools/</code>.</p>
+    <p>Os testes do recorte unitário rápido do backend também compõem a suíte completa (os totais consolidados no resumo executivo não contam duplicidade: somam Backend Completo + Frontend Unitário + Ferramentas).</p>
+    <p>A cada execução de <code>python scripts/test-report.py</code>, o relatório HTML é salvo em <code>output/coverage/index.html</code> e espelhado em <code>backend/tests/relatorio-cobertura.html</code>, junto aos artefatos <code>backend-coverage.xml</code>, <code>backend-junit.xml</code> e <code>frontend-lcov.info</code> consumidos pelo SonarQube.</p>
+  </section>
+</main>
+<script>
+      function filterTable(input, tbodyId) {
+        var q = (input.value || '').trim().toLowerCase();
+        var rows = document.getElementById(tbodyId).querySelectorAll('tr');
+        rows.forEach(function (tr) {
+          var name = tr.getAttribute('data-file') || '';
+          tr.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
+        });
+      }
+    </script>
+</body>
+</html>

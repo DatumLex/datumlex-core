@@ -1,0 +1,84 @@
+name: Qualidade de Código e SonarQube
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, fix/recover-datumlex-delivery]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Cobertura, Lint e SonarQube
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências Python e Frontend
+        run: |
+          python -m pip install -r backend/requirements-dev.txt
+          npm --prefix frontend ci
+
+      - name: Rodar testes automatizados e gerar cobertura (HTML + XML + LCOV)
+        run: python scripts/test-report.py
+
+      - name: Verificar análise estática crítica (Ruff F-series + ESLint)
+        run: |
+          python -m ruff check backend/src --select F
+          npm --prefix frontend run lint
+
+      - name: Publicar relatório de cobertura e artefatos Sonar
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: datumlex-quality-reports
+          path: |
+            output/coverage/index.html
+            output/coverage/backend-coverage.xml
+            output/coverage/backend-junit.xml
+            output/coverage/frontend-lcov.info
+          if-no-files-found: warn
+
+      - name: Verificar configuração de secrets do SonarQube
+        id: sonar_cfg
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ] && [ -n "$SONAR_HOST_URL" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Artefatos Sonar gerados (backend-coverage.xml, backend-junit.xml, frontend-lcov.info)."
+            echo "Para enviar ao servidor SonarQube/SonarCloud, configure os secrets SONAR_TOKEN e SONAR_HOST_URL."
+          fi
+
+      - name: Executar análise SonarQube
+        if: steps.sonar_cfg.outputs.enabled == 'true'
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connections, transaction
 
 from src.accounts.models import Court
-from src.db.models import DimResult, DimSubject, ExtractionRun, FactProcess, FactProcessSubject, ProcessMovement
+from src.db.models import DimResult, DimSubject, FactProcess, FactProcessSubject, ProcessMovement
 from src.db.sampling_models import CivilSampleMember, CivilSamplingCohort
 from src.services.publication_manifest import (
     FACT_DEPENDENCIES, build_cohort_manifest, build_manifest, digest, is_sha256, load_revocations,

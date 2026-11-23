@@ -49,7 +49,17 @@ Na raiz do projeto, execute:
 python scripts/test-report.py
 ```
 
-A cada execução, o comando roda os testes, mede a cobertura e substitui `output/coverage/index.html`. O arquivo mostra o horário da geração, os resultados desta execução e as linhas e ramificações cobertas. Uma falha aparece no HTML e também gera um código de saída diferente de zero.
+A cada execução, o comando roda as 4 suítes (`Backend unitário`, `Backend completo`, `Frontend unitário` e `Ferramentas NLP`), executa análise estática (`Ruff` + `ESLint`), exporta os artefatos para o SonarQube (`output/coverage/backend-coverage.xml`, `output/coverage/backend-junit.xml` e `output/coverage/frontend-lcov.info`) e grava o painel HTML em **`output/coverage/index.html`** e em **`backend/tests/relatorio-cobertura.html`**.
+
+## Qualidade de código e SonarQube
+
+O projeto conta com configuração unificada de SonarQube em `sonar-project.properties` (`sonar.projectKey=br.edu.fatec:datumlex`, cobrindo Python em `backend/src` e React/JS em `frontend/src`, sem tokens hardcoded):
+
+- **CI automático (`.github/workflows/sonar.yml`):** executa `python scripts/test-report.py`, valida `ruff check backend/src --select F` e `npm --prefix frontend run lint`, publica os artefatos de cobertura e envia a análise ao servidor SonarQube/SonarCloud quando os segredos `SONAR_TOKEN` e `SONAR_HOST_URL` estão configurados.
+- **Execução local reproduzível (`docker-compose.sonar.yml`):**
+  1. `python scripts/test-report.py`
+  2. `docker compose -f docker-compose.sonar.yml up -d sonarqube`
+  3. `SONAR_TOKEN=<seu-token> docker compose -f docker-compose.sonar.yml run --rm sonar-scanner`
 
 O script usa `backend/.venv` quando disponível e precisa do Node.js no PATH. Para instalar o Coverage.py e as demais dependências de desenvolvimento no ambiente virtual do backend, execute na raiz do projeto:
 

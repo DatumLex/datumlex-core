@@ -8,7 +8,7 @@ from src.db.models import LegalCorpusTopicMatch
 from src.services.statistics_service import InvalidQuery, filtered_processes
 from src.services.corpus_publication import published_items, with_public_excerpt
 from src.services.source_metadata import public_source_metadata
-from src.nlp.topics import TOPICS, classify, folded
+from src.nlp.topics import TOPICS, classify as classify, folded as folded
 
 VERSION = 'lexical_candidate_v1'
 CATEGORIES = ('jurisprudence','precedent','doctrine')

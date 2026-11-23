@@ -126,3 +126,31 @@ class ChatProviderTests(SimpleTestCase):
             self.assertIn('Órgão?', request.data.decode('utf-8'))
             self.assertEqual(usage['totalTokenCount'], 10)
             self.assertEqual(model, 'test-model')
+
+    def test_validate_accepts_nonbreaking_space_literal_quote(self):
+        retrieved = [{
+            'id': 'ev-1',
+            'passages': ['A restituição em dobro\xa0pressupõe a cobrança indevida e a ausência de engano justificável.'],
+        }]
+        output = {
+            'status': 'draft',
+            'facts': [{'evidence_id': 'ev-1', 'quote': 'A restituição em dobro pressupõe a cobrança indevida'}],
+            'interpretations': [{'text': 'A devolução em dobro exige cobrança indevida.', 'evidence_ids': ['ev-1']}],
+            'uncertainties': ['Recorte limitado à amostra revisada.'],
+        }
+        validated = chat.validate(output, retrieved)
+        self.assertEqual(validated['status'], 'draft')
+        self.assertEqual(len(validated['facts']), 1)
+        self.assertEqual(len(validated['interpretations']), 1)
+        self.assertEqual(len(validated['uncertainties']), 1)
+
+    def test_validate_blocks_paraphrased_quote(self):
+        retrieved = [{'id': 'ev-1', 'passages': ['A restituição em dobro pressupõe cobrança indevida.']}]
+        output = {
+            'status': 'draft',
+            'facts': [{'evidence_id': 'ev-1', 'quote': 'Trecho inventado que não consta no acórdão'}],
+            'interpretations': [],
+            'uncertainties': [],
+        }
+        with self.assertRaises(ValueError):
+            chat.validate(output, retrieved)
