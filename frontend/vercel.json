@@ -29,7 +29,7 @@
           "value": "datumlex-core.vercel.app"
         }
       ],
-      "destination": "https://datumlex-api-pedromattos-production.up.railway.app/api/:path*/"
+      "destination": "https://datumlex-api-real-production.up.railway.app/api/:path*/"
     },
     {
       "source": "/api/:path*",
@@ -39,7 +39,7 @@
           "value": "datumlex-core.vercel.app"
         }
       ],
-      "destination": "https://datumlex-api-pedromattos-production.up.railway.app/api/:path*/"
+      "destination": "https://datumlex-api-real-production.up.railway.app/api/:path*/"
     },
     {
       "source": "/api/:path*/",

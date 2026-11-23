@@ -8,7 +8,7 @@ test('production and synthetic preview use distinct same-origin rewrites', async
     (!rule.has || rule.has.some(item => item.type === 'host' && item.value === host))).destination
   for (const source of ['/api/:path*/', '/api/:path*']) {
     assert.equal(new URL(target('datumlex-core.vercel.app', source)).hostname,
-      'datumlex-api-pedromattos-production.up.railway.app')
+      'datumlex-api-real-production.up.railway.app')
     assert.equal(new URL(target('datumlex-core-git-fix-reco-1c680c-pedromattos-projects-d7c0e0fe.vercel.app', source)).hostname,
       'datumlex-api-preview-recovery-preview.up.railway.app')
     assert.match(target('unassigned-build.vercel.app', source), /^\/api\/gateway\?/)
