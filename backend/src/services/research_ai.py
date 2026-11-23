@@ -94,9 +94,14 @@ def findings(data):
     permitted = {f"F{pk}" for pk in allowed.filter(pk__in=source_ids).values_list("pk", flat=True)}
     for doc in data["sources"]:
         if doc["id"] in permitted and doc["url"]:
+            # The provider receives only category/ID. Render the permitted original
+            # locally after selection, without transmitting titles or excerpts.
+            source_text = f"Fonte · {doc['title']}. Trecho original: " + (
+                doc.get("excerpt", "")[:700] or "Referência bibliográfica; consulte a publicação original."
+            )
             available[doc["id"]] = (
                 {"category": doc["kind"]},
-                block("Fonte revisada recuperada no recorte. Consulte o trecho e a publicação original.", [doc["id"]]),
+                block(source_text, [doc["id"]]),
             )
     return available
 
@@ -117,8 +122,20 @@ def generate(available, scope, question):
     model = settings.RESEARCH_GEMINI_MODEL
     if not re.fullmatch(r"gemini-[a-z0-9.-]{1,70}", model):
         raise AnalysisUnavailable("Modelo Gemini inválido.")
+    # A request for doctrine or precedents must not turn into unrelated volume
+    # statistics. This restriction changes no source rights or court filters.
+    query_intent = intent(question)
+    if query_intent == "sources":
+        query = folded(question)
+        requested = {kind for stem, kind in (("doutrin", "doctrine"), ("precedent", "precedent"),
+                                            ("jurisprud", "jurisprudence")) if stem in query}
+        available = {key: value for key, value in available.items()
+                     if key == "catalog" or (key.startswith("F") and
+                        (not requested or value[0].get("category") in requested))}
+        if not available:
+            raise AnalysisUnavailable("Não há fontes autorizadas para esta consulta no recorte selecionado.")
     payload = {
-        "intent": intent(question),
+        "intent": query_intent,
         "scope": {key: scope[key] for key in ("court", "start", "end", "subject_codes", "topics")},
         "findings": {key: values for key, (values, _) in available.items()},
     }
