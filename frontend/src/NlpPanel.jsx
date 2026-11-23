@@ -165,8 +165,17 @@ export default function NlpPanel({ contextKey, chatOnly = false }) {
     <h2 id="nlp-title">{chatOnly ? 'Fontes revisadas para o chat' : 'Teses identificadas nas decisões'}</h2>
     <p>Tribunais, assunto e período seguem o recorte aplicado acima. Fontes e desfechos abaixo filtram somente este painel de NLP; as taxas DataJud mantêm sua própria população.</p>
     <Feedback state={options} retry={retryOptions} />
-    {options.data && <><form onSubmit={event => { event.preventDefault(); setApplied({ sources: selected.sources, outcomes: selected.outcomes }); setVersion(value => value + 1) }}>
-      <div className="nlp-controls"><fieldset><legend>Fontes do NLP</legend>{options.data.sources.map(source => <label key={source.id}><input type="checkbox" checked={selected.sources.includes(source.id)} onChange={event => toggle('sources', source.id, event.target.checked)} />{sourceLabels[source.id]} · liberação por documento</label>)}</fieldset>
+    {options.data && <>
+      {options.data.readiness && (
+        <p role="status" className="nlp-readiness">
+          <strong>Prontidão NLP v2:</strong>{' '}
+          {options.data.readiness.documents_with_text} documento(s) com texto integral ·{' '}
+          {options.data.readiness.documents_quality_released} liberado(s) para análise ·{' '}
+          {options.data.readiness.approved_evidences} evidência(s) revisada(s) e aprovada(s) (teses e fundamentos).
+        </p>
+      )}
+      <form onSubmit={event => { event.preventDefault(); setApplied({ sources: selected.sources, outcomes: selected.outcomes }); setVersion(value => value + 1) }}>
+      <div className="nlp-controls"><fieldset><legend>Fontes do NLP</legend>{options.data.sources.map(source => <label key={source.id}><input type="checkbox" checked={selected.sources.includes(source.id)} onChange={event => toggle('sources', source.id, event.target.checked)} />{sourceLabels[source.id]}{source.quality_released_documents > 0 ? ` · ${source.quality_released_documents} liberado(s)` : ' · liberação por documento'}</label>)}</fieldset>
         <fieldset><legend>Desfechos exibidos nos textos de decisões</legend>{options.data.outcomes.map(value => <label key={value}><input type="checkbox" checked={selected.outcomes.includes(value)} onChange={event => toggle('outcomes', value, event.target.checked)} />{outcomeLabels[value]}</label>)}</fieldset></div>
       <button className="apply-button" type="submit">Aplicar filtros de NLP</button> <button className="secondary-button" type="button" onClick={() => { setChoices(null); setApplied(null); setVersion(value => value + 1) }}>Restaurar padrões do NLP</button>
     </form>

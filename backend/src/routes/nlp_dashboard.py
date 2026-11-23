@@ -42,7 +42,7 @@ def endpoint(methods):
 @endpoint(['GET'])
 def options(request):
     selected = context.from_query(request.user, request.GET)
-    documents, _, exclusions = service.collect(request.user, selected)
+    documents, evidence, exclusions = service.collect(request.user, selected)
     sources = []
     for source in context.SOURCES:
         matching = [d for d in documents if d['metadata']['source'] == source]
@@ -55,7 +55,13 @@ def options(request):
             'query_id': context.identity(selected), 'default_context': context.resolve(request.user, {}),
             'courts': sorted(context.permitted(request.user)), 'outcomes': list(context.OUTCOMES),
             'subject_codes': list(context.SUBJECTS),
-            'sources': sources, 'unmapped_documents': exclusions['unmapped_documents']}
+            'sources': sources, 'unmapped_documents': exclusions['unmapped_documents'],
+            'readiness': {
+                'documents_in_scope': len(documents),
+                'documents_with_text': sum(d.get('has_text', False) for d in documents),
+                'documents_quality_released': sum(d.get('released', False) for d in documents),
+                'approved_evidences': len(evidence),
+            }}
 
 
 @endpoint(['POST'])

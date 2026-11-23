@@ -43,22 +43,57 @@ STOP = set(
 )
 
 
+CATEGORY_STEMS = (
+    ("doctrine", ("doutrin", "artig", "ril")),
+    ("precedent", ("precedent", "sumul", "tema repetitiv", "temas repetitiv")),
+    ("jurisprudence", ("jurisprud", "ementa", "acordao", "decis")),
+)
+MAX_SAFE_EXCERPT = 25000
+
+
+def strip_source_ids(text):
+    return SOURCE_ID.sub("", text or "").strip()
+
+
+def requested_categories(question):
+    phrase = folded(question or "")
+    return {
+        category
+        for category, stems in CATEGORY_STEMS
+        if any(stem in phrase for stem in stems)
+    }
+
+
 def follows_up(question):
     return bool(
         re.search(r"^e\s|\b(isso|nesse|nessa|desse|dessa|mesmo tema|sobre ele|sobre ela)\b", folded(question))
     )
 
 
+def explicit_anaphora(question):
+    return bool(
+        re.search(r"\b(sobre isso|nesse|nessa|desse|dessa|mesmo tema|sobre ele|sobre ela)\b", folded(question))
+    )
+
+
 def question_scope(params, question, previous):
     courts = set(params.get("court", "TJDFT").split(","))
     named = set(re.findall(r"\b[A-Z]{2,8}\b", question.upper())) & set(ACTIVE_COURTS)
+    inherited_courts = []
     if not named and previous and follows_up(question):
-        named = set(re.findall(r"\b[A-Z]{2,8}\b", previous[-1].upper())) & set(ACTIVE_COURTS)
+        prev_text = strip_source_ids(previous[-1])
+        prev_named = set(re.findall(r"\b[A-Z]{2,8}\b", prev_text.upper())) & set(ACTIVE_COURTS)
+        # Only inherit court narrowing if not switching broad category without repeating the court
+        if prev_named and not requested_categories(question):
+            named = prev_named
+            inherited_courts = sorted(prev_named)
     if named - courts:
         raise InvalidQuery("O tribunal mencionado está fora deste recorte. Ajuste os filtros da pesquisa.")
     filtered = params.copy()
     if named:
         filtered["court"] = ",".join(sorted(named))
+    if inherited_courts:
+        filtered._inherited_courts = inherited_courts
     return filtered
 
 
@@ -208,7 +243,13 @@ def context(params, question="", previous=()):
     query, scope, indexed, merit_query = selection(params)
     counts = {key: 0 for key in CATEGORIES}
     counts.update(dict(indexed.order_by().values_list("category").annotate(n=Count("pk", distinct=True))))
-    docs = retrieve(indexed, question, previous)
+    docs, inherited_topics = retrieve_with_context(indexed, question, previous)
+    inherited = {}
+    inherited_courts = getattr(params, "_inherited_courts", None)
+    if inherited_courts:
+        inherited["courts"] = inherited_courts
+    if inherited_topics:
+        inherited["topics"] = [TOPIC_LABELS.get(t, t) for t in sorted(inherited_topics)]
     # Relation counts concern the complete selected set, independent of examples returned to the chat.
     usage = (
         usage_summary(scope, page_size=4)
@@ -239,23 +280,69 @@ def context(params, question="", previous=()):
         "history": instance_series(query),
         "counts": counts,
         "sources": docs,
+        "inherited_context": inherited,
         "usage": usage["counts"] if usage else None,
         "topics": TOPIC_LABELS,
         "nlp": lexical_nlp_analysis(query, question=question),
         "provider": "gemini" if ai_ready() else "local",
+        "gemini_cooldown_seconds": getattr(settings, "RESEARCH_GEMINI_COOLDOWN_SECONDS", 8),
     }
 
 
 def retrieve(indexed, question, previous):
-    # Earlier document mentions help with follow-ups, but can never extend the authorized queryset.
+    docs, _ = retrieve_with_context(indexed, question, previous)
+    return docs
+
+
+def retrieve_with_context(indexed, question, previous):
+    # Earlier document mentions help with follow-ups, but switching explicit categories must never
+    # silently inherit IDs or topics from the prior category's sources (fix C01).
     direct = SOURCE_ID.findall(question)
-    recent = previous[-1] if previous and follows_up(question) else ""
-    ids = list(map(int, direct or SOURCE_ID.findall(recent)))
-    inferred = classify(question) or classify(recent)
-    if ids and not inferred:
+    is_followup = bool(previous and follows_up(question))
+    has_anaphora = bool(previous and explicit_anaphora(question))
+    recent = previous[-1] if is_followup else ""
+    recent_text = strip_source_ids(recent)
+    asked_categories = requested_categories(question)
+    prev_categories = requested_categories(recent_text) if recent_text else set()
+    switching_category = bool(asked_categories and (not prev_categories or asked_categories != prev_categories))
+
+    # Inherit F<id> references only when explicitly referenced or using explicit anaphora ("sobre isso", "desse", etc.)
+    if direct:
+        ids = list(map(int, direct))
+    elif has_anaphora or (is_followup and not asked_categories):
+        ids = list(map(int, SOURCE_ID.findall(recent)))
+    else:
+        ids = []
+
+    question_topics = set(classify(question).keys())
+    prev_question_topics = set(classify(recent_text).keys()) if is_followup else set()
+    inherited_topics = set()
+
+    if question_topics:
+        inferred = question_topics
+    elif prev_question_topics:
+        inferred = prev_question_topics
+        inherited_topics = set(prev_question_topics)
+    elif ids and (has_anaphora or (not switching_category and not asked_categories)):
         inferred = {t for t in indexed.filter(pk__in=ids).values_list("topic_matches__topic", flat=True) if t}
+        inherited_topics = set(inferred)
+    else:
+        inferred = set()
+
+    filtered = indexed
     if inferred and not direct:
-        indexed = indexed.filter(topic_matches__topic__in=inferred).distinct()
+        narrowed = indexed.filter(topic_matches__topic__in=inferred).distinct()
+        # Never hide existing sources of an explicitly requested category due to inherited continuation filters
+        if inherited_topics and asked_categories and not narrowed.filter(category__in=asked_categories).exists():
+            if indexed.filter(category__in=asked_categories).exists():
+                inferred = set()
+                inherited_topics = set()
+                filtered = indexed
+            else:
+                filtered = narrowed
+        else:
+            filtered = narrowed
+
     terms = list(dict.fromkeys(t for t in re.findall(r"[\w-]{4,}", question.lower()) if t not in STOP))[:8]
     score = Value(0, output_field=IntegerField())
     if ids:
@@ -265,15 +352,16 @@ def retrieve(indexed, question, previous):
         score += Case(When(Exists(matches), then=15), default=0)
     for term in terms:
         score += Case(When(title__icontains=term, then=3), When(public_excerpt__icontains=term, then=1), default=0)
-    ranked = with_public_excerpt(indexed).annotate(relevance=score).order_by("-relevance", F("date").desc(nulls_last=True), "pk")
+    ranked = with_public_excerpt(filtered).annotate(relevance=score).order_by("-relevance", F("date").desc(nulls_last=True), "pk")
     docs = []
     for kind in CATEGORIES:
-        for item in ranked.filter(category=kind)[:3]:
+        limit = 5 if kind in asked_categories else 3
+        for item in ranked.filter(category=kind)[:limit]:
             docs.append(source_item(item))
-    return docs
+    return docs, inherited_topics
 
 
-def source_item(item):
+def source_item(item, *, max_excerpt=MAX_SAFE_EXCERPT):
     permissions = item.provenance.get("permissions", {}) if isinstance(item.provenance, dict) else {}
     origin = item.source_name or item.court
     details = public_source_metadata(
@@ -283,6 +371,14 @@ def source_item(item):
         origin=origin,
         safe_url=safe_url,
     )
+    text_allowed = permissions.get("text") == "allowed"
+    raw_excerpt = item.excerpt or ""
+    if text_allowed:
+        excerpt = raw_excerpt if max_excerpt is None else raw_excerpt[:max_excerpt]
+        truncated = len(raw_excerpt) > len(excerpt)
+    else:
+        excerpt = ""
+        truncated = False
     return {
         "id": f"F{item.pk}",
         "kind": item.category,
@@ -293,7 +389,9 @@ def source_item(item):
         **details,
         "date": item.date,
         "date_kind": item.date_kind,
-        "excerpt": item.excerpt[:1000] if permissions.get("text") == "allowed" else "",
+        "excerpt": excerpt,
+        "excerpt_truncated": truncated,
+        "excerpt_total_length": len(raw_excerpt) if text_allowed else 0,
         "url": safe_url(item.source_url),
         "authors": item.authors,
         "review_status": item.review_status,
@@ -357,14 +455,14 @@ def local_answer(data, question="", previous=()):
             sections.append(block("Sem registros de ajuizamento para compor o histórico."))
     kinds = [
         k
-        for k, stem in (("doctrine", "doutrin"), ("precedent", "precedent"), ("jurisprudence", "decis"))
-        if stem in phrase
+        for k in ("doctrine", "precedent", "jurisprudence")
+        if k in requested_categories(question)
     ]
     if general:
         kinds = ["precedent", "doctrine"]
     if "precedent" in kinds or any(s in phrase for s in ("afast", "aplica", "citad")):
         counts = data["usage"]
-        if counts is not None:
+        if counts is not None and any(counts.values()):
             links = [d["id"] for d in docs if d["kind"] == "link"]
             sections.append(
                 block(
@@ -374,17 +472,26 @@ def local_answer(data, question="", previous=()):
             )
     for kind in kinds:
         examples = [d for d in docs if d["kind"] == kind]
+        total_in_scope = (data.get("counts") or {}).get(kind, 0)
         if not examples:
-            sections.append(block(f"{TYPES[kind]}: nenhuma fonte no recorte selecionado."))
-        else:
-            doc = examples[0]
-            sections.append(
-                block(
-                    f"{TYPES[kind]} · {doc['title']}. "
-                    + (doc["excerpt"][:420] or "Item bibliográfico sem trecho indexado."),
-                    [doc["id"]],
+            if total_in_scope > 0:
+                sections.append(
+                    block(
+                        f"{TYPES[kind]}: há {number(total_in_scope)} fonte(s) aprovada(s) no recorte geral, "
+                        "mas nenhuma coincidiu diretamente com os termos específicos desta pergunta. Consulte a aba Acervo para ver todas."
+                    )
                 )
-            )
+            else:
+                sections.append(block(f"{TYPES[kind]}: nenhuma fonte no recorte selecionado."))
+        else:
+            for doc in examples[:3]:
+                sections.append(
+                    block(
+                        f"{TYPES[kind]} · {doc['title']}. "
+                        + (doc["excerpt"][:420] or "Item bibliográfico sem trecho indexado."),
+                        [doc["id"]],
+                    )
+                )
     if not sections:
         terms = set(re.findall(r"\w{4,}", phrase)) - STOP
         hits = [d for d in docs if any(t in folded(d["title"] + " " + d["excerpt"]) for t in terms)]

@@ -248,17 +248,112 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.rw-source {
+.rw-source,
+.access-root .rw-shell .rw-source,
+.access-root .rw-drawer .rw-source {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) 16px;
   align-items: center;
-  gap: 9px;
+  justify-content: stretch;
+  justify-items: start;
+  gap: 12px;
   width: 100%;
   padding: 12px 0;
+  border: 0;
   border-top: 1px solid var(--border);
   text-align: left;
   color: var(--deep-navy);
   background: #fff;
+}
+.access-root .rw-shell .rw-source > svg:last-child,
+.rw-source > svg:last-child {
+  justify-self: end;
+  color: var(--muted);
+}
+.rw-funnel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 12px;
+  padding: 10px 14px;
+  background: #f7f6f2;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--navy);
+  border-radius: 6px;
+  font-size: 0.92rem;
+}
+.rw-funnel span {
+  white-space: nowrap;
+}
+.rw-funnel-sep {
+  color: var(--muted);
+}
+.rw-chat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.rw-chat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: #edf2ef;
+  color: var(--teal);
+}
+.rw-chat-badge.is-gemini {
+  background: #e6f2ed;
+  color: #154d3f;
+  border: 1px solid #b5d5cb;
+}
+.rw-inherited-note {
+  font-size: 0.84rem;
+  color: var(--teal);
+  background: #f3f7f5;
+  padding: 6px 10px;
+  border-radius: 5px;
+  margin: 6px 0;
+}
+.rw-chat-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+.rw-chat-source-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #faf9f5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.rw-chat-source-card strong {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+.rw-chat-source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 0.83rem;
+}
+.rw-nlp-details {
+  margin-top: 8px;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+.rw-nlp-details summary {
+  cursor: pointer;
 }
 .rw-source:hover strong {
   text-decoration: underline;

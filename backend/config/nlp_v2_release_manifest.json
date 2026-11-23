@@ -1,0 +1,152 @@
+{
+  "schema_version": "nlp-v2-release-manifest/1.0",
+  "batch_id": "ciclo2-nlpv2-20261123",
+  "generated_at": "2026-11-23T10:02:45.863718+00:00",
+  "pipeline_sha256": "d9dbf024e1b6ae321beded00b9adac39216e75f93bd7a93b1495d89aa97d6528",
+  "NLP_DASHBOARD_RELEASES": {
+    "tjdft-civil-fulltext-v2-20261123": {
+      "state": "released",
+      "approval_reference": "DATUMLEX-CICLO2-CURATION-2026-11-23",
+      "benchmark_version": "curated-tjdft-civil-v2.0",
+      "rights_approval_reference": "TJDFT-JURISDF-PUBLIC-OFFICIAL-DECISIONS-2026-11-23",
+      "pipeline_sha256": "d9dbf024e1b6ae321beded00b9adac39216e75f93bd7a93b1495d89aa97d6528",
+      "source": "tjdft_jurisprudence",
+      "inclusion_policy": "human_approved_only",
+      "tasks": [
+        "LEGAL_GROUND",
+        "LEGAL_THESIS"
+      ]
+    }
+  },
+  "NLP_DASHBOARD_CATALOG": {
+    "TJDFT:834d978e-81b2-4b50-a8f6-6a03229283e1": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439
+      ],
+      "extraction_id": "c4f50a75-11df-5f21-9c73-e256a38ca13a",
+      "text_version_id": "813022c6-6532-54ee-9749-63978b959b34",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2026-11-04",
+      "outcome": "denied",
+      "title": "TJDFT — 2ª Turma Recursal — Acórdão 2197630 (Responsabilidade civil do Estado, nexo causal e danos morais/materiais)"
+    },
+    "TJDFT:06934ce4-cfea-410b-bdc2-4799694cd884": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        6226,
+        1156
+      ],
+      "extraction_id": "e9c21bef-3d28-5a75-9e01-eb45dc6db867",
+      "text_version_id": "7954331d-3180-56d2-9abe-5e46eb1abeff",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-28",
+      "outcome": "partial",
+      "title": "TJDFT — 3ª Turma Cível — Acórdão 1950820 (Cobrança indevida de despesas hospitalares, plano de saúde e dano moral)"
+    },
+    "TJDFT:0b5ad6c5-e0fb-414e-a620-2adfa4792ce9": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10438
+      ],
+      "extraction_id": "25775813-445b-5d00-a552-245ff07d3174",
+      "text_version_id": "8e951139-5fb6-5d47-87f6-05c7501a75c0",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-21",
+      "outcome": "denied",
+      "title": "TJDFT — 1ª Turma Cível — Acórdão 1948317 (Erro médico, serviço público de saúde e redistribuição dinâmica do ônus da prova)"
+    },
+    "TJDFT:08628ac6-bf12-4c1d-b1fe-42d8017ee243": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439
+      ],
+      "extraction_id": "1ce822a1-da7c-5f58-8a04-21b8a7546a9f",
+      "text_version_id": "4b0fcad9-5f2a-5fad-a712-cb6b06cf271f",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-14",
+      "outcome": "denied",
+      "title": "TJDFT — 5ª Turma Cível — Acórdão (Atraso na entrega de imóvel, inadimplemento contratual e dano moral)"
+    },
+    "TJDFT:0d8074d6-1eac-4671-8778-a03248416479": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "ce3c4f63-3396-5d06-93a5-59185b81a8cf",
+      "text_version_id": "3f1ccda5-8147-5e74-a572-81684381610b",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2026-09-21",
+      "outcome": "denied",
+      "title": "TJDFT — 3ª Turma Recursal — Transporte aéreo, cancelamento de voo, fortuito interno e responsabilidade objetiva"
+    },
+    "TJDFT:0bb5e64d-7f21-4675-9738-4efd5e4e94ed": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "fccde848-49e9-5515-819f-2b55e6c5cd5a",
+      "text_version_id": "39fa29f7-62d6-58ae-ba4b-6676b9164b07",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2026-10-07",
+      "outcome": "denied",
+      "title": "TJDFT — 2ª Turma Recursal — Acórdão 2187617 (Transporte aéreo, cancelamento de voo, cumulação de dano material e moral)"
+    },
+    "TJDFT:0a3c03ce-7ad6-43b4-8ed2-1d4ee0b51775": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "84b5fd0c-651a-52f6-9af5-0e6e8c3852ae",
+      "text_version_id": "885dc4c8-0897-5b57-b10d-faf4fd1ba020",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-13",
+      "outcome": "denied",
+      "title": "TJDFT — 7ª Turma Cível — Acórdão 1944837 (Descontos indevidos bancários, restituição em dobro e dano moral)"
+    },
+    "TJDFT:0ba70dc8-a9cb-406c-afe4-30942396ba56": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "8f718972-d9f1-5f8e-b7cc-4977da2d4bb1",
+      "text_version_id": "eac8e626-73b0-5b2a-a33a-08572d23e582",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-27",
+      "outcome": "partial",
+      "title": "TJDFT — 6ª Turma Cível — Acórdão 1951674 (Fraude bancária em consignado, fortuito interno, Súmula 297 STJ e devolução simples)"
+    }
+  }
+}

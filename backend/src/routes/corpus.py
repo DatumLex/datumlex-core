@@ -17,7 +17,7 @@ def catalog(request):
 @require_GET
 def detail(request, source_id):
     item = get_object_or_404(court_items(request.user, published_items()), pk=source_id)
-    return JsonResponse(source_item(item))
+    return JsonResponse(source_item(item, max_excerpt=None))
 
 
 @require_GET

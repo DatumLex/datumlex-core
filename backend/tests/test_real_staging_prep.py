@@ -100,7 +100,7 @@ class RealStagingPrepTests(TestCase):
         # Procedural cohort data
         self.cohort = CivilSamplingCohort.objects.create(
             name=EXPECTED_COHORT,
-            definition={"start_year": 2010, "target": 325, "subjects": [10433]},
+            definition={"start_year": 2010, "target": 300, "subjects": [10433]},
         )
         run = ExtractionRun.objects.create(
             status="completed",

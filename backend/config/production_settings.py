@@ -80,6 +80,8 @@ elif PRODUCTION_DEMO:
     ):
         raise ImproperlyConfigured("The production demonstration requires its dedicated database and cohort.")
     SYNTHETIC_PREVIEW = True
+    NLP_DASHBOARD_CATALOG = {}
+    NLP_DASHBOARD_RELEASES = {}
 elif private_db.path == SYNTHETIC_DATABASE_PATH:
     raise ImproperlyConfigured("The synthetic database requires the demonstration mode.")
 

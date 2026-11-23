@@ -1,5 +1,6 @@
 """Local-first settings. PostgreSQL is selected explicitly through DATABASE_URL."""
 
+import json
 import os
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -105,6 +106,20 @@ if SYNTHETIC_PREVIEW:
         raise ValueError("Invalid isolated synthetic preview configuration")
 RESEARCH_GEMINI_ENABLED = os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() == "true"
 RESEARCH_GEMINI_MODEL = os.environ.get("RESEARCH_GEMINI_MODEL", "gemini-3.5-flash-lite")
+RESEARCH_GEMINI_COOLDOWN_SECONDS = max(
+    0, int(os.environ.get("RESEARCH_GEMINI_COOLDOWN_SECONDS", "8"))
+)
+NLP_DASHBOARD_CATALOG = {}
+NLP_DASHBOARD_RELEASES = {}
+_nlp_manifest_path = Path(__file__).resolve().parent / "nlp_v2_release_manifest.json"
+if (
+    not SYNTHETIC_PREVIEW
+    and os.environ.get("NLP_DASHBOARD_USE_MANIFEST", "true").lower() != "false"
+    and _nlp_manifest_path.exists()
+):
+    _nlp_manifest = json.loads(_nlp_manifest_path.read_text(encoding="utf-8"))
+    NLP_DASHBOARD_CATALOG = _nlp_manifest.get("NLP_DASHBOARD_CATALOG", {})
+    NLP_DASHBOARD_RELEASES = _nlp_manifest.get("NLP_DASHBOARD_RELEASES", {})
 PANGEA_SEARCH_BASE_URL = os.environ.get(
     "PANGEA_SEARCH_BASE_URL", "https://pangeabnp.pdpj.jus.br"
 ).rstrip("/")

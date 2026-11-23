@@ -27,7 +27,7 @@ class Command(BaseCommand):
         parser.add_argument("--courts", nargs="+", choices=ACTIVE_COURTS, default=list(ACTIVE_COURTS))
         parser.add_argument("--start-year", type=int, default=2010)
         parser.add_argument("--end", type=date.fromisoformat, default=today())
-        parser.add_argument("--target", type=int, default=325)
+        parser.add_argument("--target", type=int, default=300)
         parser.add_argument("--subjects", nargs="+", type=int, choices=sorted(SUBJECTS), default=[ROOT])
         parser.add_argument("--cohort", default="civil-2010-sgt-2026-11")
         parser.add_argument("--seed", default="datumlex-civil-v1")

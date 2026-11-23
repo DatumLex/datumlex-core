@@ -125,7 +125,7 @@ def chat(request):
         return error(str(exc), 400)
     except DatabaseError:
         return error("O banco está indisponível para esta consulta.", 503)
-    mode, notice = "local", ""
+    mode, notice, retry_after = "local", "", 0
     paragraphs = None
     if use_gemini and research.ai_ready():
         available = research_ai.findings(data)
@@ -134,12 +134,13 @@ def chat(request):
         else:
             try:
                 research_ai.claim_request(request.user.pk)
-                paragraphs = research_ai.generate(available, data["scope"], question)
+                paragraphs = research_ai.generate(available, data["scope"], question, previous=previous)
                 if research_ai.findings(data) != available:
                     raise research_ai.AnalysisUnavailable("As permissões das fontes mudaram durante a consulta.")
                 mode = "gemini"
             except research_ai.AnalysisUnavailable as exc:
                 paragraphs = None
+                retry_after = getattr(exc, "retry_after", 0)
                 notice = f"{exc} Veja a consulta direta ao acervo abaixo."
                 try:
                     data = research.context(params, question, previous)
@@ -161,6 +162,9 @@ def chat(request):
         {
             "mode": mode,
             "notice": notice,
+            "retry_after": retry_after,
+            "cooldown_seconds": research_ai.cooldown_seconds(),
+            "inherited_context": data.get("inherited_context") or {},
             "paragraphs": paragraphs,
             "sources": [s for s in data["sources"] if s["id"] in cited],
             "nlp": nlp_summary,

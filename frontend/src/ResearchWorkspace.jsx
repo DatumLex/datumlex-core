@@ -330,19 +330,39 @@ function LexicalNlpBox({ nlp, showQuery = false }) {
   )
 }
 function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
-  const [useGemini, setUseGemini] = useState(false)
+  const [geminiChoice, setGeminiChoice] = useState(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const tail = useRef(null)
+  const useGemini = geminiChoice ?? (provider === 'gemini')
+  const lastTurn = thread.turns.length ? thread.turns[thread.turns.length - 1] : null
+  const cooldownUntil = lastTurn?.cooldownUntil || 0
+  const cooldownLeft = cooldownUntil > nowMs ? Math.ceil((cooldownUntil - nowMs) / 1000) : 0
   useEffect(() => {
     if (thread.turns.length) tail.current?.scrollIntoView({ block: 'nearest' })
   }, [thread.turns.length])
+  useEffect(() => {
+    if (!cooldownUntil || cooldownUntil <= Date.now()) return undefined
+    const timer = setInterval(() => {
+      const current = Date.now()
+      setNowMs(current)
+      if (current >= cooldownUntil) clearInterval(timer)
+    }, 500)
+    return () => clearInterval(timer)
+  }, [cooldownUntil])
   return (
     <section className="rw-card rw-chat">
       <div className="rw-heading">
         <h2>Conversa sobre o recorte</h2>
-        <small>{provider === 'gemini' ? 'Gemini disponível' : 'Consulta direta ao acervo'}</small>
+        <small>
+          {provider === 'gemini'
+            ? cooldownLeft > 0
+              ? `Gemini pronto em ${cooldownLeft}s`
+              : 'Gemini pronto para síntese fundamentada'
+            : 'Consulta direta ao acervo'}
+        </small>
       </div>
       <p className="rw-note">
-        A conversa acompanha os filtros aplicados. Abra as referências para conferir o texto original.
+        A conversa acompanha os filtros aplicados e integra indicadores do banco com ementas, precedentes e doutrina autorizados.
       </p>
       <LexicalNlpBox nlp={nlp} />
       {!thread.turns.length && (
@@ -354,18 +374,62 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
           ))}
         </div>
       )}
-      {thread.turns.map((t, i) => (
-        <article className="rw-turn" key={i}>
-          <p className="rw-question">
-            <strong>Você</strong>
-            {t.question}
-          </p>
-          <small>{t.mode === 'gemini' ? 'DatumLex · Seleção de achados com Gemini' : 'DatumLex · Consulta ao acervo'}</small>
-          {t.notice && <p>{t.notice}</p>}
-          <Paragraphs blocks={t.paragraphs} docs={t.sources} onOpen={onOpen} />
-          <LexicalNlpBox nlp={t.nlp} showQuery />
-        </article>
-      ))}
+      {thread.turns.map((t, i) => {
+        const inherited = t.inherited_context || {}
+        const inheritedParts = [
+          ...(inherited.topics?.length ? [`Temas: ${inherited.topics.join(', ')}`] : []),
+          ...(inherited.courts?.length ? [`Tribunais: ${inherited.courts.join(', ')}`] : []),
+        ]
+        return (
+          <article className="rw-turn" key={i}>
+            <p className="rw-question">
+              <strong>Você</strong>
+              {t.question}
+            </p>
+            <div className="rw-chat-meta">
+              <span className={`rw-chat-badge${t.mode === 'gemini' ? ' is-gemini' : ''}`}>
+                {t.mode === 'gemini' ? 'Gemini · Resposta fundamentada' : 'Consulta direta ao acervo (local)'}
+              </span>
+              {t.retry_after > 0 && <small>Próxima consulta Gemini em ~{t.retry_after}s</small>}
+            </div>
+            {inheritedParts.length > 0 && (
+              <p className="rw-inherited-note">
+                Filtro herdado da conversa anterior · {inheritedParts.join(' · ')}
+              </p>
+            )}
+            {t.notice && <p className="rw-note">{t.notice}</p>}
+            <Paragraphs blocks={t.paragraphs} docs={t.sources} onOpen={onOpen} />
+            {t.sources?.length > 0 && (
+              <div className="rw-chat-sources" aria-label="Fontes citadas nesta resposta">
+                {t.sources.map((doc) => (
+                  <div className="rw-chat-source-card" key={doc.id}>
+                    <small>
+                      {doc.id} · {sourceLabels[doc.kind] || doc.kind}
+                      {doc.date ? ` · ${String(doc.date).slice(0, 4)}` : ''}
+                    </small>
+                    <strong>{doc.title}</strong>
+                    <small>{doc.authors?.length ? doc.authors.join(', ') : doc.origin || doc.court}</small>
+                    <div className="rw-chat-source-actions">
+                      <button type="button" className="rw-link" onClick={() => onOpen(doc)}>
+                        Abrir ficha e texto
+                      </button>
+                      {doc.url && (
+                        <a className="rw-link" href={doc.url} target="_blank" rel="noreferrer">
+                          Fonte oficial
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <details className="rw-nlp-details">
+              <summary>Análise léxica da pergunta</summary>
+              <LexicalNlpBox nlp={t.nlp} showQuery />
+            </details>
+          </article>
+        )
+      })}
       <div ref={tail} />
       <form
         className="rw-compose"
@@ -388,13 +452,14 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
               if (!thread.busy && thread.draft.trim()) e.currentTarget.form.requestSubmit()
             }
           }}
-          placeholder="Pergunte sobre um indicador, tema ou fonte…"
+          placeholder="Pergunte sobre um indicador, tema, precedente ou doutrina…"
         />
         {provider === 'gemini' && (
           <label>
             <input type="checkbox" checked={useGemini} disabled={thread.busy}
-              onChange={(event) => setUseGemini(event.target.checked)} />
-            {' '}Usar Gemini para selecionar achados com dados agregados do recorte
+              onChange={(event) => setGeminiChoice(event.target.checked)} />
+            {' '}Usar Gemini com indicadores e fontes autorizadas do recorte
+            {cooldownLeft > 0 ? ` (disponível em ${cooldownLeft}s)` : ''}
           </label>
         )}
         <div className="rw-actions">
@@ -504,13 +569,21 @@ export default function ResearchWorkspace({ session }) {
       if (resp.status === 401) window.dispatchEvent(new Event('datumlex:session-ended'))
       const answer = await resp.json()
       if (!resp.ok) throw Error(answer.error?.message || 'Falha na consulta.')
-      if (!c.signal.aborted)
+      if (!c.signal.aborted) {
+        const waitSec =
+          answer.retry_after > 0
+            ? answer.retry_after
+            : answer.mode === 'gemini'
+              ? answer.cooldown_seconds ?? data.gemini_cooldown_seconds ?? 8
+              : 0
+        const cooldownUntil = waitSec > 0 ? Date.now() + waitSec * 1000 : 0
         updateThread((t) => ({
           ...t,
           busy: false,
           draft: '',
-          turns: [...t.turns, { question: q, ...answer }],
+          turns: [...t.turns, { question: q, ...answer, cooldownUntil }],
         }))
+      }
     } catch (err) {
       if (!c.signal.aborted)
         updateThread((t) => ({ ...t, busy: false, error: err.message || 'Falha de conexão.' }))
@@ -671,8 +744,23 @@ export default function ResearchWorkspace({ session }) {
                 <h2 id="rw-process-title">Resultados processuais</h2>
                 <button className="rw-link" onClick={() => navigate('coverage')}>Ver cobertura do lote</button>
               </div>
-              <p><strong>{number(m.process_records)} documentos DataJud</strong> · {number(m.distinct_process_numbers)} números CNJ distintos.</p>
-              <p className="rw-note">Processos por data de ajuizamento. O assunto-pai inclui descendentes e a união dos códigos conta cada documento uma vez.</p>
+              <div className="rw-funnel" aria-label="Funil de elegibilidade dos processos">
+                <span><strong>{number(m.process_records)}</strong> documentos DataJud</span>
+                <span className="rw-funnel-sep" aria-hidden="true">→</span>
+                <span><strong>{number(m.distinct_process_numbers)}</strong> CNJs únicos</span>
+                <span className="rw-funnel-sep" aria-hidden="true">→</span>
+                <span>
+                  <strong>{number(data.merit_baseline.binary_denominator)}</strong> elegíveis para desfecho
+                  {data.merit_baseline.binary_denominator > 0
+                    ? ` (${number(data.merit_baseline.granted)} providos · ${number(data.merit_baseline.denied)} desprovidos)`
+                    : ''}
+                </span>
+              </div>
+              <p className="rw-note">
+                Assunto CNJ ativo: <strong>{[...filters.subject].sort().join(', ') || 'Todos no lote'}</strong>
+                {filters.subject.includes('10431') ? ' (Responsabilidade Civil e descendentes)' : ''}.
+                Processos por data de ajuizamento; cada documento é contado uma vez.
+              </p>
               <p className="rw-note">Temas editoriais atuam no acervo e nas ementas. A lista processual mantém o recorte TPU aplicado.</p>
               {data.scope.sources.includes('datajud') ? <CaseBrowser key={key} scopeKey={key} /> : <p>DataJud desmarcado nos filtros.</p>}
             </section>
@@ -900,7 +988,14 @@ function SourceDetail({ doc, saved, onToggleSave }) {
         </p>
       )}
       {doc.excerpt ? (
-        <blockquote>{doc.excerpt}</blockquote>
+        <>
+          <blockquote style={{ whiteSpace: 'pre-line' }}>{doc.excerpt}</blockquote>
+          {doc.excerpt_truncated && (
+            <p className="rw-note">
+              Texto truncado por limite de segurança ({number(doc.excerpt.length)} de {number(doc.excerpt_total_length)} caracteres). Abra a publicação original para consultar a íntegra.
+            </p>
+          )}
+        </>
       ) : (
         <p className="rw-note">
           A ficha exibe metadados e link. O texto da fonte está disponível apenas na publicação de origem.
@@ -924,24 +1019,42 @@ function SourceDetail({ doc, saved, onToggleSave }) {
 
 function ResearchIndicators({ data }) {
   const base = data.merit_baseline
+  const m = data.metrics
   const exclusions = Object.entries(base.excluded).filter(([, count]) => count > 0)
   const excluded = exclusions.reduce((total, [, count]) => total + count, 0)
   const hasOutcomeFilter = data.scope.outcomes.length !== Object.keys(results).length
+  const subjectCodes = data.scope.selected_subject_codes || []
   return (
     <section className="rw-card rw-indicators" aria-labelledby="rw-indicators-title">
       <h2 id="rw-indicators-title">Indicadores do recorte</h2>
+      <div className="rw-funnel" aria-label="Funil de cálculo de desfecho">
+        <span><strong>{number(m.process_records)}</strong> documentos</span>
+        <span className="rw-funnel-sep" aria-hidden="true">→</span>
+        <span><strong>{number(m.distinct_process_numbers)}</strong> CNJs únicos</span>
+        <span className="rw-funnel-sep" aria-hidden="true">→</span>
+        <span><strong>{number(base.binary_denominator)}</strong> elegíveis para desfecho</span>
+        {base.binary_denominator > 0 && (
+          <>
+            <span className="rw-funnel-sep" aria-hidden="true">→</span>
+            <span><strong>{number(base.granted)}</strong> providos ({rate(base.grant_rate)}) · <strong>{number(base.denied)}</strong> desprovidos ({rate(base.denial_rate)})</span>
+          </>
+        )}
+      </div>
       {base.binary_denominator > 0 ? (
         <p><strong>{number(base.granted)} de {number(base.binary_denominator)} providos ({rate(base.grant_rate)})</strong>
-          {' · '}{number(base.denied)} desprovidos.</p>
+          {' · '}{number(base.denied)} desprovidos ({rate(base.denial_rate)}).</p>
       ) : <p><strong>Sem documentos elegíveis para calcular a taxa.</strong></p>}
-      <p>{number(base.binary_denominator)} documentos elegíveis para a taxa e {number(excluded)} excluídos da base binária.</p>
+      <p>
+        {number(base.binary_denominator)} documentos elegíveis para a taxa binária e {number(excluded)} excluídos do denominador.
+        {' '}Recorte TPU ativo: <strong>{subjectCodes.length ? subjectCodes.join(', ') : 'Todos os assuntos do lote'}</strong>.
+      </p>
       {hasOutcomeFilter && <p>O filtro de resultado mostra {number(data.metrics.process_records)} documentos de {number(base.binary_denominator + excluded)}.
         O cálculo acima usa a base anterior a esse filtro.</p>}
       {exclusions.length > 0 && <details>
-        <summary>Ver exclusões da base</summary>
+        <summary>Ver exclusões da base ({number(excluded)})</summary>
         <ul>{exclusions.map(([key, count]) => <li key={key}>{results[key]} · {number(count)}</li>)}</ul>
       </details>}
-      <p className="rw-note">Cobertura parcial. A regra de resultado recursal foi validada para TJDFT (2ª instância e turmas recursais) e STJ (grau superior). A taxa descreve a amostra e não estima a chance de êxito judicial.</p>
+      <p className="rw-note">Cobertura parcial. As taxas de {base.binary_denominator > 0 ? `${rate(base.grant_rate)} e ${rate(base.denial_rate)}` : 'resultado'} referem-se exclusivamente aos {number(base.binary_denominator)} documentos elegíveis (TJDFT 2ª instância/turmas recursais e STJ grau superior), nunca ao total de {number(m.process_records)} documentos. Não estima probabilidade de êxito judicial.</p>
     </section>
   )
 }
