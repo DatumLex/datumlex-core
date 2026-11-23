@@ -449,8 +449,7 @@ def detail_table(files, scope, section_id):
     rows = sorted(
         files,
         key=lambda row: (
-            row["covered_lines"] - row["num_statements"],
-            row["covered_branches"] - row["num_branches"],
+            -(100 * row["covered_lines"] / row["num_statements"]) if row["num_statements"] else -101.0,
             row["name"],
         ),
     )
@@ -459,39 +458,49 @@ def detail_table(files, scope, section_id):
         lines, branches = row["num_statements"], row["num_branches"]
         missed = lines - row["covered_lines"]
         pct = (100 * row["covered_lines"] / lines) if lines else 100.0
-        cls = tone(pct)
+        br_pct = (100 * row["covered_branches"] / branches) if branches else -1.0
         name = escape(row["name"])
         missing = escape(row["missing"])
         missing_content = (
-            f'<details class="lines"><summary>{number(missed)} linhas</summary><p>{missing}</p></details>'
+            f'<details class="lines"><summary>{number(missed)} linha(s)</summary><p>{missing}</p></details>'
             if missed
-            else "—"
+            else "0"
         )
-        rendered.append(f"""<tr data-file="{name.lower()}">
-          <th scope="row"><code>{name}</code></th>
-          <td>
-            <div class="bar-cell">
-              <span class="pill pill--{cls}">{rate(row["covered_lines"], lines)}</span>
-              <small>{counts(row["covered_lines"], lines) if lines else ""}</small>
-            </div>
-          </td>
-          <td>{rate(row["covered_branches"], branches)}<small>{counts(row["covered_branches"], branches) if branches else ""}</small></td>
-          <td>{missing_content}</td>
-        </tr>""")
-    is_full = section_id == "backend"
+        rendered.append(
+            f'<tr data-file="{name.lower()}" data-pct="{pct:.4f}" data-br="{br_pct:.4f}" '
+            f'data-lines="{lines}" data-missed="{missed}">'
+            f'<td class="col-file"><code>{name}</code></td>'
+            f'<td class="num"><strong>{rate(row["covered_lines"], lines)}</strong></td>'
+            f'<td class="num">{counts(row["covered_lines"], lines) if lines else "0/0"}</td>'
+            f'<td class="num">{rate(row["covered_branches"], branches)}</td>'
+            f'<td class="num">{counts(row["covered_branches"], branches) if branches else "—"}</td>'
+            f'<td>{missing_content}</td>'
+            f'</tr>'
+        )
     search_box = (
-        f'<label class="filter-box">Filtrar arquivo: '
-        f'<input type="search" placeholder="Ex.: research, nlp, legal_chat..." '
+        f'<div class="toolbar">'
+        f'<label>Filtrar arquivo: <input type="search" placeholder="Ex.: research, nlp, legal_chat, accounts..." '
         f'oninput="filterTable(this, \'{section_id}-tbody\')"></label>'
-        if len(rows) > 8
+        f'<span class="hint">Clique nos cabeçalhos para ordenar · {number(len(rows))} arquivo(s)</span>'
+        f'</div>'
+        if len(rows) > 5
         else ""
     )
-    return f'''<details class="files"{" open" if not is_full else ""}>
-      <summary>Cobertura por arquivo <span>({number(len(rows))})</span></summary>
+    return f'''<details class="files" open>
+      <summary>Cobertura por arquivo — % individual <span>({number(len(rows))} arquivos)</span></summary>
       {search_box}
       <div class="table-scroll">
         <table aria-label="Cobertura por arquivo — {escape(scope)}">
-          <thead><tr><th scope="col">Arquivo</th><th scope="col">Linhas</th><th scope="col">Ramificações</th><th scope="col">Linhas a cobrir</th></tr></thead>
+          <thead>
+            <tr>
+              <th scope="col" class="sortable" onclick="sortTable('{section_id}-tbody', 'file', this)">Arquivo</th>
+              <th scope="col" class="num sortable" onclick="sortTable('{section_id}-tbody', 'pct', this)">Linhas (%)</th>
+              <th scope="col" class="num sortable" onclick="sortTable('{section_id}-tbody', 'lines', this)">Cobertas / Total</th>
+              <th scope="col" class="num sortable" onclick="sortTable('{section_id}-tbody', 'br', this)">Ramificações (%)</th>
+              <th scope="col" class="num">Ramos</th>
+              <th scope="col" class="sortable" onclick="sortTable('{section_id}-tbody', 'missed', this)">Linhas descobertas</th>
+            </tr>
+          </thead>
           <tbody id="{section_id}-tbody">{"".join(rendered)}</tbody>
         </table>
       </div>
@@ -499,32 +508,40 @@ def detail_table(files, scope, section_id):
 
 
 def render_layers_section(layers):
-    cards = []
+    rows = []
     for layer in layers:
         pct_str = rate(layer["covered_lines"], layer["num_statements"])
-        cls = tone(layer["pct"])
-        cards.append(f"""<article class="layer-card">
-          <div class="layer-head">
-            <div>
-              <h3>{escape(layer["title"])}</h3>
-              <p class="layer-sub">{escape(layer["subtitle"])}</p>
-            </div>
-            <span class="pill pill--{cls}">{pct_str}</span>
-          </div>
-          <div class="progress" role="progressbar" aria-valuenow="{layer['pct']:.1f}" aria-valuemin="0" aria-valuemax="100">
-            <span class="progress-fill progress-fill--{cls}" style="width:{min(100.0, layer['pct']):.1f}%"></span>
-          </div>
-          <div class="layer-meta">
-            <span><code>{escape(layer["prefix"])}</code></span>
-            <span>{number(layer["files"])} arquivo(s)</span>
-            <span>Linhas: {counts(layer["covered_lines"], layer["num_statements"])}</span>
-            <span>Ramificações: {rate(layer["covered_branches"], layer["num_branches"])}</span>
-          </div>
-        </article>""")
+        br_str = rate(layer["covered_branches"], layer["num_branches"])
+        rows.append(
+            f'<tr>'
+            f'<td><strong>{escape(layer["title"])}</strong><br><small>{escape(layer["subtitle"])}</small></td>'
+            f'<td><code>{escape(layer["prefix"])}</code></td>'
+            f'<td class="num">{number(layer["files"])}</td>'
+            f'<td class="num"><strong>{pct_str}</strong></td>'
+            f'<td class="num">{counts(layer["covered_lines"], layer["num_statements"])}</td>'
+            f'<td class="num">{br_str}</td>'
+            f'<td class="num">{counts(layer["covered_branches"], layer["num_branches"])}</td>'
+            f'</tr>'
+        )
     return f'''<section id="camadas" aria-labelledby="camadas-title">
       <h2 id="camadas-title">Cobertura por camada e serviço</h2>
-      <p class="muted">Agrupamento direto da execução medida sobre os serviços de domínio, APIs, motor NLP v2, ETL, segurança e frontend.</p>
-      <div class="layer-grid">{"".join(cards)}</div>
+      <p class="muted">Agrupamento da cobertura medida por pacote/serviço (backend e frontend).</p>
+      <div class="table-scroll">
+        <table aria-label="Cobertura por camada e serviço">
+          <thead>
+            <tr>
+              <th scope="col">Camada / Serviço</th>
+              <th scope="col">Diretório</th>
+              <th scope="col" class="num">Arquivos</th>
+              <th scope="col" class="num">Linhas (%)</th>
+              <th scope="col" class="num">Linhas</th>
+              <th scope="col" class="num">Ramificações (%)</th>
+              <th scope="col" class="num">Ramos</th>
+            </tr>
+          </thead>
+          <tbody>{"".join(rows)}</tbody>
+        </table>
+      </div>
     </section>'''
 
 
@@ -535,56 +552,36 @@ def render_sonar_section(static, sonar_files_status):
     es_warn = "—" if static.eslint_warnings is None else number(static.eslint_warnings)
 
     kpis = [
-        metric(
-            "Ruff · Erros críticos (F/E9)",
-            ruff_crit,
-            static.ruff_note or "Bugs, nomes indefinidos e imports mortos",
-            badge_tone="good" if static.ruff_critical == 0 else "low",
-        ),
-        metric(
-            "Ruff · Avisos de estilo",
-            ruff_style,
-            "Code smells de formatação em backend/src",
-            badge_tone="good" if static.ruff_style == 0 else "warn",
-        ),
-        metric(
-            "ESLint · Erros Frontend",
-            es_err,
-            static.eslint_note or f"{number(static.eslint_files)} arquivos JS/JSX verificados",
-            badge_tone="good" if static.eslint_errors == 0 else ("low" if static.eslint_errors else ""),
-        ),
-        metric(
-            "ESLint · Avisos Frontend",
-            es_warn,
-            "Regras React Hooks e qualidade JS",
-            badge_tone="good" if static.eslint_warnings == 0 else "",
-        ),
+        metric("Ruff · Erros críticos (F/E9)", ruff_crit, static.ruff_note or "Bugs, nomes indefinidos e imports mortos"),
+        metric("Ruff · Avisos de estilo", ruff_style, "Avisos de formatação em backend/src"),
+        metric("ESLint · Erros Frontend", es_err, static.eslint_note or f"{number(static.eslint_files)} arquivos verificados"),
+        metric("ESLint · Avisos Frontend", es_warn, "Regras React Hooks e JS"),
     ]
     artifact_rows = "".join(
         f"<tr><td><code>{escape(name)}</code></td><td>{escape(desc)}</td>"
-        f"<td><span class='pill pill--{'good' if exists else 'warn'}'>{'Gerado / Pronto' if exists else 'Pendente'}</span></td></tr>"
+        f"<td><strong>{'OK' if exists else 'Pendente'}</strong></td></tr>"
         for name, desc, exists in sonar_files_status
     )
     rules_note = ""
     if static.ruff_top_rules:
-        chips = " · ".join(f"<code>{escape(code)}</code> ({n})" for code, n in static.ruff_top_rules)
-        rules_note = f"<p class='muted' style='margin-top:10px'>Regras Ruff mais frequentes (estilo): {chips}</p>"
+        chips = ", ".join(f"{code} ({n})" for code, n in static.ruff_top_rules)
+        rules_note = f"<p class='muted' style='margin-top:8px'>Regras Ruff (estilo): <code>{escape(chips)}</code></p>"
 
     return f'''<section id="sonar" aria-labelledby="sonar-title">
-      <h2 id="sonar-title">Qualidade estática e integração SonarQube</h2>
-      <p class="muted">Análise estática executada nesta rodada (Ruff + ESLint) combinada com a configuração oficial do projeto SonarQube (<code>br.edu.fatec:datumlex</code>) para Python e JavaScript.</p>
+      <h2 id="sonar-title">Análise estática e integração SonarQube</h2>
+      <p class="muted">Projeto SonarQube <code>br.edu.fatec:datumlex</code> (Python + JS/JSX) com relatórios gerados automaticamente.</p>
       <dl class="metrics">{"".join(kpis)}</dl>
       {rules_note}
       <div class="table-scroll">
-        <table aria-label="Artefatos de integração SonarQube">
-          <thead><tr><th scope="col">Artefato / Configuração</th><th scope="col">Finalidade no SonarQube</th><th scope="col">Status</th></tr></thead>
+        <table aria-label="Artefatos SonarQube">
+          <thead><tr><th scope="col">Artefato / Configuração</th><th scope="col">Finalidade</th><th scope="col">Status</th></tr></thead>
           <tbody>{artifact_rows}</tbody>
         </table>
       </div>
-      <p class="muted" style="margin-top:12px">
-        Execução local com Docker: <code>docker compose -f docker-compose.sonar.yml up -d sonarqube</code> e
+      <p class="muted" style="margin-top:10px">
+        Local (Docker): <code>docker compose -f docker-compose.sonar.yml up -d sonarqube</code> e
         <code>SONAR_TOKEN=&lt;token&gt; docker compose -f docker-compose.sonar.yml run --rm sonar-scanner</code>.
-        No GitHub Actions, o workflow <code>.github/workflows/sonar.yml</code> consome automaticamente os segredos <code>SONAR_TOKEN</code> e <code>SONAR_HOST_URL</code>.
+        CI: <code>.github/workflows/sonar.yml</code> (secrets <code>SONAR_TOKEN</code> e <code>SONAR_HOST_URL</code>).
       </p>
     </section>'''
 
@@ -675,6 +672,19 @@ def render(full, unit, web, tools, static, status, generated, unsuccessful):
     sections = [
         executive_section,
         render_layers_section(layers),
+        summarize(
+            "backend",
+            "Cobertura por arquivo (%) — Backend completo",
+            "47 arquivos de teste exercitando APIs REST, serviços de domínio, Chat Gemini, NLP v2, ETL DataJud/Pangea, segurança e settings de produção. Cobertura de <code>backend/src</code> sem migrações.",
+            full,
+        ),
+        summarize(
+            "unitarios-frontend",
+            "Frontend · testes unitários (Node.js) — % por arquivo",
+            f"{len(web.files)} de {frontend_count} arquivos JavaScript/JSX em <code>frontend/src</code> foram medidos. "
+            "O Node.js mede os módulos carregados pelos testes em <code>frontend/tests/unit/</code>.",
+            web,
+        ),
         render_sonar_section(static, sonar_files_status),
         summarize(
             "unitarios-backend",
@@ -684,88 +694,60 @@ def render(full, unit, web, tools, static, status, generated, unsuccessful):
             unit,
         ),
         summarize(
-            "unitarios-frontend",
-            "Frontend · testes unitários (Node.js)",
-            f"{len(web.files)} de {frontend_count} arquivos JavaScript/JSX em <code>frontend/src</code> foram medidos. "
-            "O Node.js mede os módulos carregados pelos testes em <code>frontend/tests/unit/</code>.",
-            web,
-        ),
-        summarize(
             "ferramentas",
             "Ferramentas · validação NLP e coletores",
             "Testes automatizados em <code>tools/doctrine/</code> e <code>tools/nlp_validation/</code> garantindo contratos de coleta e cobertura.",
             tools,
         ),
-        summarize(
-            "backend",
-            "Backend · suíte completa (unitários + integração)",
-            "47 arquivos de teste exercitando APIs REST, serviços de domínio, Chat Gemini, NLP v2, ETL DataJud/Pangea, segurança e settings de produção. Cobertura de <code>backend/src</code> sem migrações.",
-            full,
-        ),
     ]
     styles = """
-      :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; color: #14293c; background: #f3f6f8; line-height: 1.55; }
+      :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #111; background: #fff; line-height: 1.45; font-size: 14px; }
       * { box-sizing: border-box; }
-      body { margin: 0; }
-      header { background: linear-gradient(135deg, #102a3f 0%, #14334a 55%, #0c4d45 100%); color: #fff; }
-      .wrap, main { max-width: 1180px; margin: auto; padding-inline: clamp(16px,4vw,52px); }
-      header .wrap { padding-block: 40px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; }
-      h1 { margin: 4px 0 8px; font-size: clamp(1.9rem,4.5vw,3rem); line-height: 1.1; letter-spacing: -.03em; }
-      .brand { margin: 0; color: #b7ebd9; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: .85rem; }
-      header p:last-child { margin: 0; color: #dce9f1; }
-      .gate-badge { padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: .92rem; letter-spacing: .03em; border: 1px solid rgba(255,255,255,.28); }
-      .gate-badge--good { background: rgba(16,185,129,.22); color: #d1fae5; }
-      .gate-badge--low { background: rgba(239,68,68,.26); color: #fee2e2; }
-      nav { padding-block: 18px 8px; display: flex; flex-wrap: wrap; gap: 8px 16px; }
-      nav a { color: #07594e; font-weight: 650; text-underline-offset: 3px; font-size: .94rem; }
-      section { margin: 18px 0; padding: clamp(16px,3vw,28px); background: #fff; border: 1px solid #d9e3e9; border-radius: 12px; scroll-margin-top: 12px; box-shadow: 0 1px 2px rgba(16,42,63,.04); }
-      h2 { font-size: clamp(1.2rem,2.6vw,1.55rem); margin: 0 0 4px; line-height: 1.3; }
-      h3 { margin: 0; font-size: 1rem; color: #14293c; }
-      .muted { overflow-wrap: anywhere; color: #405a6d; margin: 0; font-size: .94rem; }
-      .alert { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 8px; }
-      .metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 10px; margin: 18px 0 8px; }
-      .metric { padding: 12px 13px; border: 1px solid #d9e8e5; background: #f4faf8; border-radius: 10px; }
-      .metric--good { border-color: #bbf7d0; background: #f0fdf4; }
-      .metric--warn { border-color: #fde68a; background: #fffbeb; }
-      .metric--low { border-color: #fecaca; background: #fef2f2; }
-      dt { font-size: .82rem; color: #304d56; font-weight: 600; }
-      dd { margin: 2px 0 0; color: #07594e; font-weight: 750; font-size: 1.35rem; }
-      .metric--warn dd { color: #92400e; }
+      body { margin: 0; padding: 0; }
+      header { border-bottom: 2px solid #111; background: #fff; }
+      .wrap, main { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+      header .wrap { padding: 18px 20px 14px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; }
+      h1 { margin: 2px 0 4px; font-size: 1.55rem; font-weight: 700; color: #111; }
+      .brand { margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #555; }
+      header p:last-child { margin: 0; font-size: .86rem; color: #444; }
+      .gate-badge { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .85rem; font-weight: 700; padding: 4px 10px; border: 1px solid #111; background: #f8f8f8; color: #111; }
+      .gate-badge--low { border-color: #991b1b; color: #991b1b; background: #fff5f5; }
+      nav { padding: 10px 0; border-bottom: 1px solid #d4d4d4; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .88rem; }
+      nav a { color: #0b4f8a; text-decoration: underline; }
+      section { margin: 0; padding: 18px 0; border-bottom: 1px solid #e0e0e0; scroll-margin-top: 8px; }
+      h2 { font-size: 1.15rem; margin: 0 0 4px; font-weight: 700; color: #111; }
+      .muted { overflow-wrap: anywhere; color: #555; margin: 0 0 10px; font-size: .88rem; }
+      .alert { color: #991b1b; border: 1px solid #991b1b; background: #fff5f5; padding: 8px 10px; }
+      .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; margin: 10px 0; border-top: 1px solid #ccc; border-left: 1px solid #ccc; }
+      .metric { padding: 8px 10px; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; background: #fafafa; }
+      .metric--low { background: #fff5f5; }
+      dt { font-size: .78rem; color: #555; }
+      dd { margin: 2px 0 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: 700; font-size: 1.15rem; color: #111; }
       .metric--low dd { color: #991b1b; }
-      small { display: block; font-size: .78rem; font-weight: 500; color: #405a6d; }
+      small { display: block; font-family: inherit; font-size: .76rem; font-weight: 400; color: #555; }
       dd, td { font-variant-numeric: tabular-nums; }
-      .layer-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(270px,1fr)); gap: 12px; margin-top: 16px; }
-      .layer-card { border: 1px solid #dce6ec; border-radius: 10px; padding: 14px; background: #fbfdfe; }
-      .layer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
-      .layer-sub { margin: 2px 0 0; font-size: .82rem; color: #4b6476; }
-      .progress { height: 9px; background: #e2ecf1; border-radius: 999px; overflow: hidden; margin-bottom: 10px; }
-      .progress-fill { display: block; height: 100%; border-radius: 999px; }
-      .progress-fill--good { background: #0f766e; }
-      .progress-fill--warn { background: #d97706; }
-      .progress-fill--low { background: #dc2626; }
-      .layer-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: .8rem; color: #405a6d; }
-      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .8rem; font-weight: 700; white-space: nowrap; }
-      .pill--good { background: #dcfce7; color: #166534; }
-      .pill--warn { background: #fef3c7; color: #92400e; }
-      .pill--low { background: #fee2e2; color: #991b1b; }
-      .bar-cell { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
-      summary { cursor: pointer; color: #07594e; font-weight: 650; }
-      summary span { color: #405a6d; }
-      .filter-box { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: .88rem; color: #304d56; }
-      .filter-box input { padding: 6px 10px; border: 1px solid #cbd8e0; border-radius: 6px; min-width: 240px; font: inherit; }
-      .table-scroll { margin-top: 10px; overflow-x: auto; }
-      table { border-collapse: collapse; width: 100%; text-align: left; font-size: .88rem; }
-      th, td { padding: 9px 10px; border-bottom: 1px solid #e1e9ee; vertical-align: top; }
-      thead { background: #e9f1f5; }
-      tbody th { font-weight: 500; overflow-wrap: anywhere; width: 52%; }
-      tbody tr:nth-child(even) { background: #f8fbfc; }
-      .lines p { margin: 4px 0; overflow-wrap: anywhere; }
-      code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .88em; background: #eef4f7; padding: 1px 4px; border-radius: 4px; }
-      #metodo { margin-bottom: 36px; }
-      #metodo p { margin: 8px 0; }
+      summary { cursor: pointer; font-weight: 700; color: #111; margin: 8px 0 6px; }
+      summary span { color: #555; font-weight: 400; }
+      .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; font-size: .86rem; }
+      .toolbar input { padding: 4px 8px; border: 1px solid #999; min-width: 260px; font: inherit; }
+      .hint { color: #666; font-size: .8rem; }
+      .table-scroll { margin-top: 6px; overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; text-align: left; font-size: .85rem; border: 1px solid #ccc; }
+      th, td { padding: 6px 8px; border: 1px solid #ddd; vertical-align: top; }
+      thead th { background: #efefef; font-weight: 700; color: #111; white-space: nowrap; }
+      th.sortable { cursor: pointer; user-select: none; }
+      th.sortable:hover { background: #e3e3e3; }
+      th.sortable::after { content: " ↕"; color: #777; font-weight: 400; }
+      tbody tr:nth-child(even) { background: #fafafa; }
+      td.num, th.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; }
+      td.col-file { overflow-wrap: anywhere; }
+      .lines summary { margin: 0; font-weight: 400; color: #0b4f8a; }
+      .lines p { margin: 4px 0 0; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .8rem; color: #444; }
+      code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .88em; }
+      #metodo { border-bottom: 0; padding-bottom: 32px; }
+      #metodo p { margin: 6px 0; color: #333; }
       @media (max-width: 560px) {
-        table { min-width: 510px; }
-        header .wrap { padding-block: 28px 24px; }
+        table { min-width: 560px; }
       }
     """
     script = """
@@ -777,35 +759,49 @@ def render(full, unit, web, tools, static, status, generated, unsuccessful):
           tr.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
         });
       }
+      function sortTable(tbodyId, field, th) {
+        var tbody = document.getElementById(tbodyId);
+        var asc = th.getAttribute('data-asc') !== '1';
+        th.setAttribute('data-asc', asc ? '1' : '0');
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        rows.sort(function (a, b) {
+          var av = a.getAttribute('data-' + field) || '';
+          var bv = b.getAttribute('data-' + field) || '';
+          if (field === 'file') return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+          var an = parseFloat(av), bn = parseFloat(bv);
+          return asc ? (an - bn) : (bn - an);
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+      }
     """
     html = f"""<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DatumLex · Painel de Testes Automatizados, Cobertura e SonarQube</title>
+<title>DatumLex — Relatório de Testes Automatizados e Cobertura</title>
 <style>{styles}</style>
 </head>
 <body>
 <header><div class="wrap">
   <div>
-    <p class="brand">DatumLex · Engenharia de Qualidade</p>
-    <h1>Testes Automatizados e Cobertura</h1>
+    <p class="brand">DatumLex / Qualidade e Testes Automatizados</p>
+    <h1>Relatório de Testes, Cobertura por Arquivo e SonarQube</h1>
     <p>Gerado em <time datetime="{generated.isoformat()}">{generated:%d/%m/%Y às %H:%M:%S %z}</time> · {escape(status)}</p>
   </div>
   <div class="gate-badge gate-badge--{'good' if gate_ok else 'low'}">
-    Quality Gate · {'APROVADO' if gate_ok else 'ATENÇÃO'}
+    QUALITY GATE: {'APROVADO' if gate_ok else 'ATENÇÃO'}
   </div>
 </div></header>
 <main>
   <nav aria-label="Seções do relatório">
-    <a href="#resumo">Resumo / Quality Gate</a>
+    <a href="#resumo">Resumo</a>
     <a href="#camadas">Cobertura por serviço</a>
-    <a href="#sonar">Análise estática & SonarQube</a>
+    <a href="#backend">Cobertura por arquivo (%)</a>
+    <a href="#sonar">Análise estática e SonarQube</a>
     <a href="#unitarios-backend">Backend unitário</a>
     <a href="#unitarios-frontend">Frontend unitário</a>
     <a href="#ferramentas">Ferramentas NLP</a>
-    <a href="#backend">Backend completo</a>
     <a href="#metodo">Metodologia</a>
   </nav>
   {"".join(sections)}
