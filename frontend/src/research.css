@@ -25,11 +25,14 @@
   display: grid;
   gap: 4px;
 }
-.rw-rail button {
+.rw-rail button,
+.access-root .rw-rail nav button {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  width: 100%;
   gap: 10px;
-  padding: 11px;
+  padding: 11px 12px;
   text-align: left;
   font-weight: 600;
   font-size: 0.94rem;
@@ -37,6 +40,9 @@
   color: var(--teal);
   background: transparent;
   cursor: pointer;
+}
+.access-root .rw-rail nav button svg {
+  flex-shrink: 0;
 }
 .rw-rail button:hover,
 .rw-rail button[aria-current] {
@@ -419,6 +425,62 @@
 }
 .rw-actions {
   margin: 12px 0;
+}
+.rw-actions.rw-query {
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+.rw-actions.rw-query label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--deep-navy);
+}
+.rw-actions.rw-query input {
+  margin-top: 0;
+  min-height: 40px;
+  padding: 8px 11px;
+  min-width: 240px;
+}
+.rw-actions.rw-query .secondary-button,
+.rw-actions.rw-query .rw-link {
+  min-height: 40px;
+}
+.access-root .rw-filterbar {
+  align-items: center;
+}
+.access-root .rw-filterbar > button {
+  justify-self: end;
+}
+.access-root .rw-shell .filter-panel {
+  align-items: start;
+}
+.access-root .rw-shell .filter-grid {
+  align-items: start;
+}
+.access-root .rw-shell .filter-field > label {
+  display: block;
+}
+.access-root .rw-shell .filter-field input,
+.access-root .rw-shell .filter-field select,
+.access-root .rw-shell .tribunal-trigger {
+  min-height: 42px;
+}
+.access-root .rw-shell .tribunal-trigger {
+  justify-content: space-between;
+  text-align: left;
+  width: 100%;
+}
+.access-root .rw-shell .filter-actions {
+  align-self: start;
+  padding-top: 22px;
+}
+.access-root .rw-shell .nlp-controls fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .rw-shell input,
 .rw-drawer input,

@@ -371,7 +371,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
         <button id="tab-overview" type="button" role="tab" aria-selected={activeTab === 'overview'} aria-controls="panel-overview" className={activeTab === 'overview' ? 'is-active' : ''} onClick={() => setActiveTab('overview')}>Visão geral</button>
         {courts.includes('TJDFT') && <button id="tab-precedents" type="button" role="tab" aria-selected={activeTab === 'precedents'} aria-controls="panel-precedents" className={activeTab === 'precedents' ? 'is-active' : ''} onClick={() => setActiveTab('precedents')}>Precedentes e teses</button>}
         <button id="tab-sources" type="button" role="tab" aria-selected={activeTab === 'sources'} aria-controls="panel-sources" className={activeTab === 'sources' ? 'is-active' : ''} onClick={() => setActiveTab('sources')}>Fontes e cobertura</button>
-        <button id="tab-nlp" type="button" role="tab" aria-selected={activeTab === 'nlp'} aria-controls="panel-nlp" className={activeTab === 'nlp' ? 'is-active' : ''} onClick={() => setActiveTab('nlp')}>NLP v2 · Teses e fundamentos</button>
+        <button id="tab-nlp" type="button" role="tab" aria-selected={activeTab === 'nlp'} aria-controls="panel-nlp" className={activeTab === 'nlp' ? 'is-active' : ''} onClick={() => setActiveTab('nlp')}>NLP · Teses e fundamentos</button>
         <button id="tab-chat" type="button" role="tab" aria-selected={activeTab === 'chat'} aria-controls="panel-chat" className={activeTab === 'chat' ? 'is-active' : ''} onClick={() => setActiveTab('chat')}>Chat de análise · IA</button>
       </nav>
       <div className="data-status" role={activeTab === 'corpus' ? 'status' : error ? 'alert' : 'status'}>
@@ -475,7 +475,12 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
             <p>{sourceData?.coverage || 'Aguardando carregamento dos metadados.'}</p>
           </article>
         })}</div>
-        {alignment && <div className="source-card corpus-card"><span className="section-kicker">Corpus jurídico</span><h3>Precedentes STJ e doutrina BDJur</h3><div className="alignment-metrics">
+        {alignment && (
+          (alignment.metadata.approved_references.precedents || 0) +
+          (alignment.metadata.approved_references.doctrine || 0) +
+          (alignment.metadata.review_queue.pending_or_unreviewed || 0) +
+          (alignment.metrics.validated_links || 0) > 0
+        ) && <div className="source-card corpus-card"><span className="section-kicker">Corpus jurídico</span><h3>Precedentes STJ e doutrina BDJur</h3><div className="alignment-metrics">
           <IndicatorCard label="Precedentes aprovados" value={formatNumber(alignment.metadata.approved_references.precedents)} accent="navy" note="Referências rastreáveis cadastradas no corpus" />
           <IndicatorCard label="Doutrinas BDJur aprovadas" value={formatNumber(alignment.metadata.approved_references.doctrine)} accent="green" note="Fontes de apoio; não integram a taxa de aderência" />
           <IndicatorCard label="Avaliações pendentes" value={formatNumber(alignment.metadata.review_queue.pending_or_unreviewed)} accent="gold" note="Não entram nos indicadores até validação" />

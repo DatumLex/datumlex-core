@@ -34,7 +34,7 @@ const pages = {
   chat: ['Chat da pesquisa', 'Chat da pesquisa', MessageSquare],
   corpus: ['Acervo por assunto', 'Acervo por assunto', BookOpen],
   precedents: ['Precedentes e teses', 'Precedentes e teses', Scale],
-  nlp: ['NLP v2 · Teses', 'Análise NLP v2 — Teses e fundamentos', Sparkles],
+  nlp: ['NLP · Teses', 'Análise NLP — Teses e fundamentos', Sparkles],
   notebook: ['Caderno', 'Caderno de pesquisa', Bookmark],
   coverage: ['Fontes e cobertura', 'Fontes e cobertura', Database],
   legacy: ['Análise detalhada', 'Análise detalhada', FolderSearch],
@@ -332,10 +332,9 @@ function LexicalNlpBox({ nlp, showQuery = false }) {
   )
 }
 function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
-  const [geminiChoice, setGeminiChoice] = useState(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const tail = useRef(null)
-  const useGemini = geminiChoice ?? (provider === 'gemini')
+  const useGemini = provider === 'gemini'
   const lastTurn = thread.turns.length ? thread.turns[thread.turns.length - 1] : null
   const cooldownUntil = lastTurn?.cooldownUntil || 0
   const cooldownLeft = cooldownUntil > nowMs ? Math.ceil((cooldownUntil - nowMs) / 1000) : 0
@@ -456,19 +455,17 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
           }}
           placeholder="Pergunte sobre um indicador, tema, precedente ou doutrina…"
         />
-        {provider === 'gemini' && (
-          <label>
-            <input type="checkbox" checked={useGemini} disabled={thread.busy}
-              onChange={(event) => setGeminiChoice(event.target.checked)} />
-            {' '}Usar Gemini com indicadores e fontes autorizadas do recorte
-            {cooldownLeft > 0 ? ` (disponível em ${cooldownLeft}s)` : ''}
-          </label>
-        )}
         <div className="rw-actions">
           <button className="apply-button" disabled={thread.busy || !thread.draft.trim()}>
             <Send size={15} /> Enviar pergunta
           </button>
-          <span role="status">{thread.busy ? 'Consultando a pesquisa…' : ''}</span>
+          <span role="status">
+            {thread.busy
+              ? 'Consultando a pesquisa…'
+              : cooldownLeft > 0
+                ? `Próxima síntese Gemini disponível em ${cooldownLeft}s`
+                : ''}
+          </span>
         </div>
         {thread.error && <p role="alert">{thread.error}</p>}
       </form>

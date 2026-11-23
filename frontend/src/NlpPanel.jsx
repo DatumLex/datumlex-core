@@ -168,7 +168,7 @@ export default function NlpPanel({ contextKey, chatOnly = false }) {
     {options.data && <>
       {options.data.readiness && (
         <p role="status" className="nlp-readiness">
-          <strong>Prontidão NLP v2:</strong>{' '}
+          <strong>Prontidão NLP:</strong>{' '}
           {options.data.readiness.documents_with_text} documento(s) com texto integral ·{' '}
           {options.data.readiness.documents_quality_released} liberado(s) para análise ·{' '}
           {options.data.readiness.approved_evidences} evidência(s) revisada(s) e aprovada(s) (teses e fundamentos).
