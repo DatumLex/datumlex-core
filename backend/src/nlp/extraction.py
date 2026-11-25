@@ -5,9 +5,14 @@ import re
 from .contracts import fingerprint, unknown, validate_annotation
 from .topics import classify
 
-RULES_VERSION = "0.3.0"
+RULES_VERSION = "0.4.0"
 NUMBER_PREFIX = r"(?:n(?:[.º°o]|\s)*\s*)?"
+THEME_CITATION = (
+    rf"\bTema\s+(?:repetitivo\s+)?{NUMBER_PREFIX}"
+    r"(?:\d{1,2}\.\d{3}|\d{1,5})\s*,?\s*(?:/\s*|do\s+)(?:STJ|STF)\b"
+)
 AUTHORITY_RULES = {
+    "theme": THEME_CITATION,
     "sumula": rf"\bS[úu]mula\s+{NUMBER_PREFIX}\d+\s*,?\s*(?:do\s+|/\s*)(?:STJ|STF)\b",
     "judgment": rf"\b(?:REsp|AREsp)\s+{NUMBER_PREFIX}\d[\d.]*(?:\s*/\s*[A-Z]{{2}})\b",
     "statute": rf"\bLei\s+{NUMBER_PREFIX}\d[\d.]*(?:\s*/\s*\d{{2,4}})?\b",

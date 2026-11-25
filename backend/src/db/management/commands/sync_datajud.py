@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from src.db.models import ExtractionRun
 from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
-from src.services.period import HISTORY_START, today
+from src.services.period import EARLIEST_DATE, HISTORY_START, today
 from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 
@@ -25,7 +25,7 @@ class Command(BaseCommand):
         try:
             start = date.fromisoformat(options["start"])
             subjects = sorted({int(code.strip()) for code in options["subjects"].split(",")})
-            if start < HISTORY_START or start > today() or not subjects or min(subjects) < 1:
+            if start < EARLIEST_DATE or start > today() or not subjects or min(subjects) < 1:
                 raise ValueError
         except ValueError:
             raise CommandError("Use a valid start date from 2016 to today and positive subject codes") from None

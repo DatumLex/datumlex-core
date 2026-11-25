@@ -8,10 +8,11 @@ from django.core import signing
 from django.db import connection, transaction
 from django.utils import timezone
 
-from src.db.models import NlpExtraction, NlpSnapshot
+from src.db.models import NlpExtraction, NlpSnapshot, NlpTextVersion
 from src.nlp.contracts import bytes_hash, fingerprint
 from src.services import analytical_context as context_service
 from src.services import nlp_evidence
+from src.services.corpus_publication import allowed_versions, current_evidence, version_available
 
 CONTRACT = 'nlp-dashboard/1.0'
 DISCLAIMER = 'Frequência documental não representa probabilidade de vitória nem autoridade jurídica.'
@@ -61,6 +62,7 @@ def collect(actor, context):
     """
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
     releases = getattr(settings, 'NLP_DASHBOARD_RELEASES', {})
+    allowed = allowed_versions()
     max_documents = getattr(settings, 'NLP_DASHBOARD_MAX_DOCUMENTS', 10000)
     runs = NlpExtraction.objects.filter(document__court__in=context['courts']).select_related('document', 'text_version')
     if not context['sources'] or not context['subject_codes']:
@@ -103,11 +105,12 @@ def collect(actor, context):
                  and metadata.get('text_version_id') == str(run.text_version_id)
                  and release.get('inclusion_policy') == 'human_approved_only'
                  and release.get('tasks') == ['LEGAL_GROUND', 'LEGAL_THESIS'])
-        if not valid:
+        if not valid or not version_available(run.text_version, allowed):
             exclusions['quality_blocked'] += 1
             continue
         document['released'] = True
         document['release'] = deepcopy(release)
+        document["text_sha256"] = run.text_version.sha256
         if kind == 'decision_text' and metadata.get('outcome', 'unknown') not in context['outcomes']:
             continue
         if bytes_hash(run.text_version.text.encode('utf-8')) != run.text_version.sha256:
@@ -115,7 +118,7 @@ def collect(actor, context):
         for row in run.evidences.select_related('extraction__document', 'extraction__text_version').order_by('annotation_id'):
             item = nlp_evidence.read_evidence(row, actor=actor)
             nlp_evidence.annotation_check(item['effective'], run.text_version.text)
-            if item['review_status'] != 'approved':
+            if item['review_status'] != 'approved' or item["source_state"] != "available":
                 exclusions['evidence_not_approved'] += 1
                 continue
             item['population'] = kind
@@ -123,7 +126,7 @@ def collect(actor, context):
             item['document_metadata'] = deepcopy(metadata)
             item['official_url'] = official_url(item['source'].get('source_url'))
             item['quality_release'] = deepcopy(release)
-            evidence.append(item)
+            evidence.append(nlp_evidence.public_payload(item))
     return documents, evidence, exclusions
 
 
@@ -171,13 +174,14 @@ def materialize(context, documents, evidence, exclusions, *, data_mode='live'):
         population['reason'] = None if released else 'reviewed_quality_and_source_mapping_required'
         populations[kind] = population
     bindings = {d['metadata']['release_id']: d['release'] for d in documents if d['released']}
+    version_bindings = {d["metadata"]["text_version_id"]: d["text_sha256"] for d in documents if d["released"]}
     fixture_ids = sorted({d['metadata']['fixture_id'] for d in documents if d['metadata'].get('fixture_id')})
     if fixture_ids:
         data_mode = 'fixture'
     return {'contract_version': CONTRACT, 'context': context, 'query_id': context_service.identity(context),
             'data_mode': data_mode, 'fixture_ids': fixture_ids, 'disclaimer': DISCLAIMER, 'items': evidence, 'populations': populations,
             'exclusions': exclusions, 'status': 'empty' if not context['sources'] or not context['subject_codes'] else 'partial' if evidence else 'unavailable',
-            'release_bindings': bindings,
+            'release_bindings': bindings, "source_versions": version_bindings,
             'warnings': ['loaded_corpus_not_judicial_census', 'exact_literal_grouping_not_semantic_equivalence'],
             'quality': {'state': 'released' if bindings else 'pending_or_unavailable',
                         'reason': None if bindings else 'reviewed_quality_and_source_mapping_required'},
@@ -213,6 +217,15 @@ def read(actor, snapshot_id):
     for release_id, decision in record.payload.get('release_bindings', {}).items():
         if releases.get(release_id) != decision:
             raise PermissionError('release_revoked_or_changed')
+    items = record.payload["items"]
+    versions = record.payload.get("source_versions", {})
+    if (items or record.payload.get("release_bindings")) and not versions:
+        raise PermissionError("source_not_published")
+    allowed = allowed_versions(ids=versions)
+    current = NlpTextVersion.objects.filter(pk__in=versions).select_related("document")
+    verified = {str(version.pk): version.sha256 for version in current if version_available(version, allowed)}
+    if verified != versions or len(current_evidence(items)) != len(items):
+        raise PermissionError("source_or_evidence_revoked")
     return record
 
 

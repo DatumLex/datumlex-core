@@ -1,0 +1,58 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*/",
+      "has": [
+        {
+          "type": "host",
+          "value": "datumlex-core-git-fix-reco-1c680c-pedromattos-projects-d7c0e0fe.vercel.app"
+        }
+      ],
+      "destination": "https://datumlex-api-preview-recovery-preview.up.railway.app/api/:path*/"
+    },
+    {
+      "source": "/api/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "datumlex-core-git-fix-reco-1c680c-pedromattos-projects-d7c0e0fe.vercel.app"
+        }
+      ],
+      "destination": "https://datumlex-api-preview-recovery-preview.up.railway.app/api/:path*/"
+    },
+    {
+      "source": "/api/:path*/",
+      "has": [
+        {
+          "type": "host",
+          "value": "datumlex-core.vercel.app"
+        }
+      ],
+      "destination": "https://datumlex-api-real-production.up.railway.app/api/:path*/"
+    },
+    {
+      "source": "/api/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "datumlex-core.vercel.app"
+        }
+      ],
+      "destination": "https://datumlex-api-real-production.up.railway.app/api/:path*/"
+    },
+    {
+      "source": "/api/:path*/",
+      "destination": "/api/gateway?datumlex_path=:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/gateway?datumlex_path=:path*"
+    }
+  ],
+  "functions": {
+    "api/gateway.js": {
+      "maxDuration": 60
+    }
+  }
+}

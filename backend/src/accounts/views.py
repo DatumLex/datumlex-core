@@ -5,6 +5,8 @@ import uuid
 from datetime import timedelta
 from functools import wraps
 
+from django.conf import settings
+
 from django.contrib.auth import login as session_login
 from django.contrib.auth import logout as session_logout
 from django.contrib.auth import update_session_auth_hash
@@ -22,6 +24,10 @@ from django.views.decorators.http import require_http_methods
 from .middleware import denied
 from .models import AuditEvent, Court, RequestLimit, User
 from src.db.court_catalog import ACTIVE_COURTS
+
+
+class RegistrationUnavailableError(RuntimeError):
+    pass
 
 
 def csrf_failure(request, reason=""):
@@ -45,6 +51,8 @@ def api(methods):
                 return denied("CPF ou e-mail já cadastrado, ou dados incompatíveis.", 409, "conflict")
             except PermissionError as exc:
                 return denied(str(exc))
+            except RegistrationUnavailableError as exc:
+                return denied(str(exc), 503, "registration_unavailable")
             except User.DoesNotExist:
                 return denied("Usuário não encontrado.", 404, "not_found")
 
@@ -137,19 +145,60 @@ def csrf(request):
     return {"csrfToken": get_token(request)}
 
 
+def registration_courts():
+    configured = getattr(settings, "PUBLIC_REGISTRATION_COURTS", ())
+    if isinstance(configured, str):
+        configured = [code.strip().upper() for code in configured.split(",") if code.strip()]
+    allowed = {
+        code.strip().upper()
+        for code in configured
+        if isinstance(code, str) and code.strip()
+    } & set(ACTIVE_COURTS)
+    if not allowed:
+        return []
+    return list(Court.objects.filter(code__in=allowed).order_by("code").values_list("code", flat=True))
+
+
 @api(["POST"])
 def register(request):
+    if settings.SYNTHETIC_PREVIEW:
+        raise PermissionError("O cadastro está fechado nesta demonstração.")
     throttle(request, "register", maximum=20)
     if set(request.payload) - {"name", "email", "cpf", "password"}:
         raise ValueError("O cadastro público aceita somente nome, CPF, e-mail e senha.")
+    assigned_courts = registration_courts()
+    if not assigned_courts:
+        raise RegistrationUnavailableError(
+            "O cadastro público está indisponível porque nenhum tribunal padrão está configurado."
+        )
     values = identity(request.payload)
     secret = password(request.payload)
     with transaction.atomic():
-        user = User(username=uuid.uuid4().hex, **values)
+        user = User(
+            username=uuid.uuid4().hex,
+            role="Padrão",
+            approved=True,
+            is_active=True,
+            support=False,
+            must_change_password=False,
+            **values,
+        )
         user.set_password(secret)
         user.save()
-        audit(request, "user.registered", user.pk)
-    return {"message": "Cadastro enviado. Aguarde a aprovação de um responsável."}
+        user.courts.set(assigned_courts)
+        audit(
+            request,
+            "user.registered",
+            user.pk,
+            {"role": user.role, "approved": user.approved, "courts": assigned_courts},
+        )
+    session_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    audit(request, "login.succeeded", user.pk)
+    return {
+        "user": serialize(user),
+        "csrfToken": get_token(request),
+        "message": "Cadastro concluído.",
+    }
 
 
 @api(["POST"])

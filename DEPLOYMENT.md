@@ -1,4 +1,63 @@
-# Render deployment
+# Railway e Vercel
+
+## API no Railway
+
+No serviço Django, selecione o repositório oficial e a raiz `/backend`. O
+Dockerfile dessa pasta fixa Python 3.13.18, instala `requirements.txt` uma vez
+e copia os recursos de PDF. Remova a personalização de build que chamava
+`pip` no diretório errado. O comando padrão inicia Gunicorn em `$PORT`.
+Configure `/api/health/` como verificação de saúde.
+
+Em Deploy, configure o comando de pré-implantação abaixo após confirmar que o
+banco privado e a versão do esquema correspondem ao plano revisado.
+
+```sh
+python manage.py migrate --noinput && python manage.py bootstrap_support
+```
+
+Configure `DATABASE_URL` pela referência ao PostgreSQL Railway. Defina
+`DJANGO_DEBUG=false`, `DJANGO_SECRET_KEY`, `DATUMLEX_SUPPORT_PASSWORD` e
+`DJANGO_ALLOWED_HOSTS` com o hostname público da API e o hostname de probe
+exigido pelo Railway, caso o serviço receba health checks por esse host.
+Defina `CSRF_TRUSTED_ORIGINS=https://datumlex-core.vercel.app`.
+Mantenha cookies Secure com SameSite=Lax para a sessão de mesma origem.
+Acompanhe o host real de health no log e evite curingas em Allowed Hosts.
+Habilite Gemini e uma coorte DataJud publicada apenas quando essas dependências
+forem verificadas. Nenhuma credencial deve ser incorporada à imagem.
+
+## Frontend na Vercel
+
+Raiz `frontend`, preset Vite. Defina `DATUMLEX_RAILWAY_ORIGIN` com a origem
+HTTPS pública do Django, apenas hostname e porta se houver. Deixe
+`VITE_API_BASE_URL` ausente ou igual a `/api`. A função
+`frontend/api/gateway.js` encaminha chamadas ao host configurado e preserva
+Origin, token CSRF, cookies e cabeçalhos de download, com cache desabilitado.
+O navegador continua usando o domínio da Vercel. A prévia autorizada tem
+rewrite externo nativo vinculado exclusivamente ao seu hostname. A função
+configurável permanece para outros escopos. Exportações acima do limite de
+resposta da função (4,5 MB) exigem rewrite nativo ou estratégia de arquivo dedicada.
+O destino da prévia não deve ser usado em produção.
+
+## Publicação, banco e reversão
+
+Confirme primeiro o health da API, depois o mesmo health pelo frontend. Percorra
+cadastro, aprovação, login, reload, logout e pesquisa; confira PDF/XLSX e os
+erros 401/403. Verifique no navegador os cookies, o token e as origens em
+ambiente publicado. Confira o catálogo, os resultados NLP rotulados como
+candidatos e Gemini somente com chave e uso autorizados.
+
+Antes de qualquer importação, faça backup do destino. Use um dump sanitizado e
+validado, sem contas/sessões antigas, com partição do acervo e referências
+verificadas. Meça tabelas, índices, espaço de importação e crescimento. A base
+de ensaio inteira ocupa cerca de 3,11 GB e ainda não foi autorizada para
+publicação. Preserve o último deploy aprovado. Em caso de falha, reverta
+primeiro o frontend à versão compatível e restaure o serviço e configurações
+anteriores. Migrações já aplicadas exigem avaliação de compatibilidade antes
+de qualquer reversão de esquema ou restauração.
+
+---
+
+# Render deployment (legacy)
 
 `render.yaml` provisions three resources for the college-project deployment:
 
@@ -12,7 +71,7 @@
 
 O React abre a pesquisa após o login. O Django atende `/api/research/`, `/api/research/sources/`,
 `/api/research/chat/` e `/api/research/export/` no serviço de API existente. O chat padrão consulta o banco
-e as ementas sem acessar a OpenAI. Os indicadores são calculados no servidor em ambos os modos.
+e as ementas localmente. Os indicadores são calculados no servidor em ambos os modos.
 
 Para testar o React local com um backend já atualizado no Render, use `VITE_API_BASE_URL=/api` e
 `DATUMLEX_DEV_API_TARGET` em `frontend/.env.local`, com a origem HTTPS pública exibida pelo serviço Django.
@@ -25,11 +84,12 @@ mesma revisão do repositório na API e no site já existentes, atualizando prim
 abaixo usa outros nomes de recursos. Confirme `/api/health/`, faça login e confira os filtros de TJDFT + STJ,
 uma fonte de doutrina, um precedente, uma pergunta com citação e a exportação do recorte.
 
-O modo generativo é opcional. Depois de verificar o saldo e o faturamento da organização de API,
-configure `OPENAI_API_KEY` como segredo do backend, `RESEARCH_OPENAI_MODEL` como modelo autorizado
-e `RESEARCH_OPENAI_ENABLED=true`. Nesse modo uma pergunta envia a pergunta, o contexto recente,
-os indicadores e trechos selecionados à OpenAI. O carregamento do painel continua usando a síntese local.
-Se a API externa estiver indisponível, a interface identifica a resposta de consulta direta ao banco.
+O modo generativo da pesquisa usa Gemini. Após validar a conta e o modelo, defina
+`GEMINI_API_KEY`, `RESEARCH_GEMINI_MODEL` e `RESEARCH_GEMINI_ENABLED=true` no backend.
+A ação é opcional na interface. Somente códigos do recorte, indicadores agregados e referências
+opacas a itens revisados são enviados. Texto de documentos, pergunta bruta, histórico, URLs e
+identificadores processuais ficam no DatumLex. O Gemini seleciona achados verificáveis;
+a apresentação de números e fontes é construída pelo servidor. O modo direto continua disponível.
 
 ### Credenciais do Blueprint
 
@@ -54,7 +114,7 @@ development database is intentionally ignored by Git and is never included in a 
 
 ## Historical data and PDF summaries
 
-DataJud extraction and dashboard filters accept filing dates from **2016-01-01** through
+DataJud extraction and dashboard filters accept filing dates from **2010-01-01** through
 today. The current year is incomplete. A date range does not establish complete court
 coverage. Existing saved runs keep their original scopes and cursors.
 

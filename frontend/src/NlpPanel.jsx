@@ -9,6 +9,132 @@ const outcomeLabels = { granted: 'Provido', denied: 'Desprovido', partial: 'Parc
 const sourceStates = { available: 'Disponível na última consulta', changed: 'Fonte alterada; trecho da versão arquivada', not_found: 'Não encontrada na última consulta', removed: 'Remoção registrada', temporarily_unavailable: 'Temporariamente indisponível', restricted: 'Acesso restrito' }
 const populationLabels = { decision_text: 'Textos de decisões', precedent: 'Precedentes', doctrine: 'Doutrina' }
 
+function RealNlpInsights({ inherited }) {
+  const [queryDraft, setQueryDraft] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const params = new URLSearchParams()
+  if (Array.isArray(inherited.courts) && inherited.courts.length) params.set('courts', inherited.courts.join(','))
+  if (inherited.start) params.set('start', inherited.start)
+  if (inherited.end) params.set('end', inherited.end)
+  if (submittedQuery) params.set('q', submittedQuery)
+  const path = `nlp-insights/?${params.toString()}`
+  const [state, retry] = useRemote(path, signal => nlpRequest(path, { signal }))
+  const data = state.data
+  const maxTfidf = Math.max(0.0001, ...(data?.top_tfidf_terms || []).map(item => item.score || 0))
+  const safeUrl = (value) => {
+    try {
+      const parsed = new URL(value)
+      return parsed.protocol === 'https:' ? parsed.href : null
+    } catch { return null }
+  }
+
+  return <section className="nlp-engine-card" aria-labelledby="nlp-engine-title">
+    <div className="nlp-engine-header">
+      <div>
+        <span className="section-kicker">Motor NLP Estatístico e Neural · Execução Real</span>
+        <h3 id="nlp-engine-title">spaCy ({data?.engine?.model || 'pt_core_news_sm'}) + scikit-learn (TF-IDF e Cosseno)</h3>
+      </div>
+      {data?.engine && (
+        <span className="nlp-engine-badge">
+          spaCy {data.engine.spacy_version} · scikit-learn {data.engine.sklearn_version}
+        </span>
+      )}
+    </div>
+    <p className="nlp-engine-lead">
+      Pipeline real de processamento de linguagem natural em português: tokenização, lematização, POS tagging e Reconhecimento de Entidades Nomeadas (NER) com <strong>spaCy</strong>, combinados a vetorização <strong>TF-IDF</strong> e busca por <strong>similaridade de cosseno</strong> com <strong>scikit-learn</strong> sobre as decisões oficiais do recorte.
+    </p>
+    <Feedback state={state} retry={retry} />
+    {data && <>
+      <dl className="nlp-engine-stats">
+        <div><dt>Decisões analisadas</dt><dd>{data.corpus_stats.documents_analyzed.toLocaleString('pt-BR')}</dd></div>
+        <div><dt>Tokens processados</dt><dd>{data.corpus_stats.total_tokens.toLocaleString('pt-BR')}</dd></div>
+        <div><dt>Sentenças segmentadas</dt><dd>{data.corpus_stats.total_sentences.toLocaleString('pt-BR')}</dd></div>
+        <div><dt>Vocabulário TF-IDF</dt><dd>{data.corpus_stats.vocabulary_size.toLocaleString('pt-BR')} termos</dd></div>
+      </dl>
+
+      <div className="nlp-insights-grid">
+        <article className="nlp-insight-box">
+          <span className="section-kicker">scikit-learn · TfidfVectorizer (n-gramas 1–2)</span>
+          <h4>Termos e expressões mais relevantes (TF-IDF)</h4>
+          {data.top_tfidf_terms.length ? (
+            <ol className="nlp-tfidf-list">
+              {data.top_tfidf_terms.slice(0, 10).map(item => (
+                <li key={item.term}>
+                  <div className="nlp-tfidf-row">
+                    <strong>{item.term}</strong>
+                    <small>peso {item.score.toFixed(3)} · {item.doc_count} docs</small>
+                  </div>
+                  <div className="thesis-track">
+                    <div className="thesis-track-fill" style={{ width: `${Math.min(100, (item.score / maxTfidf) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : <p>Sem termos TF-IDF suficientes neste recorte.</p>}
+        </article>
+
+        <article className="nlp-insight-box">
+          <span className="section-kicker">spaCy NER · {data.engine.model}</span>
+          <h4>Entidades nomeadas reconhecidas nos acórdãos</h4>
+          {data.entities.length ? (
+            <ul className="nlp-entity-list">
+              {data.entities.slice(0, 12).map(ent => (
+                <li key={`${ent.label}-${ent.text}`}>
+                  <span className="nlp-entity-name">{ent.text}</span>
+                  <span className="nlp-entity-meta">
+                    <span className={`nlp-ent-tag nlp-ent-tag--${ent.label.toLowerCase()}`}>{ent.label_pt}</span>
+                    <strong>{ent.count}×</strong>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : <p>Nenhuma entidade reconhecida neste recorte.</p>}
+        </article>
+      </div>
+
+      <form className="nlp-sim-form" onSubmit={event => { event.preventDefault(); setSubmittedQuery(queryDraft.trim()) }}>
+        <label htmlFor="nlp-sim-input">Busca por similaridade semântica (TF-IDF + Similaridade por Cosseno)</label>
+        <div className="nlp-sim-controls">
+          <input
+            id="nlp-sim-input"
+            type="search"
+            maxLength={400}
+            value={queryDraft}
+            onChange={event => setQueryDraft(event.target.value)}
+            placeholder="Ex.: cancelamento de voo fortuito interno dano moral · negativação súmula 385"
+          />
+          <button type="submit" className="apply-button">Calcular similaridade</button>
+          {submittedQuery && (
+            <button type="button" className="secondary-button" onClick={() => { setQueryDraft(''); setSubmittedQuery('') }}>Limpar</button>
+          )}
+        </div>
+      </form>
+
+      {submittedQuery && (
+        <div className="nlp-sim-results">
+          <h4>Decisões mais similares para “{submittedQuery}”</h4>
+          {data.similar_documents.length ? (
+            <ul className="nlp-sim-list">
+              {data.similar_documents.map(doc => {
+                const href = safeUrl(doc.url)
+                return <li key={doc.id} className="nlp-sim-item">
+                  <div className="nlp-sim-head">
+                    <strong>{doc.title}</strong>
+                    <span className="nlp-sim-score">{(doc.similarity * 100).toFixed(1).replace('.', ',')}% cosseno</span>
+                  </div>
+                  <p className="nlp-sim-meta">{doc.court} · {doc.id}{doc.date ? ` · ${doc.date}` : ''}</p>
+                  <p>{doc.snippet}…</p>
+                  {href && <a href={href} target="_blank" rel="noreferrer">Abrir fonte oficial</a>}
+                </li>
+              })}
+            </ul>
+          ) : <p>Nenhuma decisão apresentou similaridade relevante acima do limiar para esta consulta.</p>}
+        </div>
+      )}
+    </>}
+  </section>
+}
+
 function useRemote(key, load) {
   const [state, setState] = useState({ key: null, status: 'loading' })
   const [retry, setRetry] = useState(0)
@@ -162,11 +288,21 @@ export default function NlpPanel({ contextKey, chatOnly = false }) {
     setChoices({ ...selected, [field]: checked ? [...selected[field], value] : selected[field].filter(item => item !== value) })
   }
   return <section className="nlp-panel" aria-labelledby="nlp-title">
-    <h2 id="nlp-title">{chatOnly ? 'Fontes revisadas para o chat' : 'Teses identificadas nas decisões'}</h2>
+    <h2 id="nlp-title">{chatOnly ? 'Fontes revisadas para o chat' : 'Análise NLP · Entidades, TF-IDF e Teses'}</h2>
     <p>Tribunais, assunto e período seguem o recorte aplicado acima. Fontes e desfechos abaixo filtram somente este painel de NLP; as taxas DataJud mantêm sua própria população.</p>
+    {!chatOnly && <RealNlpInsights inherited={inherited} />}
     <Feedback state={options} retry={retryOptions} />
-    {options.data && <><form onSubmit={event => { event.preventDefault(); setApplied({ sources: selected.sources, outcomes: selected.outcomes }); setVersion(value => value + 1) }}>
-      <div className="nlp-controls"><fieldset><legend>Fontes do NLP</legend>{options.data.sources.map(source => <label key={source.id}><input type="checkbox" checked={selected.sources.includes(source.id)} onChange={event => toggle('sources', source.id, event.target.checked)} />{sourceLabels[source.id]} · liberação por documento</label>)}</fieldset>
+    {options.data && <>
+      {options.data.readiness && (
+        <p role="status" className="nlp-readiness">
+          <strong>Prontidão NLP:</strong>{' '}
+          {options.data.readiness.documents_with_text} documento(s) com texto integral ·{' '}
+          {options.data.readiness.documents_quality_released} liberado(s) para análise ·{' '}
+          {options.data.readiness.approved_evidences} evidência(s) revisada(s) e aprovada(s) (teses e fundamentos).
+        </p>
+      )}
+      <form onSubmit={event => { event.preventDefault(); setApplied({ sources: selected.sources, outcomes: selected.outcomes }); setVersion(value => value + 1) }}>
+      <div className="nlp-controls"><fieldset><legend>Fontes do NLP</legend>{options.data.sources.map(source => <label key={source.id}><input type="checkbox" checked={selected.sources.includes(source.id)} onChange={event => toggle('sources', source.id, event.target.checked)} />{sourceLabels[source.id]}{source.quality_released_documents > 0 ? ` · ${source.quality_released_documents} liberado(s)` : ' · liberação por documento'}</label>)}</fieldset>
         <fieldset><legend>Desfechos exibidos nos textos de decisões</legend>{options.data.outcomes.map(value => <label key={value}><input type="checkbox" checked={selected.outcomes.includes(value)} onChange={event => toggle('outcomes', value, event.target.checked)} />{outcomeLabels[value]}</label>)}</fieldset></div>
       <button className="apply-button" type="submit">Aplicar filtros de NLP</button> <button className="secondary-button" type="button" onClick={() => { setChoices(null); setApplied(null); setVersion(value => value + 1) }}>Restaurar padrões do NLP</button>
     </form>

@@ -1,10 +1,11 @@
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.db.models.deletion import ProtectedError
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 
 from src.accounts.models import AuditEvent, Court, User
 from src.accounts.provisioning import provision_support
+from src.db.models import LegalCorpusItem
 
 
 class AccessTests(TestCase):
@@ -62,21 +63,119 @@ class AccessTests(TestCase):
         self.assertEqual(response.json()["metadata"]["scope"]["court"], "TJDFT,STJ")
         self.assertEqual(self.client.get("/api/statistics/?court=TJDFT,STJ,UNKNOWN").status_code, 403)
 
-    def test_register_pending_hash_and_no_privilege_assignment(self):
-        result = self.send("auth/register", self.payload)
+    @override_settings(PUBLIC_REGISTRATION_COURTS=("TJDFT", "UNKNOWN", "TJSP"))
+    def test_register_immediate_login_configured_courts_and_restrictions(self):
+        stj, _ = Court.objects.get_or_create(code="STJ", defaults={"name": "STJ"})
+        pending_source = LegalCorpusItem.objects.create(
+            origin_key="test:pending-registration",
+            title="Fonte pendente de revisão",
+            category="precedent",
+            court="TJDFT",
+            review_status="pending",
+            provenance={},
+        )
+        client = Client(enforce_csrf_checks=True)
+        token = client.get("/api/auth/csrf/").json()["csrfToken"]
+        result = client.post(
+            "/api/auth/register/",
+            self.payload,
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
         self.assertEqual(result.status_code, 200)
+        body = result.json()
+        self.assertIn("csrfToken", body)
+        self.assertEqual(body["user"]["role"], "Padrão")
+        self.assertEqual(body["user"]["status"], "Ativo")
+        self.assertEqual(body["user"]["courts"], ["TJDFT"])
+        self.assertFalse(body["user"]["support"])
+        self.assertFalse(body["user"]["must_change_password"])
+
         user = User.objects.get(email="test@example.com")
         self.assertEqual(user.role, "Padrão")
-        self.assertFalse(user.approved)
+        self.assertTrue(user.approved)
+        self.assertTrue(user.is_active)
+        self.assertFalse(user.support)
         self.assertFalse(user.must_change_password)
-        self.assertFalse(user.courts.exists())
+        self.assertEqual(list(user.courts.values_list("code", flat=True)), ["TJDFT"])
         self.assertNotEqual(user.password, "abcdefgh")
         self.assertTrue(user.check_password("abcdefgh"))
+        self.assertTrue(AuditEvent.objects.filter(action="user.registered", target_id=user.pk).exists())
+        self.assertTrue(AuditEvent.objects.filter(action="login.succeeded", actor=user, target_id=user.pk).exists())
+        self.assertNotIn("abcdefgh", str(list(AuditEvent.objects.values())))
+
+        # Session persists across subsequent requests (reload) and respects configured court scope.
+        me = client.get("/api/auth/me/")
+        self.assertEqual(me.status_code, 200)
+        self.assertEqual(me.json()["user"]["id"], user.pk)
+        self.assertEqual(client.get("/api/statistics/?court=TJDFT").status_code, 200)
+        self.assertEqual(client.get("/api/research/?court=TJDFT").status_code, 200)
+        self.assertEqual(client.get(f"/api/statistics/?court={stj.code}").status_code, 403)
+        self.assertEqual(client.get(f"/api/research/?court={stj.code}").status_code, 403)
+
+        # Standard account remains blocked from admin and legal review routes.
+        self.assertEqual(client.get("/api/users/").status_code, 403)
+        self.assertEqual(client.get("/api/audit/").status_code, 403)
+        self.assertEqual(client.get("/api/corpus/review/").status_code, 403)
+        self.assertEqual(client.get(f"/api/corpus/review/{pending_source.pk}/").status_code, 403)
+        self.assertEqual(client.get(f"/api/corpus/{pending_source.pk}/").status_code, 404)
+
+        # Rotated CSRF token works for logout, and re-login works immediately.
+        logout = client.post(
+            "/api/auth/logout/",
+            {},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=body["csrfToken"],
+        )
+        self.assertEqual(logout.status_code, 200)
+        self.assertEqual(client.get("/api/auth/me/").status_code, 401)
+        relogin = self.send("auth/login", {"login": user.email, "password": "abcdefgh"})
+        self.assertEqual(relogin.status_code, 200)
+
+        # Admin deactivation immediately blocks both existing sessions and future logins.
+        user.is_active = False
+        user.save()
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
         self.assertEqual(
             self.send("auth/login", {"login": user.email, "password": "abcdefgh"}).status_code, 403
         )
-        self.assertEqual(self.send("auth/register", {**self.payload, "role": "Master"}).status_code, 400)
 
+    def test_register_fails_closed_when_no_default_courts_are_configured_or_available(self):
+        for configured in ((), ("FAKE", "INVALID"), ("TJSP",)):
+            with self.subTest(configured=configured), override_settings(PUBLIC_REGISTRATION_COURTS=configured):
+                result = self.send("auth/register", self.payload)
+                self.assertEqual(result.status_code, 503)
+                body = result.json()
+                self.assertEqual(body["error"]["code"], "registration_unavailable")
+                self.assertIn("nenhum tribunal padrão", body["error"]["message"].lower())
+                self.assertFalse(User.objects.filter(email="test@example.com").exists())
+                self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+                self.assertFalse(AuditEvent.objects.filter(action="user.registered").exists())
+                self.assertFalse(AuditEvent.objects.filter(action="login.succeeded").exists())
+
+    @override_settings(PUBLIC_REGISTRATION_COURTS=("TJDFT",))
+    def test_register_rejects_privileged_fields(self):
+        for forbidden in (
+            {"role": "Master"},
+            {"role": "Admin"},
+            {"approved": True},
+            {"is_active": True},
+            {"support": True},
+            {"courts": ["TJDFT"]},
+            {"is_superuser": True},
+            {"is_staff": True},
+            {"must_change_password": False},
+        ):
+            self.assertEqual(self.send("auth/register", {**self.payload, **forbidden}).status_code, 400)
+        self.assertFalse(User.objects.filter(email="test@example.com").exists())
+
+    @override_settings(SYNTHETIC_PREVIEW=True, PUBLIC_REGISTRATION_COURTS=("TJDFT",))
+    def test_register_blocked_in_synthetic_preview(self):
+        result = self.send("auth/register", self.payload)
+        self.assertEqual(result.status_code, 403)
+        self.assertFalse(User.objects.filter(email="test@example.com").exists())
+
+    @override_settings(PUBLIC_REGISTRATION_COURTS=("TJDFT",))
     def test_identity_validation_and_database_uniqueness(self):
         for change in (
             {"cpf": "11111111111"},

@@ -1,5 +1,6 @@
 import os
 
+from django.conf import settings
 from django.db import transaction
 
 from .models import AuditEvent, Court, SupportIdentity, User
@@ -29,5 +30,5 @@ def provision_support(password=None):
 
 def provision_after_migrate(sender, **kwargs):
     # Test databases need no deployment credential. Deployment requires the env var.
-    if os.environ.get("DATUMLEX_SUPPORT_PASSWORD"):
+    if not settings.SYNTHETIC_PREVIEW and os.environ.get("DATUMLEX_SUPPORT_PASSWORD"):
         provision_support()

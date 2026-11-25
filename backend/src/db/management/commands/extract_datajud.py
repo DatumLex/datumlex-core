@@ -13,7 +13,7 @@ from src.db.models import ExtractionRun, RejectedRecord
 from src.db.subject_catalog import DEFAULT_DATAJUD_SUBJECT_CODES_CSV
 from src.etl.loader import load_record
 from src.etl.transformer import InvalidRecord, normalize
-from src.services.period import HISTORY_START, today
+from src.services.period import EARLIEST_DATE, HISTORY_START, today
 from src.db.court_catalog import ACTIVE_COURTS as COURTS
 
 
@@ -81,11 +81,11 @@ class Command(BaseCommand):
                     start, end = None, None
                 else:
                     start, end = date.fromisoformat(options["start"]), date.fromisoformat(options["end"])
-                    if start < HISTORY_START or start > end or end > today():
+                    if start < EARLIEST_DATE or start > end or end > today():
                         raise ValueError
             except ValueError:
                 raise CommandError(
-                    "Use valid dates from 2016 to today, positive subject codes and page-size 1..1000"
+                    "Use valid dates from 2010 to today, positive subject codes and page-size 1..1000"
                 ) from None
             scope = {
                 "court": options["court"],

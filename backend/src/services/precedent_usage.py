@@ -9,17 +9,18 @@ from django.conf import settings
 from django.db.models import OuterRef, Subquery
 
 from src.db.models import NlpTextVersion
+from src.services.corpus_publication import allowed_versions, version_available
 from src.nlp.contracts import bytes_hash, fingerprint
 from src.nlp.topics import classify
 from src.services.subject_groups import matching_codes
 
-VERSION = 'ementa-explicit-stj-v1'
+VERSION = 'ementa-explicit-stj-v2'
 DISCLAIMER = ('Identificação automática de linguagem na ementa, sem aprovação dos desenvolvedores. '
               'Aplicação ou afastamento textual não comprova correção jurídica, aderência material ou divergência. '
               'O percentual usa apenas vínculos com aplicação ou afastamento explícito; não representa todos os processos.')
 AUTHORITY = re.compile(
     r'\b(?P<kind>S[úu]mula|Tema)\s+(?:repetitivo\s+)?(?:n(?:[.º°o]|\s)*\s*)?'
-    r'(?P<number>\d{1,5})\s*,?\s*(?:/\s*|d[oa]\s+)(?:STJ|Superior\s+Tribunal\s+de\s+Justi[çc]a)\b', re.I)
+    r'(?P<number>\d{1,2}\.\d{3}|\d{1,5})\s*,?\s*(?:/\s*|d[oa]\s+)(?:STJ|Superior\s+Tribunal\s+de\s+Justi[çc]a)\b', re.I)
 HEADING = re.compile(r'(?im)^[ \t]*(?:EMENTA)[ \t]*$')
 END = re.compile(r'(?im)^[ \t]*(?:AC[ÓO]RD[ÃA]O|RELAT[ÓO]RIO|VOTOS?|DECIS[ÃA]O)[ \t]*$')
 # Grammar must connect the use verb directly to the identified authority.
@@ -92,7 +93,7 @@ def extract(text, source):
         elif positive:
             status, reason = 'applied', 'explicit_application_language'
         identifier = 'STJ:' + ('SUMULA' if citation.group('kind').lower().startswith('s') else 'TEMA')
-        identifier += ':' + str(int(citation.group('number')))
+        identifier += ':' + str(int(citation.group('number').replace('.', '')))
         results.append(dict(authority_id=identifier, authority_literal=citation.group(),
                             status=status, reason=reason, start=left, end=right, excerpt=fragment,
                             citation_start=citation.start(), citation_end=citation.end(),
@@ -107,10 +108,15 @@ def summarize(scope, *, page=1, page_size=20):
     coverage = Counter()
     records = []
     catalog = getattr(settings, 'NLP_DASHBOARD_CATALOG', {})
+    allowed = allowed_versions()
+    topics = set(scope.get('topics') or ([scope['topic']] if scope.get('topic') else []))
     latest = NlpTextVersion.objects.filter(document_id=OuterRef('document_id')).order_by('-created_at')
     versions = NlpTextVersion.objects.filter(
-        created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
+        pk__in=allowed, created_at=Subquery(latest.values('created_at')[:1]), document__court__in=scope['court'].split(','),
     ).select_related('document').order_by('document__source_key')
+    if selected_subject_codes:
+        # Missing TPU confirmation is common; avoid loading the entire text corpus for that case.
+        versions = versions.defer('text')
     for _, current_versions in groupby(versions.iterator(chunk_size=100), key=lambda row: row.document_id):
         version = next(current_versions)
         other = next(current_versions, None)
@@ -123,6 +129,8 @@ def summarize(scope, *, page=1, page_size=20):
                 coverage['integrity_failed'] += 1
             continue
         source = version.source
+        if not version_available(version, allowed):
+            continue
         if (source.get('category', 'jurisprudence') != 'jurisprudence'
                 or source.get('content_kind') in ('precedent_reference', 'publication_excerpt', 'doctrine')
                 or source.get('text_field') in ('tese', 'questao')
@@ -130,10 +138,6 @@ def summarize(scope, *, page=1, page_size=20):
                 or source.get('data_mode') == 'fixture'):
             continue
         coverage['source_documents'] += 1
-        topics = scope.get('topics') or ([scope['topic']] if scope.get('topic') else [])
-        if topics and not set(topics).intersection(classify(version.text)):
-            coverage['outside_topic'] += 1
-            continue
         if (source.get('court') != version.document.court
                 or source.get('document_id') != version.document.source_key
                 or not official_source(source.get('source_url', ''))):
@@ -149,6 +153,9 @@ def summarize(scope, *, page=1, page_size=20):
             continue
         if not scope['start'] <= day <= scope['end']:
             coverage['outside_period'] += 1
+            continue
+        if topics and not topics.intersection(classify(version.text)):
+            coverage['outside_topic'] += 1
             continue
         if bytes_hash(version.text.encode('utf-8')) != version.sha256:
             coverage['integrity_failed'] += 1

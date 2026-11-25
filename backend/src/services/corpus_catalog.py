@@ -4,9 +4,11 @@ import json
 from datetime import date
 from urllib.parse import urlparse
 from django.db.models import Count, F, Max, Q
-from src.db.models import LegalCorpusItem, LegalCorpusTopicMatch
+from src.db.models import LegalCorpusTopicMatch
 from src.services.statistics_service import InvalidQuery, filtered_processes
-from src.nlp.topics import TOPICS, classify, folded
+from src.services.corpus_publication import published_items, with_public_excerpt
+from src.services.source_metadata import public_source_metadata
+from src.nlp.topics import TOPICS, classify as classify, folded as folded
 
 VERSION = 'lexical_candidate_v1'
 CATEGORIES = ('jurisprudence','precedent','doctrine')
@@ -26,12 +28,14 @@ def parse_date(value):
 def fingerprint(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False,default=str).encode()).hexdigest()
 
-def scoped_items(scope, include_undated=True):
-    base = LegalCorpusItem.objects.filter(Q(category='doctrine') | Q(court__in=scope['court'].split(',')))
+def scoped_items(scope, include_undated=True, *, use="display", all_dates=False):
+    base = published_items(use).filter(Q(category='doctrine') | Q(court__in=scope['court'].split(',')))
     period = Q(date__range=[scope['start'], scope['end']])
+    if all_dates:
+        period = Q(date__isnull=False)
     if include_undated:
         period |= Q(date__isnull=True)
-    return base.filter(period, topic_matches__isnull=False).distinct()
+    return base.filter(period).distinct()
 
 
 def inventory(params):
@@ -73,25 +77,36 @@ def inventory(params):
     counts=dict.fromkeys(CATEGORIES,0)
     for row in base.values('category').annotate(count=Count('pk',distinct=True)):counts[row['category']]=row['count']
     undated=base.filter(date__isnull=True).count()
-    items=base.filter(category=category).order_by(F('date').desc(nulls_last=True),'title','pk')
+    items=with_public_excerpt(base.filter(category=category)).order_by(F('date').desc(nulls_last=True),'title','pk')
     total=counts[category]
-    fields=('id','title','category','court','source_name','source_url','content_kind','date','date_kind','excerpt','authors','review_status',
-            'provenance__pending_nlp', 'provenance__nlp_extraction_id', 'provenance__nlp_status')
+    fields=('id','title','category','court','source_name','source_url','content_kind','date','date_kind','public_excerpt','authors','review_status',
+            'provenance')
     page_rows=list(items.values(*fields)[(page-1)*size:page*size])
     matches={}
     for match in LegalCorpusTopicMatch.objects.filter(item_id__in=[row['id'] for row in page_rows]).values('item_id','topic','matched_terms'):
         matches.setdefault(match['item_id'],[]).append({'id':match['topic'],'terms':match['matched_terms']})
     for row in page_rows:
-        row['processing_status']='awaiting_nlp' if row.pop('provenance__pending_nlp',False) else 'source_indexed'
-        row['nlp_extraction_id'] = row.pop('provenance__nlp_extraction_id')
-        row['nlp_status'] = row.pop('provenance__nlp_status')
+        provenance = row.pop('provenance', None) or {}
+        row['processing_status']='awaiting_nlp' if provenance.get('pending_nlp', False) else 'source_indexed'
+        row['nlp_extraction_id'] = provenance.get('nlp_extraction_id')
+        row['nlp_status'] = provenance.get('nlp_status')
+        row['excerpt']=row.pop('public_excerpt')
         row['source_url']=safe_url(row['source_url'])
+        details = public_source_metadata(
+            provenance,
+            category=row['category'],
+            authors=row['authors'],
+            origin=row['source_name'] or row['court'],
+            safe_url=safe_url,
+        )
+        row['editorial_topics'] = details.pop('topics')
+        row.update(details)
         row['topics']=matches.get(row['id'],[])
         row['period_confirmed']=row['date'] is not None
     return {'scope':scope,'topics':topics,'counts':counts,'items':page_rows,
             'pagination':{'page':page,'page_size':size,'total':total,'has_next':page*size<total},
             'classification':{'method':VERSION,'review_status':'pending','note':'Candidatos por termos no texto; nao comprovam vinculo juridico entre fontes.'},
-            'coverage':{'undated':undated,'indexed_at':LegalCorpusItem.objects.aggregate(value=Max('indexed_at'))['value'],
+            'coverage':{'undated':undated,'indexed_at':base.aggregate(value=Max('indexed_at'))['value'],
                         'counting_unit':'unique_source_document','topics_overlap':True,
                         'doctrine_scope':'Bibliografia compartilhada, sem atribuicao a tribunal',
                         'topic_selection':'Dez temas iniciais; nao e ranking nacional de frequencia'}}

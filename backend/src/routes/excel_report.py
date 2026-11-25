@@ -1,19 +1,17 @@
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from src.services.excel_report import document_rows, workbook
+from src.services.report_transaction import report_transaction
 from src.services.statistics_service import InvalidQuery, filtered_processes, instance_series, metrics
 
 
 @require_GET
 def report(request):
     try:
-        with transaction.atomic():
-            if connection.vendor == "postgresql":
-                with connection.cursor() as cursor:
-                    cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        with report_transaction():
             query, scope = filtered_processes(request.GET)
             if scope["outcome"] != "all":
                 raise InvalidQuery("A exportação inclui todos os resultados; use outcome=all.")

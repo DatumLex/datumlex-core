@@ -10,7 +10,7 @@ export default function Demo() {
   useEffect(() => {
     let active = true
     if (!['127.0.0.1', 'localhost'].includes(location.hostname) || location.port !== '5180') return
-    authRequest('auth/login', 'POST', { login: 'fx115-demo@example.invalid', password: 'FX115-local-demo-only' })
+    authRequest('auth/login', 'POST', { login: 'fx115-demo@example.invalid', password: import.meta.env.VITE_LOCAL_DEMO_PASSWORD || '' })
       .then(() => { if (active) setState('ready') })
       .catch(error => { if (active) setState(error.message) })
     return () => { active = false }

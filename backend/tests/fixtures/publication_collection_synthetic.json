@@ -1,0 +1,60 @@
+{
+  "id": "datumlex-contract-fixture",
+  "version": "1",
+  "synthetic": true,
+  "items": [
+    {
+      "id": "fake-item",
+      "category": "jurisprudence",
+      "review_status": "approved",
+      "source_url": "https://example.test/datumlex-sintetico",
+      "source_locator": "documento sintético, seção 1",
+      "subject_codes": [
+        10433
+      ],
+      "tpu_required": true,
+      "text_version_id": "fake-text",
+      "evidence_ids": [
+        "accepted-example"
+      ]
+    }
+  ],
+  "references": [],
+  "text_versions": [
+    {
+      "id": "fake-text",
+      "item_id": "fake-item",
+      "review_status": "approved",
+      "source_url": "https://example.test/datumlex-sintetico",
+      "source_locator": "documento sintético, seção 1",
+      "rights": "authorized",
+      "subject_codes": [
+        10433
+      ],
+      "text": "Isto é um trecho jurídico inteiramente sintético.",
+      "sha256": "9fffe4a81b631c7f99e9fd979bde85b9ca27c8c665e0ab5cc0dd8b8368ef057d"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "accepted-example",
+      "review_status": "approved",
+      "text_version_id": "fake-text",
+      "text_sha256": "9fffe4a81b631c7f99e9fd979bde85b9ca27c8c665e0ab5cc0dd8b8368ef057d",
+      "start": 0,
+      "end": 49,
+      "excerpt_sha256": "9fffe4a81b631c7f99e9fd979bde85b9ca27c8c665e0ab5cc0dd8b8368ef057d",
+      "rule_version": "fixture-only-v1"
+    },
+    {
+      "id": "candidate-example",
+      "review_status": "candidate",
+      "text_version_id": "fake-text",
+      "text_sha256": "9fffe4a81b631c7f99e9fd979bde85b9ca27c8c665e0ab5cc0dd8b8368ef057d",
+      "start": 0,
+      "end": 49,
+      "excerpt_sha256": "9fffe4a81b631c7f99e9fd979bde85b9ca27c8c665e0ab5cc0dd8b8368ef057d",
+      "rule_version": "fixture-only-v1"
+    }
+  ]
+}

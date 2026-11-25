@@ -1,5 +1,6 @@
 """Local-first settings. PostgreSQL is selected explicitly through DATABASE_URL."""
 
+import json
 import os
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -80,9 +81,45 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 ).split(",")
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS)).split(",")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
-RESEARCH_OPENAI_ENABLED = os.environ.get("RESEARCH_OPENAI_ENABLED", "false").lower() == "true"
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-RESEARCH_OPENAI_MODEL = os.environ.get("RESEARCH_OPENAI_MODEL", "gpt-4.1-mini")
+RESEARCH_CIVIL_COHORT = os.environ.get("RESEARCH_CIVIL_COHORT", "").strip()
+PUBLIC_REGISTRATION_COURTS = tuple(
+    dict.fromkeys(
+        code.strip().upper()
+        for code in os.environ.get("DATUMLEX_PUBLIC_REGISTRATION_COURTS", "").split(",")
+        if code.strip()
+    )
+)
+SYNTHETIC_PREVIEW = os.environ.get("DATUMLEX_SYNTHETIC_PREVIEW") == "true"
+PREVIEW_REVISION = os.environ.get("DATUMLEX_PREVIEW_REVISION", "")
+if SYNTHETIC_PREVIEW:
+    if (
+        DEBUG
+        or os.environ.get("RAILWAY_ENVIRONMENT_NAME") != "recovery-preview"
+        or os.environ.get("RAILWAY_SERVICE_NAME") != "datumlex-api-preview"
+        or not database_url
+        or DATABASES["default"]["HOST"] != "postgres.railway.internal"
+        or DATABASES["default"]["NAME"] != "datumlex_preview_4f_demo"
+        or RESEARCH_CIVIL_COHORT != "civil-synthetic-4f"
+        or os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() != "false"
+    ):
+        raise ValueError("Invalid isolated synthetic preview configuration")
+RESEARCH_GEMINI_ENABLED = os.environ.get("RESEARCH_GEMINI_ENABLED", "false").lower() == "true"
+RESEARCH_GEMINI_MODEL = os.environ.get("RESEARCH_GEMINI_MODEL", "gemini-3.5-flash-lite")
+RESEARCH_GEMINI_COOLDOWN_SECONDS = max(
+    0, int(os.environ.get("RESEARCH_GEMINI_COOLDOWN_SECONDS", "8"))
+)
+NLP_DASHBOARD_CATALOG = {}
+NLP_DASHBOARD_RELEASES = {}
+_nlp_manifest_path = Path(__file__).resolve().parent / "nlp_v2_release_manifest.json"
+if (
+    not SYNTHETIC_PREVIEW
+    and os.environ.get("NLP_DASHBOARD_USE_MANIFEST", "true").lower() != "false"
+    and _nlp_manifest_path.exists()
+):
+    _nlp_manifest = json.loads(_nlp_manifest_path.read_text(encoding="utf-8"))
+    NLP_DASHBOARD_CATALOG = _nlp_manifest.get("NLP_DASHBOARD_CATALOG", {})
+    NLP_DASHBOARD_RELEASES = _nlp_manifest.get("NLP_DASHBOARD_RELEASES", {})
 PANGEA_SEARCH_BASE_URL = os.environ.get(
     "PANGEA_SEARCH_BASE_URL", "https://pangeabnp.pdpj.jus.br"
 ).rstrip("/")
@@ -94,4 +131,4 @@ BNP_TOKEN_URL = os.environ.get(
 BNP_API_CLIENT_ID = os.environ.get("BNP_API_CLIENT_ID", "")
 BNP_API_CLIENT_SECRET = os.environ.get("BNP_API_CLIENT_SECRET", "")
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL') or RESEARCH_GEMINI_MODEL

@@ -17,6 +17,7 @@ from src.db.models import (
 )
 from src.nlp.contracts import bytes_hash, fingerprint, validate_annotation, validate_result
 from src.db.court_catalog import COURTS
+from src.services.corpus_catalog import safe_url
 
 
 class Conflict(ValueError):
@@ -217,6 +218,17 @@ def read_evidence(evidence, *, actor, revision=None, original=False):
         'source_observation_id': str(observation.pk),
         'coverage': run.original_result['coverage'], 'evaluation': run.original_result['evaluation'],
         'warnings': run.original_result['warnings'], 'extraction_status': run.status,
+    }
+
+
+def public_payload(item):
+    """Serve the approved effective annotation without draft content or storage locators."""
+    source = {key: item["source"][key] for key in ("decision_date", "publication_date", "content_kind")
+              if key in item["source"]}
+    source["source_url"] = safe_url(item["source"].get("source_url"))
+    return {
+        **{key: value for key, value in item.items() if key not in ("original", "source")},
+        "source": source,
     }
 
 

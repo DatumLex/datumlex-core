@@ -1,6 +1,7 @@
 from django.db.models import Count, Q
 
 from src.db.models import DecisionAssessment, DimSubject
+from src.services.corpus_publication import published_references
 from src.services.precedent_usage import summarize as precedent_usage
 from src.services.report_nlp import report_nlp
 
@@ -21,7 +22,7 @@ def report_context(query, scope, actor=None):
             local_decision__court="TJDFT",
             decision_date__range=[scope["start"], scope["end"]],
             review_state=DecisionAssessment.REVIEW_APPROVED,
-            reference__approved=True,
+            reference__in=published_references(),
             reference__reference_type="precedent",
             reference__source_institution="STJ",
         )

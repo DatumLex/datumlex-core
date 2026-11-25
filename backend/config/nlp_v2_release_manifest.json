@@ -1,0 +1,824 @@
+{
+  "schema_version": "nlp-v2-release-manifest/1.0",
+  "batch_id": "ciclo2-nlpv2-20261123",
+  "generated_at": "2026-11-23T10:02:45.863718+00:00",
+  "pipeline_sha256": "d9dbf024e1b6ae321beded00b9adac39216e75f93bd7a93b1495d89aa97d6528",
+  "NLP_DASHBOARD_RELEASES": {
+    "tjdft-civil-fulltext-v2-20261123": {
+      "state": "released",
+      "approval_reference": "DATUMLEX-CICLO2-CURATION-2026-11-23",
+      "benchmark_version": "curated-tjdft-civil-v2.0",
+      "rights_approval_reference": "TJDFT-JURISDF-PUBLIC-OFFICIAL-DECISIONS-2026-11-23",
+      "pipeline_sha256": "d9dbf024e1b6ae321beded00b9adac39216e75f93bd7a93b1495d89aa97d6528",
+      "source": "tjdft_jurisprudence",
+      "inclusion_policy": "human_approved_only",
+      "tasks": [
+        "LEGAL_GROUND",
+        "LEGAL_THESIS"
+      ]
+    },
+    "tjdft-civil-curated-20261125-8fe92bac": {
+      "state": "released",
+      "approval_reference": "DATUMLEX-ENRICH-CURATION-2026-11-25",
+      "benchmark_version": "curated-tjdft-civil-v2.1",
+      "rights_approval_reference": "TJDFT-PUBLIC-OFFICIAL-DECISIONS-2026-11-25",
+      "pipeline_sha256": "8fe92bac96b4af302c6d232786279aa7de65dbef6acad2239f37923d4eea6d59",
+      "source": "tjdft_jurisprudence",
+      "inclusion_policy": "human_approved_only",
+      "tasks": [
+        "LEGAL_GROUND",
+        "LEGAL_THESIS"
+      ]
+    },
+    "stj-civil-curated-20261125-8fe92bac": {
+      "state": "released",
+      "approval_reference": "DATUMLEX-ENRICH-CURATION-2026-11-25",
+      "benchmark_version": "curated-stj-civil-v2.1",
+      "rights_approval_reference": "STJ-PUBLIC-OFFICIAL-DECISIONS-2026-11-25",
+      "pipeline_sha256": "8fe92bac96b4af302c6d232786279aa7de65dbef6acad2239f37923d4eea6d59",
+      "source": "stj_jurisprudence",
+      "inclusion_policy": "human_approved_only",
+      "tasks": [
+        "LEGAL_GROUND",
+        "LEGAL_THESIS"
+      ]
+    }
+  },
+  "NLP_DASHBOARD_CATALOG": {
+    "TJDFT:834d978e-81b2-4b50-a8f6-6a03229283e1": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439
+      ],
+      "extraction_id": "c4f50a75-11df-5f21-9c73-e256a38ca13a",
+      "text_version_id": "813022c6-6532-54ee-9749-63978b959b34",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2026-11-04",
+      "outcome": "denied",
+      "title": "TJDFT — 2ª Turma Recursal — Acórdão 2197630 (Responsabilidade civil do Estado, nexo causal e danos morais/materiais)"
+    },
+    "TJDFT:06934ce4-cfea-410b-bdc2-4799694cd884": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        6226,
+        1156
+      ],
+      "extraction_id": "e9c21bef-3d28-5a75-9e01-eb45dc6db867",
+      "text_version_id": "7954331d-3180-56d2-9abe-5e46eb1abeff",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-28",
+      "outcome": "partial",
+      "title": "TJDFT — 3ª Turma Cível — Acórdão 1950820 (Cobrança indevida de despesas hospitalares, plano de saúde e dano moral)"
+    },
+    "TJDFT:0b5ad6c5-e0fb-414e-a620-2adfa4792ce9": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10438
+      ],
+      "extraction_id": "25775813-445b-5d00-a552-245ff07d3174",
+      "text_version_id": "8e951139-5fb6-5d47-87f6-05c7501a75c0",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-21",
+      "outcome": "denied",
+      "title": "TJDFT — 1ª Turma Cível — Acórdão 1948317 (Erro médico, serviço público de saúde e redistribuição dinâmica do ônus da prova)"
+    },
+    "TJDFT:08628ac6-bf12-4c1d-b1fe-42d8017ee243": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439
+      ],
+      "extraction_id": "1ce822a1-da7c-5f58-8a04-21b8a7546a9f",
+      "text_version_id": "4b0fcad9-5f2a-5fad-a712-cb6b06cf271f",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-14",
+      "outcome": "denied",
+      "title": "TJDFT — 5ª Turma Cível — Acórdão (Atraso na entrega de imóvel, inadimplemento contratual e dano moral)"
+    },
+    "TJDFT:0d8074d6-1eac-4671-8778-a03248416479": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "ce3c4f63-3396-5d06-93a5-59185b81a8cf",
+      "text_version_id": "3f1ccda5-8147-5e74-a572-81684381610b",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2026-09-21",
+      "outcome": "denied",
+      "title": "TJDFT — 3ª Turma Recursal — Transporte aéreo, cancelamento de voo, fortuito interno e responsabilidade objetiva"
+    },
+    "TJDFT:0bb5e64d-7f21-4675-9738-4efd5e4e94ed": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "fccde848-49e9-5515-819f-2b55e6c5cd5a",
+      "text_version_id": "39fa29f7-62d6-58ae-ba4b-6676b9164b07",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2026-10-07",
+      "outcome": "denied",
+      "title": "TJDFT — 2ª Turma Recursal — Acórdão 2187617 (Transporte aéreo, cancelamento de voo, cumulação de dano material e moral)"
+    },
+    "TJDFT:0a3c03ce-7ad6-43b4-8ed2-1d4ee0b51775": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "84b5fd0c-651a-52f6-9af5-0e6e8c3852ae",
+      "text_version_id": "885dc4c8-0897-5b57-b10d-faf4fd1ba020",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-13",
+      "outcome": "denied",
+      "title": "TJDFT — 7ª Turma Cível — Acórdão 1944837 (Descontos indevidos bancários, restituição em dobro e dano moral)"
+    },
+    "TJDFT:0ba70dc8-a9cb-406c-afe4-30942396ba56": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "8f718972-d9f1-5f8e-b7cc-4977da2d4bb1",
+      "text_version_id": "eac8e626-73b0-5b2a-a33a-08572d23e582",
+      "mapping_approval_reference": "DATUMLEX-CICLO2-MAPPING-2026-11-23",
+      "release_id": "tjdft-civil-fulltext-v2-20261123",
+      "decision_date": "2024-11-27",
+      "outcome": "partial",
+      "title": "TJDFT — 6ª Turma Cível — Acórdão 1951674 (Fraude bancária em consignado, fortuito interno, Súmula 297 STJ e devolução simples)"
+    },
+    "TJDFT:51f6d739-04a2-4a62-b6da-845a4c4f59ab": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "283129e5-0e01-4138-85ff-a1462b7e040c",
+      "text_version_id": "0a1ff10a-f710-4e20-8617-a83a148214bf",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-12-08",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N.APELAÇÃO CÍVEL 0703087-06.2023.8.07.0014APELA"
+    },
+    "TJDFT:fc459084-4a63-404b-b926-11e44a1f855d": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "c802f7fb-86d8-47d5-86e7-405904ea8ee2",
+      "text_version_id": "d64b28ca-0f63-47db-81cf-bda153c5f619",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2018-12-05",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da União TRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E TERRITÓRIOS Órgão Classe N. Processo : : : Apelante(s) : Apelado(s) : Relator Acórdão N."
+    },
+    "STJ:EMENTA:000852647": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "4967ae65-7a0b-4ad7-8824-dd9f3ebfd11a",
+      "text_version_id": "1bcbcc14-0a2d-42e6-9eea-d5852fbc2523",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2023-09-04",
+      "outcome": "unknown",
+      "title": "STJ — PROCESSUAL CIVIL. AGRAVO INTERNO NO AGRAVO EM RECURSO ESPECIAL. AÇÃO COMINATÓRIA C/C INDENIZAÇÃO E COMPENSAÇÃO POR DANOS MATERIAIS E MORAIS. AUSÊNCIA DE IMPUGNA"
+    },
+    "TJDFT:a03de931-28e9-4af5-b660-a5b49b84262f": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "d8b833a4-8f8b-491a-a97a-2e8b2991a73c",
+      "text_version_id": "00e1d562-00ee-4560-aade-66721142765a",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2023-11-30",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N.AGRAVO DE INSTRUMENTO 0723126-66.2023.8.07.00"
+    },
+    "TJDFT:f5806713-4ae6-4987-972d-ae19d09c0dbe": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "1522b910-7776-465d-b278-d5e213cb0fec",
+      "text_version_id": "f49ee4d4-d26e-4e44-aead-505b3d265856",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-11-19",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 6ª Turma Cível Processo N.APELAÇÃO CÍVEL 0741266-14.2024.8.07.0001APELA"
+    },
+    "TJDFT:b1bad531-d728-4667-b026-bebbe56a7606": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "8fffa6df-db85-4853-8c88-def4fbe8eeba",
+      "text_version_id": "86efe1e8-6d84-431a-9338-fa219a9c0bb6",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2018-12-05",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 1ª Turma Cível Processo N.APELAÇÃO 0705002-42.2017.8.07.0001APELANTE(S)"
+    },
+    "TJDFT:0a70dc7a-08e6-4ed9-92c8-219dac03ca79": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "e9c0fb88-a778-4cc7-9891-9ff7a643370b",
+      "text_version_id": "46acad6a-f63f-4770-96ee-fdc966b9ea09",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2020-12-18",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 3ª Turma Cível Processo N.APELAÇÃO CÍVEL 0706524-24.2019.8.07.0005APELA"
+    },
+    "TJDFT:f12d6111-de06-4b25-ae4c-33c5576c7914": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "f5298eef-7538-4443-95f1-adca9d19df44",
+      "text_version_id": "a519a3b7-2fb4-4427-b4c7-4294a1260116",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2019-12-05",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 8ª Turma Cível Processo N.APELAÇÃO CÍVEL 0713181-68.2018.8.07.0020APELA"
+    },
+    "TJDFT:6a5f6bfa-8c08-433a-b23e-d5a96a84ee92": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "58060719-2756-48f2-9d9b-421f46305f16",
+      "text_version_id": "39677b9a-d108-4afc-8ac1-69548601e0fb",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2019-12-13",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 3ª Turma Cível Processo N.EMBARGOS DE DECLARAÇÃO CÍVEL 0019754-13.2015."
+    },
+    "TJDFT:14c870e9-ae1d-4e6b-aec5-7afd38b1c38c": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "02fb2b61-9a48-40f0-8389-99a58ed5fc01",
+      "text_version_id": "808dffc3-f7c0-4af1-9489-9ea56612e7d7",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2019-12-13",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 3ª Turma Cível Processo N.APELAÇÃO CÍVEL 0701765-45.2018.8.07.0007APELA"
+    },
+    "TJDFT:efbcc811-db36-4120-b264-64c1d5d5733c": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "2795a198-e004-4c43-8d67-89ffdd64fdba",
+      "text_version_id": "596a8c22-690a-4b74-adcf-59de56c9ca67",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2019-12-18",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N.APELAÇÃO CÍVEL 0700173-81.2018.8.07.0001APELA"
+    },
+    "TJDFT:9f615da7-448a-4774-b024-8f27bb455147": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "60a452e0-1ff5-4c85-bc14-852cd60ca311",
+      "text_version_id": "1e825d99-779d-4177-a4ed-1e6b2d38f6f5",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2021-12-09",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N. APELAÇÃO CÍVEL 0006913-46.2016.8.07.0008 APE"
+    },
+    "TJDFT:c9598873-9fbc-4f60-9514-6708396c4ca6": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "f774ca15-9d85-4bf4-974a-e7bbbaa4552e",
+      "text_version_id": "f4d3dbd1-6719-48fc-86a3-9919b676b253",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2020-11-06",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão Primeira Turma Recursal DOS JUIZADOS ESPECIAIS DO DISTRITO FEDERAL Proc"
+    },
+    "TJDFT:ac4102f1-43a3-4165-9f14-d2aefc7c5d8c": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "9604c52f-0f06-4e33-9dd7-d91907a6a8a6",
+      "text_version_id": "b0b58000-71b8-4ba6-865e-6a3304229e41",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2020-12-18",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 3ª Turma Cível Processo N.APELAÇÃO CÍVEL 0008938-72.2015.8.07.0006APELA"
+    },
+    "TJDFT:a3c8138a-a77c-4ae5-92ca-5d2b879f2e0b": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "855bba85-e7c3-43d6-b27e-5b8363c57730",
+      "text_version_id": "376cd141-47dc-4883-a190-a9e865410554",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2021-12-15",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 6ª Turma Cível Processo N.AGRAVO DE INSTRUMENTO 0731772-36.2021.8.07.00"
+    },
+    "TJDFT:1fad8d61-f154-4a6a-8f61-f0b4e469a958": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "39ce4639-9e1d-49a5-bf72-6930370cbca9",
+      "text_version_id": "bd859bcd-b247-46b0-bed3-58d01e9dcda1",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2020-09-16",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N. APELAÇÃO CÍVEL 0705689-30.2019.8.07.0007 APE"
+    },
+    "TJDFT:82f0495c-c590-4982-89ab-22a75703baab": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "50403260-66d0-4d4b-90ed-62ccac38f78a",
+      "text_version_id": "b34d7045-baaa-43fd-bd2d-75fb44299967",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2019-12-04",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 3ª Turma Cível Processo N.APELAÇÃO CÍVEL 0016816-63.2015.8.07.0001APELA"
+    },
+    "TJDFT:acc9946d-2a86-4726-b5e1-c1bd5bfa0353": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "99e4fc2c-bae7-491f-993a-ffda91bf66dc",
+      "text_version_id": "9827199d-178f-4f1d-81d8-f62bbd481913",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2020-11-05",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N.APELAÇÃO CÍVEL 0705466-17.2018.8.07.0006APELA"
+    },
+    "STJ:EMENTA:924915": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "de21ece8-022c-4b11-abb9-f59e16679e63",
+      "text_version_id": "36aaf268-6750-4cfe-9df4-5eced4a75373",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-09-22",
+      "outcome": "unknown",
+      "title": "STJ — AGRAVO EM RECURSO ESPECIAL. CIVIL. PROCESSUAL CIVIL. AÇÃO DE INDENIZAÇÃO POR DANO MORAL. DIFAMAÇÃO E INJÚRIA. DEVER DE INDENIZAR. COMPROVAÇÃO. REEXAME. SÚMULA N"
+    },
+    "TJDFT:af55d1cd-cb90-4616-a725-c1b17317ece6": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "1a221a7f-823e-44c4-9038-2298f2178aa1",
+      "text_version_id": "9e654e34-b4bc-4015-828b-b4308ff96df0",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2021-12-09",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N. APELAÇÃO CÍVEL 0708439-52.2021.8.07.0001 APE"
+    },
+    "STJ:EMENTA:1460043": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "a2742229-f763-44d5-8086-29a04804b09a",
+      "text_version_id": "7fb54aa7-6995-45ad-99f7-34850f40baea",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2026-08-12",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO DO CONSUMIDOR E PROCESSUAL CIVIL. RECURSO ESPECIAL. AÇÃO INDENIZATÓRIA. PROCEDIMENTOS ESTÉTICOS. RESPONSABILIDADE OBJETIVA. FRANQUIA. DANOS MORAIS E EST"
+    },
+    "TJDFT:0908028e-4c96-4d0d-a34c-913dd44353b2": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "a4228d68-803c-4877-a881-1a2cd0e03472",
+      "text_version_id": "b2d25894-98c0-4ada-a4a2-d5abafe27f0f",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2020-03-18",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 5ª Turma Cível Processo N.APELAÇÃO CÍVEL 0718562-80.2019.8.07.0001APELA"
+    },
+    "TJDFT:3ded5ca2-d6cb-43d8-a062-652dac1eabf1": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "627764e0-1b1d-426f-b9b8-814ebb286bd6",
+      "text_version_id": "acbdcbbb-151e-430b-a15b-4200cfb20384",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2026-10-15",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 3ª Turma Cível Processo N.EMBARGOS DE DECLARAÇÃO CÍVEL 0704284-93.2023."
+    },
+    "STJ:EMENTA:924765": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "b07f1eb6-c3ce-43ba-91f3-9a074fa09ca9",
+      "text_version_id": "db222f14-b7bd-4862-913a-fff2c02cf196",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-09-22",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO CIVIL. AGRAVO EM RECURSO ESPECIAL. RESPONSABILIDADE CIVIL. INDENIZAÇÃO POR DANOS MORAIS. IMPOSSIBILIDADE. NÃO COMPROVAÇÃO DA PRESENÇA DOS ELEMENTOS NECE"
+    },
+    "TJDFT:fb5586fb-ae79-493b-8ca2-f731c1c09b77": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "794df5eb-5127-4d66-b0ca-8770c703cc55",
+      "text_version_id": "cb2a7c55-f4cb-436b-98b1-299f7e9aa90a",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2026-09-23",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N.EMBARGOS DE DECLARAÇÃO CÍVEL 0729176-37.2025."
+    },
+    "STJ:EMENTA:924162": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "db75c558-7abf-44a9-90fb-58dd93ec9f6b",
+      "text_version_id": "7c0dfcdb-3089-42cd-9b3e-e5b04e9422a2",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-08-25",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO CIVIL. RECURSO ESPECIAL. RESPONSABILIDADE CIVIL DE INSTITUIÇÃO FINANCEIRA. GOLPE DO FALSO LEILÃO. ABERTURA DE CONTA FRAUDULENTA. RECONHECIMENTO DE FALHA"
+    },
+    "TJDFT:bb6636e5-e711-4d94-aa33-2ee7e3744460": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "a4eb6395-5431-4956-b040-4eb15193e240",
+      "text_version_id": "27cf0b1b-c7ff-4f3e-b936-e95417210f80",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2024-12-11",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 4ª Turma Cível Processo N.APELAÇÃO CÍVEL 0705872-30.2021.8.07.0007APELA"
+    },
+    "TJDFT:b6ab7186-3c4c-4b96-a085-adb5fd6bf1bd": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "37289f21-742a-4041-af4b-c20e2a1c0794",
+      "text_version_id": "d1e4c595-df18-411b-a06c-da94dccdc88e",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2018-12-06",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão Primeira Turma Recursal DOS JUIZADOS ESPECIAIS DO DISTRITO FEDERAL Proc"
+    },
+    "STJ:EMENTA:000819543": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "72e0bc6f-b143-42ca-87fb-342090e55fbc",
+      "text_version_id": "8d9f02cf-e851-459b-8b22-409748fcef06",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2022-06-27",
+      "outcome": "unknown",
+      "title": "STJ — AGRAVO INTERNO NO AGRAVO EM RECURSO ESPECIAL. PLANO DE SAÚDE. EMERGÊNCIA. INTERNAÇÃO NEGADA. PERÍODO. FALTA DE PREQUESTIONAMENTO. FUNDAMENTO NÃO ATACADO. SÚMULA"
+    },
+    "STJ:EMENTA:925410": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "f02182f6-194e-40a8-901a-907b661ff55b",
+      "text_version_id": "612dcb95-9117-478d-9881-37b100841866",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-08-25",
+      "outcome": "unknown",
+      "title": "STJ — PROCESSUAL CIVIL. AGRAVO EM RECURSO ESPECIAL. AÇÃO DE COBRANÇA CUMULADA COM COMPENSAÇÃO POR DANOS MORAIS. NEGATIVA DE PAGAMENTO DE INDENIZAÇÃO SECURITÁRIA. FALE"
+    },
+    "TJDFT:2544d395-c237-4497-90cf-f6cddd2b20e7": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "d823c59a-4e52-430a-bb8d-025ac36c5b6e",
+      "text_version_id": "675c1af9-3f27-456b-9632-b8674cc7b567",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-12-17",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 6ª Turma Cível Processo N.EMBARGOS DE DECLARAÇÃO CÍVEL 0719989-39.2024."
+    },
+    "STJ:EMENTA:922138": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "050a5752-b270-46b6-b5ea-1aac880d2d92",
+      "text_version_id": "ea1f802b-887f-41d7-bf0e-1cb6244a8dec",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-08-18",
+      "outcome": "unknown",
+      "title": "STJ — AGRAVO EM RECURSO ESPECIAL. COMPRA E VENDA. IMÓVEL. ATRASO. ENTREGA. LUCROS CESSANTES PRESUMIDO. SÚMULA Nº 83/STJ. APURAÇÃO. VALOR. CONTRATO DE ALUGUEL. REEXAME"
+    },
+    "TJDFT:760b5790-daf6-4bfb-91b2-18d245706c10": {
+      "source": "tjdft_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "c03f9e40-7c7f-4e97-9fa1-6eab2a958992",
+      "text_version_id": "ac23a85d-ec9d-433c-9bb5-f3d74e9916d7",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "tjdft-civil-curated-20261125-8fe92bac",
+      "decision_date": "2026-10-07",
+      "outcome": "unknown",
+      "title": "TJDFT — Poder Judiciário da UniãoTRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS Órgão 2ª Turma Cível Processo N.APELAÇÃO CÍVEL 0717029-19.2025.8.07.0020APELA"
+    },
+    "STJ:EMENTA:924165": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "1fd08425-c008-48c1-a065-f5f1778af17f",
+      "text_version_id": "2f1b9f1e-d417-41dc-b55f-453888ec0fa3",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-08-25",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO CIVIL E PROCESSUAL CIVIL. RECURSO ESPECIAL. PLANO DE SAÚDE. INTERNAÇÃO EM HOSPITAL NÃO CREDENCIADO DURANTE PANDEMIA DE COVID-19. REEMBOLSO LIMITADO AO V"
+    },
+    "STJ:EMENTA:000854468": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "18442f78-cffe-4f6d-9f6a-b0c48b86cc9c",
+      "text_version_id": "4df4409f-924d-4051-bbc6-04559d15c097",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2023-09-18",
+      "outcome": "unknown",
+      "title": "STJ — AGRAVO INTERNO NO AGRAVO EM RECURSO ESPECIAL. COMPRA E VENDA DE IMÓVEL. RESCISÃO CONTRATUAL. NEGATIVA DE PRESTAÇÃO JURISDICIONAL NÃO CONFIGURADA. DEVOLUÇÃO DOS"
+    },
+    "STJ:EMENTA:921562": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "89ecbd85-da1f-4e69-9d2d-0adfd37f8da8",
+      "text_version_id": "a5cee959-597c-4ba0-8498-4689842680ac",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-08-18",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO CIVIL. AGRAVO EM RECURSO ESPECIAL. AÇÃO DECLARATÓRIA DE OBRIGAÇÃO DE FAZER C/C REPARAÇÃO POR DANOS MORAIS. PLANO DE SAÚDE. PACIENTE DIAGNOSTICADA COM TR"
+    },
+    "STJ:EMENTA:925529": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "06fb7d20-7d35-44ff-bafd-418153785653",
+      "text_version_id": "363f2883-5fb1-4867-a501-d4d78dbfe8e7",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2025-09-01",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO CIVIL. RECURSO ESPECIAL. RESPONSABILIDADE CIVIL DE INSTITUIÇÃO FINANCEIRA. FRAUDE BANCÁRIA. RECURSO ESPECIAL NÃO CONHECIDO. I. Caso em exame 1. Recurso"
+    },
+    "STJ:EMENTA:1460648": {
+      "source": "stj_jurisprudence",
+      "subject_codes": [
+        10431,
+        10433,
+        10439,
+        1156,
+        6220
+      ],
+      "extraction_id": "7a1fb9d5-61ae-4c2a-98ba-d276eb455011",
+      "text_version_id": "6309e710-ec6f-4f28-bfd4-1cec705e2b24",
+      "mapping_approval_reference": "DATUMLEX-ENRICH-MAPPING-2026-11-25",
+      "release_id": "stj-civil-curated-20261125-8fe92bac",
+      "decision_date": "2026-08-12",
+      "outcome": "unknown",
+      "title": "STJ — DIREITO DO CONSUMIDOR. RECURSO ESPECIAL. PLANO DE SAÚDE COLETIVO. RESCISÃO UNILATERAL DURANTE TRATAMENTO ONCOLÓGICO. TEMA 1.082/STJ. DANOS MORAIS. RECURSO PROVI"
+    }
+  }
+}

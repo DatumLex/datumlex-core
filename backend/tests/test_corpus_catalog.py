@@ -27,7 +27,8 @@ class CorpusCatalogTests(TestCase):
     def item(self,key,category='jurisprudence',court='TJDFT',topic='dano-moral',day=date(2020,1,1)):
         item=LegalCorpusItem.objects.create(origin_key=key,category=category,court=court,
             title=key,source_name='Teste',source_url='https://www.tjdft.jus.br/',
-            content_kind='full_text',date=day,fingerprint=key)
+            content_kind='full_text',date=day,fingerprint=key,review_status='approved',
+            provenance={'permissions':{'display':'allowed'}})
         LegalCorpusTopicMatch.objects.create(item=item,topic=topic,matched_terms=['dano moral'])
         return item
     def query(self,extra=''):
@@ -42,7 +43,7 @@ class CorpusCatalogTests(TestCase):
         self.assertTrue(result['topics'][0]['has_all_three'])
         result=self.query('&complete_only=true')
         self.assertEqual(result['counts'],{'jurisprudence':1,'precedent':1,'doctrine':1})
-        self.assertEqual(result['items'][0]['review_status'],'pending')
+        self.assertEqual(result['items'][0]['review_status'],'approved')
     def test_dates_and_unknown_period_are_separate(self):
         self.item('known')
         self.item('unknown',day=None)
@@ -62,7 +63,7 @@ class CorpusCatalogTests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get('/api/corpus/').status_code,401)
     def test_invalid_filters_rejected(self):
-        for query in ('topic=invalid','category=bad','page=0','page_size=100','include_undated=maybe','start=2015-01-01'):
+        for query in ('topic=invalid','category=bad','page=0','page_size=100','include_undated=maybe','start=2009-01-01'):
             self.assertEqual(self.client.get('/api/corpus/?'+query).status_code,400,query)
     def test_topic_overlap_does_not_double_count_document(self):
         item=self.item('unique')
@@ -92,3 +93,28 @@ class CorpusCatalogTests(TestCase):
         reference.thesis='Acidente de transito';reference.title='Acidente de transito';reference.save()
         call_command('refresh_legal_corpus',category='precedent',stdout=io.StringIO())
         self.assertEqual(list(item.topic_matches.values_list('topic',flat=True)),['transito'])
+
+    def test_complete_only_excludes_general_scope_and_deduplicates_multi_topic_items(self):
+        # Two complete topics (dano-moral and dano-material) sharing one multi-topic jurisprudence item.
+        shared = self.item('shared-jur', topic='dano-moral')
+        LegalCorpusTopicMatch.objects.create(item=shared, topic='dano-material', matched_terms=['reparacao integral'])
+        for topic in ('dano-moral', 'dano-material'):
+            self.item(f'prec-{topic}', 'precedent', topic=topic)
+            self.item(f'doc-{topic}', 'doctrine', court='', topic=topic)
+        # General-scope approved doctrine with zero topic_matches.
+        general = LegalCorpusItem.objects.create(
+            origin_key='general-doc', category='doctrine', court='', title='Geral sem subtema',
+            source_name='Senado Federal', source_url='https://example.org/geral', content_kind='artigo',
+            date=None, fingerprint='general-doc', review_status='approved',
+            provenance={'permissions': {'display': 'allowed'}, 'metadata': {'topics': ['responsabilidade-civil']}},
+        )
+        all_items = self.query('&category=doctrine')
+        self.assertEqual(all_items['counts'], {'jurisprudence': 1, 'precedent': 2, 'doctrine': 3})
+        self.assertEqual(all_items['coverage']['undated'], 1)
+        self.assertIn(general.pk, [row['id'] for row in all_items['items']])
+
+        complete = self.query('&complete_only=true&category=jurisprudence')
+        self.assertEqual(complete['counts'], {'jurisprudence': 1, 'precedent': 2, 'doctrine': 2})
+        self.assertEqual(complete['pagination']['total'], 1)
+        self.assertEqual([row['id'] for row in complete['items']], [shared.pk])
+        self.assertEqual(complete['coverage']['undated'], 0)

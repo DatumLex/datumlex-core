@@ -1,5 +1,7 @@
 """Five-page research report following the supplied Sprint 2 layout, using real data."""
 
+from django.conf import settings
+
 from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
@@ -191,8 +193,9 @@ def build_report(scope, totals, provenance, series, pangea=None, cases=None, con
         1, "Visão geral", subject[:45], f"Pesquisa integrada | {courts} | Recorte aplicado na consulta"
     )
     y = r.notice(
-        "Pesquisa sobre os dados carregados",
-        "Valores calculados no momento da exportação. A base é parcial; documentos, processos e recursos individuais são unidades diferentes.",
+        "Dados sintéticos" if settings.SYNTHETIC_PREVIEW else "Pesquisa sobre os dados carregados",
+        ("Os indicadores não representam estatísticas reais." if settings.SYNTHETIC_PREVIEW else
+         "Valores calculados no momento da exportação. A base é parcial; documentos, processos e recursos individuais são unidades diferentes."),
         y,
     )
     y = r.heading("Filtros aplicados", y)

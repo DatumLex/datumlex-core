@@ -29,5 +29,13 @@ class CorpusQueueIndexTests(TestCase):
         self.assertTrue(item.provenance['pending_nlp'])
         self.assertEqual(item.content_kind,'publication_excerpt')
         self.assertEqual(item.review_status,'pending')
+        # Pending items remain hidden from public discovery until explicitly approved for display.
+        pending_result=inventory(QueryDict('court=TJSP'))
+        self.assertEqual(pending_result['counts']['jurisprudence'],0)
+        self.assertEqual(pending_result['items'],[])
+        item.review_status='approved'
+        item.provenance={**item.provenance,'permissions':{'display':'allowed'}}
+        item.save(update_fields=['review_status','provenance'])
         result=inventory(QueryDict('court=TJSP'))
         self.assertEqual(result['items'][0]['processing_status'],'awaiting_nlp')
+        self.assertEqual(result['items'][0]['excerpt'],'')

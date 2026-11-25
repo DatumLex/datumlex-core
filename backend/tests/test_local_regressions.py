@@ -35,7 +35,7 @@ class LocalRegressions(TestCase):
         _, scope = filtered_processes(QueryDict('court=STJ&start=2016-01-01&end=2016-12-31'))
         self.assertEqual(scope['start'], '2016-01-01')
         with self.assertRaises(InvalidQuery):
-            filtered_processes(QueryDict('start=2015-12-31'))
+            filtered_processes(QueryDict('start=2009-12-31'))
 
     @override_settings(DATAJUD_API_KEY='')
     def test_missing_key_does_not_leave_running_claim(self):

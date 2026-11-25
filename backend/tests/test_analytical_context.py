@@ -73,7 +73,7 @@ class AnalyticalContextUnitTests(SimpleTestCase):
 
     def test_invalid_date_ranges_are_rejected(self):
         for supplied in (
-            {"start": "2015-12-31"},
+            {"start": "2009-12-31"},
             {"start": "2025-01-02", "end": "2025-01-01"},
             {"end": "2026-01-16"},
         ):
