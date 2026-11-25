@@ -621,8 +621,9 @@ class LegalDisplayApprovalTests(TransactionTestCase):
         self.assertEqual(applied["visibility"]["published_items"], 3)
         self.assertEqual(applied["visibility"]["published_references"], 2)
         self.assertEqual(applied["visibility"]["pending_items"], 5)
-        self.assertEqual(stat.S_IMODE(snapshot.stat().st_mode), 0o600)
-        self.assertEqual(stat.S_IMODE(receipt.stat().st_mode), 0o600)
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(snapshot.stat().st_mode), 0o600)
+            self.assertEqual(stat.S_IMODE(receipt.stat().st_mode), 0o600)
 
         self.juris_item.refresh_from_db()
         self.doctrine_ref.refresh_from_db()

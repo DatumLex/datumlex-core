@@ -25,7 +25,9 @@ export default async function handler(req, res) {
     return res.status(404).end()
   }
   const destination = new URL(backend)
-  destination.pathname = '/api/' + route.replace(/\/*$/, '/')
+  let normalizedRoute = route
+  while (normalizedRoute.endsWith('/')) normalizedRoute = normalizedRoute.slice(0, -1)
+  destination.pathname = '/api/' + normalizedRoute + '/'
   incoming.searchParams.delete('datumlex_path')
   destination.search = incoming.search
   const headers = new Headers()
