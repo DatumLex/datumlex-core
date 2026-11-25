@@ -1,18 +1,24 @@
 """Session-authorized #115 read APIs and immutable export handoff."""
+from hashlib import sha256
 import json
 from datetime import datetime
 from functools import wraps
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import DatabaseError
+from django.db.models import F, Q
 from django.http import HttpResponse, JsonResponse
 from django.template import Context, Engine
 from django.views.decorators.http import require_http_methods
 
+from src.nlp import engine as nlp_engine
 from src.services import analytical_context as context
 from src.services import nlp_dashboard as service
+from src.services.corpus_catalog import safe_url
+from src.services.corpus_publication import published_items
 from src.services.nlp_evidence import Conflict
 
 
@@ -62,6 +68,57 @@ def options(request):
                 'documents_quality_released': sum(d.get('released', False) for d in documents),
                 'approved_evidences': len(evidence),
             }}
+
+
+@endpoint(['GET'])
+def insights(request):
+    """Run real spaCy (NER/lemmas) + scikit-learn (TF-IDF + cosine similarity) over authorized decisions."""
+    if not request.user.is_authenticated:
+        raise PermissionError('authentication_required')
+    allowed_courts = sorted(context.permitted(request.user))
+    raw_courts = [c.strip().upper() for c in request.GET.get('courts', '').split(',') if c.strip()]
+    courts = [c for c in raw_courts if c in allowed_courts] if raw_courts else allowed_courts
+    if not courts:
+        raise PermissionError('no_authorized_courts')
+    query = (request.GET.get('q') or '').strip()[:400]
+    start = (request.GET.get('start') or '').strip()[:10]
+    end = (request.GET.get('end') or '').strip()[:10]
+
+    cache_payload = json.dumps({'courts': courts, 'start': start, 'end': end, 'q': query}, sort_keys=True)
+    cache_key = 'nlp-insights:' + sha256(cache_payload.encode()).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    qs = published_items('display').filter(
+        category__in=('jurisprudence', 'precedent'),
+        court__in=courts,
+        provenance__permissions__text='allowed',
+    )
+    if start and end and len(start) == 10 and len(end) == 10:
+        qs = qs.filter(Q(date__range=[start, end]) | Q(date__isnull=True))
+
+    rows = list(
+        qs.order_by(F('date').desc(nulls_last=True), '-id')
+        .values('id', 'title', 'court', 'category', 'date', 'source_url', 'excerpt')[:80]
+    )
+    docs = [
+        {
+            'id': f"F{row['id']}",
+            'title': row['title'],
+            'court': row['court'],
+            'category': row['category'],
+            'date': row['date'].isoformat() if row['date'] else None,
+            'url': safe_url(row['source_url']),
+            'text': f"{row['title']}\n{row['excerpt'] or ''}",
+        }
+        for row in rows
+        if row.get('excerpt')
+    ]
+    result = nlp_engine.analyze_corpus(docs, query=query)
+    result['scope'] = {'courts': courts, 'start': start or None, 'end': end or None}
+    cache.set(cache_key, result, timeout=600)
+    return result
 
 
 @endpoint(['POST'])

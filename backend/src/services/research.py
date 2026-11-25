@@ -11,6 +11,7 @@ from src.db.court_catalog import ACTIVE_COURTS
 from src.db.models import ExtractionRun, FactProcessSubject, LegalCorpusTopicMatch
 from src.db.sampling_models import CivilSampleMember, CivilSamplingCohort
 from src.etl.cross_source_matching import normalize_cnj_identifier
+from src.nlp import engine as nlp_engine
 from src.nlp.topics import TOPICS, classify, folded
 from src.services.analytical_context import OUTCOMES
 from src.services.corpus_catalog import CATEGORIES, safe_url, scoped_items
@@ -66,7 +67,10 @@ def requested_categories(question):
 
 def follows_up(question):
     return bool(
-        re.search(r"^e\s|\b(isso|nesse|nessa|desse|dessa|mesmo tema|sobre ele|sobre ela)\b", folded(question))
+        re.search(
+            r"(?:^e\s)|(?:\b(?:isso|nesse|nessa|desse|dessa|mesmo tema|sobre ele|sobre ela)\b)",
+            folded(question),
+        )
     )
 
 
@@ -226,15 +230,20 @@ def lexical_nlp_analysis(query, *, question="", intent_id="overview"):
                 }
             )
     scope_topics.sort(key=lambda item: (-item["documents"], item["id"]))
+    spacy_analysis = nlp_engine.analyze_text(question) if question else None
     return {
-        "method": "lexical_metadata_nlp",
+        "method": "spacy_tfidf_and_metadata_nlp",
+        "engine": nlp_engine.engine_info(),
         "intent": intent_id if intent_id in INTENT_LABELS else "overview",
         "intent_label": INTENT_LABELS.get(intent_id, INTENT_LABELS["overview"]),
         "query_topics": query_topics,
+        "query_lemmas": spacy_analysis["lemmas"][:10] if spacy_analysis else [],
+        "query_entities": spacy_analysis["entities"][:8] if spacy_analysis else [],
         "scope_metadata_topics": scope_topics,
         "limitation": (
-            "NLP léxico aplicado à pergunta e aos metadados oficiais DataJud (assuntos TPU). "
-            "Não constitui extração de teses a partir de textos integrais de acórdãos."
+            "Processamento de linguagem natural com spaCy (pt_core_news_sm) sobre a pergunta "
+            "combinado aos assuntos TPU oficiais DataJud. Para extração de teses e TF-IDF sobre "
+            "decisões reais, consulte a aba NLP · Teses."
         ),
     }
 

@@ -79,8 +79,9 @@ const today = () =>
     month: '2-digit',
     day: '2-digit',
   }).format(new Date())
+const compareText = (a, b) => String(a).localeCompare(String(b))
 const defaults = (courts) => ({
-  court: [...courts].sort(),
+  court: [...courts].sort(compareText),
   cnj: '',
   topics: [],
   subject: [],
@@ -99,7 +100,7 @@ const pack = (filters) =>
   Object.fromEntries(
     Object.entries(filters).map(([key, value]) => [
       key,
-      Array.isArray(value) ? [...value].sort().join(',') : String(value),
+      Array.isArray(value) ? [...value].sort(compareText).join(',') : String(value),
     ]),
   )
 const emptyThread = { turns: [], draft: '', busy: false, error: '' }
@@ -239,7 +240,7 @@ function Drawer({ title, children, onClose }) {
 function SourceRow({ doc, onOpen }) {
   const Icon = doc.kind === 'doctrine' ? BookOpen : doc.kind === 'precedent' ? Scale : FolderSearch
   return (
-    <button className="rw-source" onClick={() => onOpen(doc)}>
+    <button type="button" className="rw-source" onClick={() => onOpen(doc)}>
       <span>
         <Icon size={18} />
       </span>
@@ -264,6 +265,7 @@ function Paragraphs({ blocks, docs, onOpen }) {
         return (
           doc && (
             <button
+              type="button"
               className="rw-cite"
               key={id}
               aria-label={'Abrir ' + doc.title}
@@ -306,11 +308,14 @@ function History({ series }) {
 function LexicalNlpBox({ nlp, showQuery = false }) {
   if (!nlp) return null
   const queryTopics = nlp.query_topics || []
+  const queryEntities = nlp.query_entities || []
+  const queryLemmas = nlp.query_lemmas || []
   const scopeTopics = (nlp.scope_metadata_topics || []).slice(0, 6)
+  const engineLabel = nlp.engine ? `${nlp.engine.library} (${nlp.engine.model})` : 'spaCy + metadados DataJud'
   return (
     <div className="rw-nlp-meta" data-testid={showQuery ? 'chat-nlp-result' : 'scope-nlp-summary'}>
       <p>
-        <strong>NLP léxico (metadados DataJud)</strong>
+        <strong>NLP · {engineLabel}</strong>
         {showQuery && nlp.intent_label ? ` · Intenção: ${nlp.intent_label}` : ''}
       </p>
       {showQuery && (
@@ -319,6 +324,17 @@ function LexicalNlpBox({ nlp, showQuery = false }) {
           {queryTopics.length
             ? queryTopics.map((item) => `${item.label} (${item.matched_terms.join(', ')})`).join(' · ')
             : 'Nenhum tópico específico nos termos da pergunta.'}
+        </p>
+      )}
+      {showQuery && queryLemmas.length > 0 && (
+        <p>
+          <strong>Lemas (spaCy):</strong> {queryLemmas.join(', ')}
+        </p>
+      )}
+      {showQuery && queryEntities.length > 0 && (
+        <p>
+          <strong>Entidades reconhecidas (NER):</strong>{' '}
+          {queryEntities.map((ent) => `${ent.text} [${ent.label_pt}]`).join(' · ')}
         </p>
       )}
       {scopeTopics.length > 0 && (
@@ -369,7 +385,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
       {!thread.turns.length && (
         <div className="rw-prompts">
           {prompts.map((q) => (
-            <button key={q} disabled={thread.busy} onClick={() => onAsk(q, useGemini)}>
+            <button type="button" key={q} disabled={thread.busy} onClick={() => { void onAsk(q, useGemini) }}>
               {q}
             </button>
           ))}
@@ -436,7 +452,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
         className="rw-compose"
         onSubmit={(e) => {
           e.preventDefault()
-          onAsk(thread.draft, useGemini)
+          void onAsk(thread.draft, useGemini)
         }}
       >
         <label htmlFor="rw-question">Sua pergunta</label>
@@ -456,7 +472,7 @@ function Chat({ thread, onDraft, onAsk, onOpen, provider, nlp }) {
           placeholder="Pergunte sobre um indicador, tema, precedente ou doutrina…"
         />
         <div className="rw-actions">
-          <button className="apply-button" disabled={thread.busy || !thread.draft.trim()}>
+          <button type="submit" className="apply-button" disabled={thread.busy || !thread.draft.trim()}>
             <Send size={15} /> Enviar pergunta
           </button>
           <span role="status">
@@ -477,8 +493,8 @@ export default function ResearchWorkspace({ session }) {
   const [page, setPage] = useState('search'),
     [filters, setFilters] = useState(() => defaults(session.courts))
   const [drawer, setDrawer] = useState(null),
-    [saved, setSaved] = useState({}),
-    [threads, setThreads] = useState({})
+    [saved, setSaved] = useState(() => new Map()),
+    [threads, setThreads] = useState(() => new Map())
   const [request, setRequest] = useState({}),
     [retry, setRetry] = useState(0),
     [subjects, setSubjects] = useState({})
@@ -490,7 +506,7 @@ export default function ResearchWorkspace({ session }) {
     key = new URLSearchParams(params).toString()
   const data = request.key === key ? request.data : null,
     error = request.key === key ? request.error : ''
-  const thread = threads[key] || emptyThread
+  const thread = threads.get(key) || emptyThread
   const navRef = useRef(null)
   useEffect(() => {
     const pending = live.current
@@ -535,7 +551,11 @@ export default function ResearchWorkspace({ session }) {
     window.scrollTo(0, 0)
   }
   function updateThread(fn) {
-    setThreads((all) => ({ ...all, [key]: fn(all[key] || emptyThread) }))
+    setThreads((all) => {
+      const next = new Map(all)
+      next.set(key, fn(all.get(key) || emptyThread))
+      return next
+    })
   }
   function open(doc) {
     setDrawer({ doc })
@@ -632,7 +652,7 @@ export default function ResearchWorkspace({ session }) {
         </div>
         <nav aria-label="Seções da pesquisa">
           {railItems.map(([id, [label, , Icon]]) => (
-            <button key={id} aria-current={id === page ? 'page' : undefined} onClick={() => navigate(id)}>
+            <button type="button" key={id} aria-current={id === page ? 'page' : undefined} onClick={() => navigate(id)}>
               <Icon size={17} />
               {label}
             </button>
@@ -656,6 +676,7 @@ export default function ResearchWorkspace({ session }) {
           </div>
           {showFilters && (
             <button
+              type="button"
               className="secondary-button"
               disabled={!data}
               onClick={() => setDrawer({ type: 'export' })}
@@ -675,7 +696,7 @@ export default function ResearchWorkspace({ session }) {
                 pattern="[0-9]{20}|[0-9]{7}-[0-9]{2}[.][0-9]{4}[.][0-9][.][0-9]{2}[.][0-9]{4}"
                 placeholder="Com ou sem pontuação" onChange={(event) => setCnjDraft(event.target.value)} />
             </label>
-            <button className="secondary-button">Consultar processo</button>
+            <button type="submit" className="secondary-button">Consultar processo</button>
             {filters.cnj && <button type="button" className="rw-link" onClick={() => {
               setCnjDraft('')
               setFilters({ ...filters, cnj: '' })
@@ -702,13 +723,13 @@ export default function ResearchWorkspace({ session }) {
             </span>
             {page !== 'corpus' && <span>
               <small>Assuntos CNJ ativos (TPU)</small>
-              <strong>{[...filters.subject].sort().join(', ') || 'Todos no lote'}</strong>
+              <strong>{[...filters.subject].sort(compareText).join(', ') || 'Todos no lote'}</strong>
             </span>}
             {page !== 'corpus' && filters.cnj && <span><small>CNJ consultado</small>{formatProcessIdentifier(filters.cnj)}</span>}
             {page !== 'corpus' && filters.outcomes.length !== Object.keys(results).length &&
               <span><small>Resultados DataJud exibidos</small>{filters.outcomes.map((key) => results[key]).join(', ')}</span>}
             {filters.degree.length > 0 && page !== 'corpus' && <span><small>Grau DataJud</small>{filters.degree.map((key) => degrees[key]).join(', ')}</span>}
-            <button className="secondary-button" onClick={() => setDrawer({ type: 'filter' })}>
+            <button type="button" className="secondary-button" onClick={() => setDrawer({ type: 'filter' })}>
               <SlidersHorizontal size={16} /> Filtros
             </button>
           </div>
@@ -731,8 +752,8 @@ export default function ResearchWorkspace({ session }) {
         ) : page === 'notebook' ? (
           <section className="rw-card">
             <h2>Fontes guardadas nesta sessão</h2>
-            {Object.values(saved).length ? (
-              Object.values(saved).map((d) => <SourceRow key={d.id} doc={d} onOpen={open} />)
+            {saved.size ? (
+              [...saved.values()].map((d) => <SourceRow key={d.id} doc={d} onOpen={open} />)
             ) : (
               <p>Abra uma fonte e escolha “Guardar no caderno”.</p>
             )}
@@ -742,6 +763,7 @@ export default function ResearchWorkspace({ session }) {
             {error || 'Consultando a base do DatumLex…'}{' '}
             {error && (
               <button
+                type="button"
                 className="secondary-button"
                 onClick={() => {
                   setRequest({})
@@ -757,7 +779,7 @@ export default function ResearchWorkspace({ session }) {
             <section className="rw-card rw-results" aria-labelledby="rw-process-title">
               <div className="rw-heading">
                 <h2 id="rw-process-title">Resultados processuais</h2>
-                <button className="rw-link" onClick={() => navigate('coverage')}>Ver cobertura do lote</button>
+                <button type="button" className="rw-link" onClick={() => navigate('coverage')}>Ver cobertura do lote</button>
               </div>
               <div className="rw-funnel" aria-label="Funil de elegibilidade dos processos">
                 <span><strong>{number(m.process_records)}</strong> documentos DataJud</span>
@@ -772,7 +794,7 @@ export default function ResearchWorkspace({ session }) {
                 </span>
               </div>
               <p className="rw-note">
-                Assunto CNJ ativo: <strong>{[...filters.subject].sort().join(', ') || 'Todos no lote'}</strong>
+                Assunto CNJ ativo: <strong>{[...filters.subject].sort(compareText).join(', ') || 'Todos no lote'}</strong>
                 {filters.subject.includes('10431') ? ' (Responsabilidade Civil e descendentes)' : ''}.
                 Processos por data de ajuizamento; cada documento é contado uma vez.
               </p>
@@ -792,12 +814,13 @@ export default function ResearchWorkspace({ session }) {
                 </details>}
                 {data.provider === 'gemini' && (
                   <button
+                    type="button"
                     onClick={() => navigate('chat')}
                   >
                     <Sparkles size={16} /> Interpretar com IA
                   </button>
                 )}{' '}
-                <button onClick={() => navigate('chat')}>
+                <button type="button" onClick={() => navigate('chat')}>
                   <MessageSquare size={16} /> Conversar sobre a pesquisa
                 </button>
               </article>
@@ -808,7 +831,7 @@ export default function ResearchWorkspace({ session }) {
                 </div>
                 {['jurisprudence', 'precedent', 'doctrine'].map((kind) => (
                   <div className="rw-catalog-shortcut" key={kind}>
-                    <button className="rw-link" onClick={() => {
+                    <button type="button" className="rw-link" onClick={() => {
                       setCatalogCategory(kind)
                       navigate('corpus')
                     }}>{sourceLabels[kind]}</button>
@@ -835,6 +858,7 @@ export default function ResearchWorkspace({ session }) {
             <div className="rw-actions">
               {['', ...Object.keys(kinds).filter((k) => k !== 'link')].map((k) => (
                 <button
+                  type="button"
                   className="secondary-button"
                   key={k}
                   aria-pressed={catalogCategory === k}
@@ -854,7 +878,7 @@ export default function ResearchWorkspace({ session }) {
         ) : page === 'precedents' ? (
           <section className="rw-card">
             <h2>Precedentes aprovados</h2>
-            <button className="rw-link" onClick={() => {
+            <button type="button" className="rw-link" onClick={() => {
               setCatalogCategory('precedent')
               navigate('corpus')
             }}>Consultar precedentes no acervo</button>
@@ -915,12 +939,12 @@ export default function ResearchWorkspace({ session }) {
           {selected ? (
             <SourceDetail
               doc={selected}
-              saved={Boolean(saved[selected.id])}
+              saved={saved.has(selected.id)}
               onToggleSave={() =>
                 setSaved((current) => {
-                  const next = { ...current }
-                  if (next[selected.id]) delete next[selected.id]
-                  else next[selected.id] = selected
+                  const next = new Map(current)
+                  if (next.has(selected.id)) next.delete(selected.id)
+                  else next.set(selected.id, selected)
                   return next
                 })
               }
@@ -939,14 +963,14 @@ export default function ResearchWorkspace({ session }) {
               <p>Síntese com filtros, indicadores e fontes citadas.</p>
               <div className="rw-actions">
                 {['pdf', 'xlsx'].map((f) => (
-                  <button className="secondary-button" key={f} onClick={() => exportReport(f)}>
+                  <button type="button" className="secondary-button" key={f} onClick={() => { void exportReport(f) }}>
                     {f === 'pdf' ? 'Síntese em PDF' : 'Síntese em Excel'}
                   </button>
                 ))}
               </div>
               {data?.scope.sources.includes('datajud') && <>
                 <p>Planilha com cada documento DataJud encontrado e os filtros da lista processual.</p>
-                <button className="secondary-button" onClick={() => exportReport('xlsx', 'records')}>
+                <button type="button" className="secondary-button" onClick={() => { void exportReport('xlsx', 'records') }}>
                   Registros DataJud em Excel
                 </button>
               </>}
@@ -1024,7 +1048,7 @@ function SourceDetail({ doc, saved, onToggleSave }) {
             Abrir publicação original
           </a>
         )}
-        <button className="secondary-button" onClick={onToggleSave}>
+        <button type="button" className="secondary-button" onClick={onToggleSave}>
           {saved ? 'Retirar do caderno' : 'Guardar no caderno'}
         </button>
       </div>
@@ -1144,9 +1168,9 @@ function CaseBrowser({ scopeKey }) {
         </details>
       ))}
       <div className="rw-actions">
-        <button className="secondary-button" disabled={page === 1} onClick={() => setPage(page - 1)}>Anterior</button>
+        <button type="button" className="secondary-button" disabled={page === 1} onClick={() => setPage(page - 1)}>Anterior</button>
         <span>Página {page}</span>
-        <button className="secondary-button" disabled={page * 12 >= data.total} onClick={() => setPage(page + 1)}>Próxima</button>
+        <button type="button" className="secondary-button" disabled={page * 12 >= data.total} onClick={() => setPage(page + 1)}>Próxima</button>
       </div>
     </>
   )
@@ -1191,7 +1215,7 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
           Título ou identificador{' '}
           <input type="search" maxLength={120} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
-        <button className="secondary-button">Buscar</button>
+        <button type="submit" className="secondary-button">Buscar</button>
         {category === 'precedent' && <label>
           <input type="checkbox" checked={allDates} onChange={(e) => setAllDates(e.target.checked)} />
           {' '}Buscar precedentes em todas as datas
@@ -1205,11 +1229,12 @@ function CorpusBrowser({ scopeKey, category, onOpen }) {
             <SourceRow key={d.id} doc={d} onOpen={onOpen} />
           ))}
           <div className="rw-actions">
-            <button className="secondary-button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
+            <button type="button" className="secondary-button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
               Anterior
             </button>
             <span>Página {page}</span>
             <button
+              type="button"
               className="secondary-button"
               disabled={page * 12 >= data.total}
               onClick={() => setPage((n) => n + 1)}

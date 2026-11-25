@@ -34,7 +34,7 @@ export default function CorpusPanel({ court, start, end, topic: selectedTopic, o
         if (active) setState({ loading: false, data: null, error: error.name === 'AbortError' ? 'A consulta demorou. Tente novamente.' : error.message })
       } finally { clearTimeout(timer) }
     }
-    load()
+    void load()
     return () => { active = false; clearTimeout(timer); controller.abort() }
   }, [court, start, end, topic, category, completeOnly, includeUndated, query, page, retry])
   const data = state.data

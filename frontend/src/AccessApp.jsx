@@ -61,14 +61,14 @@ export default function AccessApp() {
       } catch (failure) { if (active && failure.status !== 401) setError(failure.message) }
       finally { if (active) setBooting(false) }
     }
-    restore()
+    void restore()
     authRequest('health').then(data => { if (active) setSynthetic(data.synthetic === true) }).catch(() => {})
     return () => { active = false; window.removeEventListener('datumlex:session-ended', expired) }
   }, [])
   useEffect(() => {
     if (!canManage || screen !== 'usuarios' || session.must_change_password) return
     let active = true
-    Promise.resolve().then(() => { if (active) setListLoading(true) })
+    void Promise.resolve().then(() => { if (active) setListLoading(true) })
     authRequest('users').then((data) => { if (active) setUsers(data.users) }).catch((failure) => { if (active) setError(failure.message) }).finally(() => { if (active) setListLoading(false) })
     return () => { active = false }
   }, [canManage, screen, session?.must_change_password])

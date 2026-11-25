@@ -851,13 +851,16 @@ class ResearchWorkspaceTests(TestCase):
         run = ExtractionRun.objects.create(scope=SCOPE)
         load_record(normalize(hit(), SCOPE), run)
         panel = self.client.get("/api/research/" + self.query).json()
-        self.assertEqual(panel["nlp"]["method"], "lexical_metadata_nlp")
-        self.assertIn("textos integrais", panel["nlp"]["limitation"].lower())
+        self.assertEqual(panel["nlp"]["method"], "spacy_tfidf_and_metadata_nlp")
+        self.assertEqual(panel["nlp"]["engine"]["model"], "pt_core_news_sm")
+        self.assertIn("spacy", panel["nlp"]["limitation"].lower())
+        self.assertIn("tf-idf", panel["nlp"]["limitation"].lower())
         topic_ids = {row["id"] for row in panel["nlp"]["scope_metadata_topics"]}
         self.assertIn("dano-moral", topic_ids)
 
         chat = self.ask("Qual a taxa de provimento em dano moral e negativação indevida?").json()
-        self.assertEqual(chat["nlp"]["method"], "lexical_metadata_nlp")
+        self.assertEqual(chat["nlp"]["method"], "spacy_tfidf_and_metadata_nlp")
+        self.assertTrue(len(chat["nlp"]["query_lemmas"]) > 0)
         self.assertEqual(chat["nlp"]["intent"], "outcomes")
         q_ids = {row["id"] for row in chat["nlp"]["query_topics"]}
         self.assertIn("dano-moral", q_ids)

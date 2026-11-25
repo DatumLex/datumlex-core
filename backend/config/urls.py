@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/report.pdf/", pdf_report.report),
     path("api/report.xlsx/", excel_report.report),
     path('api/v2/filter-options/', nlp_dashboard.options),
+    path('api/v2/nlp-insights/', nlp_dashboard.insights),
     path('api/v2/analysis-snapshots/', nlp_dashboard.snapshots),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/', nlp_dashboard.detail),
     path('api/v2/analysis-snapshots/<uuid:snapshot_id>/export/', nlp_dashboard.export),

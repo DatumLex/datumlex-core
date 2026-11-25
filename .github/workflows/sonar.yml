@@ -40,7 +40,7 @@ jobs:
       - name: Instalar dependências Python e Frontend
         run: |
           python -m pip install -r backend/requirements-dev.txt
-          npm --prefix frontend ci
+          npm --prefix frontend ci --ignore-scripts
 
       - name: Rodar testes automatizados e gerar cobertura (HTML + XML + LCOV)
         run: python scripts/test-report.py
@@ -62,23 +62,23 @@ jobs:
             output/coverage/frontend-lcov.info
           if-no-files-found: warn
 
-      - name: Verificar configuração de secrets do SonarQube
+      - name: Verificar configuração de secrets do SonarCloud
         id: sonar_cfg
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
         run: |
-          if [ -n "$SONAR_TOKEN" ] && [ -n "$SONAR_HOST_URL" ]; then
+          if [ -n "$SONAR_TOKEN" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "Artefatos Sonar gerados (backend-coverage.xml, backend-junit.xml, frontend-lcov.info)."
-            echo "Para enviar ao servidor SonarQube/SonarCloud, configure os secrets SONAR_TOKEN e SONAR_HOST_URL."
+            echo "Para enviar ao SonarCloud, configure o secret SONAR_TOKEN nas configurações do repositório."
           fi
 
-      - name: Executar análise SonarQube
+      - name: Executar análise SonarCloud
         if: steps.sonar_cfg.outputs.enabled == 'true'
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}

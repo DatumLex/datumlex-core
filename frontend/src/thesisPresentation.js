@@ -14,8 +14,16 @@ export function thesisTitle(group) {
   for (const [pattern, title] of themes) if (pattern.test(normalized)) return title
   const words = text.split(/\s+/)
   let title = words.slice(0, 7).join(' ')
-  if (title.length > 62) title = title.slice(0, 59).replace(/\s+\S*$/, '')
-  return `${title.replace(/[.,;:—-]+$/, '')}…`
+  if (title.length > 62) {
+    const clipped = title.slice(0, 59)
+    const lastSpace = clipped.lastIndexOf(' ')
+    title = lastSpace > 0 ? clipped.slice(0, lastSpace) : clipped
+  }
+  const trailingPunctuation = new Set(['.', ',', ';', ':', '—', '-'])
+  while (title.length > 0 && trailingPunctuation.has(title.at(-1))) {
+    title = title.slice(0, -1)
+  }
+  return `${title}…`
 }
 
 export function thesisSummary(group) {

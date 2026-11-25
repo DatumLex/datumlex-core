@@ -33,7 +33,7 @@ jobs:
         env:
           POSTGRES_DB: datumlex_ci
           POSTGRES_USER: datumlex_ci
-          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -42,8 +42,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://datumlex_ci:disposable-ci-only@127.0.0.1:5432/datumlex_ci
-      DJANGO_SECRET_KEY: disposable-ci-key-not-for-deployment
+      DATABASE_URL: postgresql://datumlex_ci@127.0.0.1:5432/datumlex_ci
+      DJANGO_SECRET_KEY: ${{ github.run_id }}-ci-ephemeral
       DJANGO_DEBUG: 'false'
       DATAJUD_API_KEY: ''
     defaults:
@@ -85,5 +85,5 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build

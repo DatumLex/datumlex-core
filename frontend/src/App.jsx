@@ -50,7 +50,7 @@ function EvidenceDrawer({ item, onClose }) {
   const sourceLocator = candidate ? item.source_locator : item.reference?.source_locator
   const excerpt = candidate ? null : item.evidence_excerpt
 
-  return <div className="evidence-drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+  return <div className="evidence-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <aside ref={drawerRef} tabIndex={-1} className="evidence-drawer" role="dialog" aria-modal="true" aria-labelledby="evidence-drawer-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose() }}>
       <div className="evidence-drawer-heading"><div><span className="eyebrow">Fonte rastreável</span><h3 id="evidence-drawer-title">{title || identifier || 'Evidência'}</h3></div><button type="button" className="secondary-button" onClick={onClose} aria-label="Fechar fontes">Fechar</button></div>
       <dl className="evidence-drawer-fields">
@@ -266,7 +266,7 @@ export default function App({ court: initialCourt, courts: authorizedCourts, ini
         if (active) setLoading(false)
       }
     }
-    load()
+    void load()
     return () => { active = false; clearTimeout(timeout); controller.abort() }
   }, [applied, retry, court, courts, authorizedCourts, topic, activeTab])
 
